@@ -208,10 +208,21 @@ body {
   font-size: 13px;
 }
 
-.setting-row button {
+.setting-row button,
+.setting-row select {
   flex: none;
   width: auto;
   min-width: 96px;
+}
+
+.setting-row select {
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
 }
 
 .setting-row.danger-row { border-bottom: none; }

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
+import { useT } from "../i18n";
 
 interface Row {
   account: string;
@@ -26,6 +27,7 @@ const NICKNAME_KEY = "dw.nickname";
  * entering is optional.
  */
 export function LeaderboardDialog({ account, onClose }: Props) {
+  const t = useT();
   const { server } = useGameServer();
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -85,45 +87,40 @@ export function LeaderboardDialog({ account, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
-          <h2>순위표</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="닫기">×</button>
+          <h2>{t("board_title")}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="close">×</button>
         </header>
 
         {!HAS_VERSE ? (
-          <p className="modal-note">
-            배포 후에 순위표가 활성화됩니다. <code>npx -y @agent8/deploy</code>
-          </p>
+          <p className="modal-note">{t("board_offline")}</p>
         ) : (
           <>
-            <p className="modal-note">
-              한 판 기록이 아니라 <b>누적 격퇴 횟수</b> 순위입니다. 등록은 선택이며,
-              등록하지 않아도 게임 진행에는 영향이 없습니다.
-            </p>
+            <p className="modal-note">{t("board_note")}</p>
 
             <div className="rank-submit">
               <input
                 value={nickname}
                 maxLength={20}
-                placeholder="표시할 이름"
+                placeholder={t("board_name")}
                 onChange={(e) => setNickname(e.target.value)}
               />
               <button onClick={() => void submit()} disabled={status === "saving"}>
-                {mine ? "갱신" : "등록"}
+                {mine ? t("board_update") : t("board_submit")}
               </button>
             </div>
 
             {error && <p className="modal-note error">{error}</p>}
-            {status === "loading" && <p className="modal-note">불러오는 중…</p>}
+            {status === "loading" && <p className="modal-note">{t("board_loading")}</p>}
 
             <table className="rank-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>이름</th>
-                  <th>격퇴</th>
-                  <th>돌파</th>
-                  <th>위협도</th>
-                  <th>전향</th>
+                  <th>{t("board_rank")}</th>
+                  <th>{t("board_player")}</th>
+                  <th>{t("board_repelled")}</th>
+                  <th>{t("board_breaches")}</th>
+                  <th>{t("stat_threat")}</th>
+                  <th>{t("board_converts")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -138,14 +135,14 @@ export function LeaderboardDialog({ account, onClose }: Props) {
                   </tr>
                 ))}
                 {rows.length === 0 && status === "idle" && (
-                  <tr><td colSpan={6}>아직 등록된 던전이 없습니다.</td></tr>
+                  <tr><td colSpan={6}>{t("board_empty")}</td></tr>
                 )}
               </tbody>
             </table>
 
             {mine && !rows.some((row) => row.account === mine.account) && (
               <p className="modal-note owned">
-                내 기록 — 격퇴 {mine.wavesRepelled} · 돌파 {mine.coreBreaches} · 위협도 {mine.threat}
+                {t("board_mine")} — {t("board_repelled")} {mine.wavesRepelled} · {t("board_breaches")} {mine.coreBreaches}
               </p>
             )}
           </>

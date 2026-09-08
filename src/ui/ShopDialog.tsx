@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+﻿import { useEffect } from "react";
 import { useVXShop } from "@verse8/platform";
+import { useT } from "../i18n";
 import { PRODUCT_ID, type Entitlements } from "../game/types";
 
 const VERSE_ID = import.meta.env.VITE_AGENT8_VERSE as string | undefined;
@@ -17,6 +18,7 @@ interface Props {
  * anything itself; it only re-reads state once the dialog closes.
  */
 export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
+  const t = useT();
   const { items, isLoading, error, buyItem, refresh, onClose: onShopClose } =
     useVXShop({ verseId: VERSE_ID });
 
@@ -33,23 +35,17 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
-          <h2>상점</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="닫기">×</button>
+          <h2>{t("shop_title")}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="close">×</button>
         </header>
 
-        {!VERSE_ID && (
-          <p className="modal-note">
-            아직 배포되지 않아 상점을 불러올 수 없습니다. <code>npx -y @agent8/deploy</code> 후
-            Verse8 대시보드의 VX Shop 탭에서 상품을 등록해야 목록이 표시됩니다.
-          </p>
-        )}
+        {!VERSE_ID && <p className="modal-note">{t("shop_offline")}</p>}
 
-        {VERSE_ID && isLoading && <p className="modal-note">상품 불러오는 중…</p>}
-        {VERSE_ID && error && <p className="modal-note error">상점 오류: {error}</p>}
+        {VERSE_ID && isLoading && <p className="modal-note">{t("shop_loading")}</p>}
+        {VERSE_ID && error && <p className="modal-note error">{error}</p>}
         {VERSE_ID && !isLoading && !error && items.length === 0 && (
           <p className="modal-note">
-            등록된 상품이 없습니다. Verse8 대시보드 → 게임 관리 → VX Shop 탭에서
-            상품 ID <code>{PRODUCT_ID.removeAds}</code>를 등록하고 Active로 전환하세요.
+            {t("shop_empty")} <code>{PRODUCT_ID.removeAds}</code>
           </p>
         )}
 
@@ -70,7 +66,7 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
                   )}
                 </div>
                 <button disabled={blocked} onClick={() => buyItem(item.productId)}>
-                  {owned ? "보유 중" : `${item.price} VX`}
+                  {owned ? t("shop_owned") : `${item.price} VX`}
                 </button>
               </li>
             );
@@ -78,7 +74,7 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
         </ul>
 
         {entitlements.adsRemoved && (
-          <p className="modal-note owned">광고 제거가 적용되어 있습니다.</p>
+          <p className="modal-note owned">{t("shop_ads_removed")}</p>
         )}
       </div>
     </div>

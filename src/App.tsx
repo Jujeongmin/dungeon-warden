@@ -17,6 +17,8 @@ import { TitleScreen } from "./ui/TitleScreen";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
+import { LocaleProvider, type Translate } from "./i18n";
+import { translate, type StringKey } from "./i18n/strings";
 import {
   DIG_COST,
   MAX_ROOMS,
@@ -36,31 +38,32 @@ import {
 } from "./game/types";
 import "./App.css";
 
-const STATUS_LABEL: Record<string, string> = {
-  connecting: "서버 연결 중",
-  loading: "세이브 불러오는 중",
-  ready: "저장됨",
-  saving: "저장 중",
-  offline: "로컬 전용 (미배포)",
-  error: "오류",
+const STATUS_LABEL: Record<string, StringKey> = {
+  connecting: "status_connecting",
+  loading: "status_loading",
+  ready: "status_ready",
+  saving: "status_saving",
+  offline: "status_offline",
+  error: "status_error",
 };
 
-const RAID_ERROR_LABEL: Record<string, string> = {
-  NO_PATH: "입구에서 코어까지 길이 이어져야 침입이 시작됩니다.",
-  NO_SAVE: "세이브를 찾을 수 없습니다.",
+const RAID_ERROR_LABEL: Record<string, StringKey> = {
+  NO_PATH: "need_path",
+  NO_SAVE: "err_no_save",
+  NO_ADVENTURERS: "err_no_adventurers",
 };
 
-const RESEARCH_ERROR: Record<string, string> = {
-  INSUFFICIENT_GOLD: "골드가 부족합니다.",
-  MISSING_PREREQUISITE: "선행 연구가 필요합니다.",
-  ALREADY_RESEARCHED: "이미 연구했습니다.",
+const RESEARCH_ERROR: Record<string, StringKey> = {
+  INSUFFICIENT_GOLD: "err_gold",
+  MISSING_PREREQUISITE: "err_prereq",
+  ALREADY_RESEARCHED: "err_done",
 };
 
 const MS_PER_MINUTE = 60_000;
 
-function remaining(at: number): string {
+function remaining(at: number, t: Translate): string {
   const minutes = Math.max(0, Math.ceil((at - Date.now()) / MS_PER_MINUTE));
-  return minutes <= 0 ? "곧" : `${minutes}분`;
+  return minutes <= 0 ? t("soon") : t("minutes", { n: minutes });
 }
 
 type Tool =
@@ -70,9 +73,9 @@ type Tool =
   | { kind: "trap"; type: TrapType }
   | { kind: "room"; type: RoomType };
 
-const TOOLS: Array<{ id: string; tool: Tool; label: string; cost: number | null }> = [
-  { id: "dig", tool: { kind: "dig" }, label: "굴착", cost: DIG_COST },
-  { id: "remove", tool: { kind: "remove" }, label: "회수", cost: null },
+const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
+  { id: "dig", tool: { kind: "dig" }, label: "tool_dig", cost: DIG_COST },
+  { id: "remove", tool: { kind: "remove" }, label: "tool_remove", cost: null },
   { id: "warrior", tool: { kind: "minion", type: "warrior" }, label: MINION_LABEL.warrior, cost: MINION_COST.warrior },
   { id: "mage", tool: { kind: "minion", type: "mage" }, label: MINION_LABEL.mage, cost: MINION_COST.mage },
   { id: "spike", tool: { kind: "trap", type: "spike" }, label: TRAP_LABEL.spike, cost: TRAP_COST.spike },
@@ -107,6 +110,11 @@ export default function App() {
   const [screen, setScreen] = useState<"title" | "game">("title");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
+
+  const t = useMemo<Translate>(
+    () => (key, vars) => translate(settings.locale, key, vars),
+    [settings.locale],
+  );
 
   const patchSettings = useCallback((patch: Partial<Settings>) => {
     setSettings((current) => {
@@ -194,7 +202,7 @@ export default function App() {
           floaterSeq.current += 1;
           added.push({
             id: floaterSeq.current,
-            text: event.kind === "captured" ? "생포!" : "처치",
+            text: event.kind === "captured" ? t("result_captured") : t("board_repelled"),
             x: at.x,
             y: at.y,
             kind: event.kind,
@@ -207,7 +215,7 @@ export default function App() {
     setFloaters((current) => [...current, ...added].slice(-24));
     const ids = new Set(added.map((f) => f.id));
     window.setTimeout(() => setFloaters((c) => c.filter((f) => !ids.has(f.id))), 1000);
-  }, []);
+  }, [t]);
 
   const raid = useRaid({
     onEvents: onSimEvents,
@@ -224,7 +232,7 @@ export default function App() {
     onFinished: save.applyRaidResult,
   });
 
-  const tool = TOOLS.find((t) => t.id === toolId)?.tool ?? { kind: "dig" as const };
+  const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "dig" as const };
 
   // Browsers only allow an AudioContext to start from a gesture.
   useEffect(() => {
@@ -401,10 +409,10 @@ export default function App() {
   const onReviveAd = useCallback(async () => {
     const revived = await raid.reviveWithAd();
     setAdNotice(
-      revived > 0 ? `부하 ${revived}기가 다시 일어섰습니다` : "광고를 끝까지 봐야 부활합니다",
+      revived > 0 ? t("ad_revived", { n: revived }) : t("ad_not_watched"),
     );
     window.setTimeout(() => setAdNotice(null), 4000);
-  }, [raid]);
+  }, [raid, t]);
 
   // Apply saved preferences once the renderer exists.
   useEffect(() => {
@@ -442,15 +450,17 @@ export default function App() {
     settings.tutorialDone || stepIndex >= TUTORIAL.length ? null : TUTORIAL[stepIndex];
 
   const toolHint = (() => {
-    if (raid.pendingSkill) return `${SKILL_LABEL[raid.pendingSkill]} — 대상 타일을 선택하세요.`;
-    if (tool.kind === "dig") return "암반 타일을 클릭하면 통로가 됩니다.";
-    if (tool.kind === "remove") return "타일 위의 부하 · 함정 · 방을 회수합니다. 환불은 없습니다.";
-    if (tool.kind === "minion") return `통로 타일에 배치합니다. ${minions.length}/${effects.minionCap}`;
-    if (tool.kind === "trap") return `통로 타일에 설치합니다. ${traps.length}/${MAX_TRAPS}`;
-    return `${ROOM_DESCRIPTION[tool.type]} 2×2 통로가 필요합니다. ${rooms.length}/${MAX_ROOMS}`;
+    if (raid.pendingSkill)
+      return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
+    if (tool.kind === "dig") return t("hint_dig");
+    if (tool.kind === "remove") return t("hint_remove");
+    if (tool.kind === "minion") return `${t("hint_minion")} ${minions.length}/${effects.minionCap}`;
+    if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
+    return `${t(ROOM_DESCRIPTION[tool.type] as StringKey)} ${t("hint_room")} ${rooms.length}/${MAX_ROOMS}`;
   })();
 
   return (
+    <LocaleProvider locale={settings.locale}>
     <div className="app">
       <canvas ref={canvasRef} className="viewport" />
 
@@ -466,36 +476,38 @@ export default function App() {
         <div className="brand">DUNGEON WARDEN <span>M6</span></div>
         <div className="stats">
           <span className="gold">🪙 {gold}</span>
-          {meta && <span className="pending">위협도 {meta.threat}</span>}
-          {pendingCost > 0 && <span className="pending">미저장 -{pendingCost}</span>}
-          <span className={`status status-${status}`}>{STATUS_LABEL[status] ?? status}</span>
+          {meta && <span className="pending">{t("stat_threat")} {meta.threat}</span>}
+          {pendingCost > 0 && <span className="pending">{t("stat_unsaved")} -{pendingCost}</span>}
+          <span className={`status status-${status}`}>
+            {STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status}
+          </span>
           <button
             className="icon-toggle"
             onClick={() => patchSettings({ muted: !settings.muted })}
-            title={settings.muted ? "소리 켜기" : "소리 끄기"}
-            aria-label={settings.muted ? "소리 켜기" : "소리 끄기"}
+            title={settings.muted ? t("menu_sound_on") : t("menu_sound_off")}
+            aria-label={settings.muted ? t("menu_sound_on") : t("menu_sound_off")}
           >
             {settings.muted ? "🔇" : "🔊"}
           </button>
           <button className="shop-btn" onClick={() => { audio.play("click"); setBoardOpen(true); }}>
-            순위표
+            {t("menu_leaderboard")}
           </button>
           <button className="shop-btn" onClick={() => { audio.play("click"); setShopOpen(true); }}>
-            상점{entitlements.adsRemoved ? " ·광고 제거됨" : ""}
+            {t("menu_shop")}
           </button>
           <button
             className="icon-toggle"
             onClick={() => { audio.play("click"); setSettingsOpen(true); }}
-            title="설정"
-            aria-label="설정"
+            title={t("menu_settings")}
+            aria-label={t("menu_settings")}
           >
             ⚙
           </button>
           <button
             className="icon-toggle"
             onClick={() => { audio.play("click"); setScreen("title"); }}
-            title="타이틀로"
-            aria-label="타이틀로"
+            title={t("menu_home")}
+            aria-label={t("menu_home")}
             disabled={raid.raiding}
           >
             ⌂
@@ -508,42 +520,43 @@ export default function App() {
       <div className="topstack">
         {isOffline && showOfflineBanner && (
           <div className="banner">
-            <button className="banner-close" onClick={() => setShowOfflineBanner(false)} aria-label="닫기">×</button>
-            아직 배포되지 않아 <code>VITE_AGENT8_VERSE</code>가 없습니다. 로컬 전용 모드로 실행 중이며
-            <b> 진행이 저장되지 않습니다</b>. <code>npx -y @agent8/deploy</code> 실행 후 다시 열면 세이브가 붙습니다.
+            <button className="banner-close" onClick={() => setShowOfflineBanner(false)} aria-label="close">×</button>
+            {t("banner_offline")}
           </div>
         )}
 
-        {error && <div className="banner banner-error">저장 오류: {error}</div>}
+        {error && <div className="banner banner-error">{t("save_error")}: {error}</div>}
         {raid.error && (
           <div className="banner banner-error">
-            {RAID_ERROR_LABEL[raid.error] ?? `침입 오류: ${raid.error}`}
+            {RAID_ERROR_LABEL[raid.error]
+              ? t(RAID_ERROR_LABEL[raid.error])
+              : `${t("raid_error")}: ${raid.error}`}
           </div>
         )}
 
         {step && !raid.raiding && (
           <div className="tutorial">
             <div className="tutorial-head">
-              <b>{stepIndex + 1}/{TUTORIAL.length} · {step.title}</b>
+              <b>{stepIndex + 1}/{TUTORIAL.length} · {t(step.title as StringKey)}</b>
               <button
                 className="icon-btn"
                 onClick={() => patchSettings({ tutorialDone: true })}
-                aria-label="튜토리얼 닫기"
+                aria-label="close"
               >
                 ×
               </button>
             </div>
-            <p>{step.body}</p>
+            <p>{t(step.body as StringKey)}</p>
           </div>
         )}
 
         {raid.raiding && raid.raidState && (
           <div className="raid-bar">
-            <b>침입 중</b>
-            <span>모험가 {raid.raidState.adventurers.filter((a) => a.alive).length}/{raid.raidState.adventurers.length}</span>
-            <span>부하 {raid.raidState.minions.filter((m) => m.alive).length}/{raid.raidState.minions.length}</span>
-            <span>함정 {raid.raidState.trapDamage}</span>
-            <span>{raid.raidState.elapsed.toFixed(0)}초</span>
+            <b>{t("raiding")}</b>
+            <span>{t("raid_adventurers")} {raid.raidState.adventurers.filter((a) => a.alive).length}/{raid.raidState.adventurers.length}</span>
+            <span>{t("raid_minions")} {raid.raidState.minions.filter((m) => m.alive).length}/{raid.raidState.minions.length}</span>
+            <span>{t("raid_traps")} {raid.raidState.trapDamage}</span>
+            <span>{raid.raidState.elapsed.toFixed(0)}{t("seconds")}</span>
             <div className="speeds">
               {RAID_SPEEDS.map((s) => (
                 <button key={s} className={raid.speed === s ? "active" : ""} onClick={() => raid.setSpeed(s)}>
@@ -566,8 +579,14 @@ export default function App() {
                 disabled={cd > 0}
                 onClick={() => { audio.play("skill"); raid.useSkill(skill); }}
               >
-                <b>{SKILL_LABEL[skill]}</b>
-                <i>{cd > 0 ? `${cd.toFixed(0)}초` : SKILL_STATS[skill].targeted ? "대상 지정" : "사용 가능"}</i>
+                <b>{t(SKILL_LABEL[skill] as StringKey)}</b>
+                <i>
+                  {cd > 0
+                    ? `${cd.toFixed(0)}${t("seconds")}`
+                    : SKILL_STATS[skill].targeted
+                      ? t("skill_target")
+                      : t("skill_ready")}
+                </i>
               </button>
             );
           })}
@@ -576,8 +595,8 @@ export default function App() {
               back — an ad button that does nothing is worse than none. */}
           {!raid.adUsed && raid.fallenMinions > 0 && (
             <button className="skill ad" disabled={raid.adBusy} onClick={() => void onReviveAd()}>
-              <b>{raid.adBusy ? "광고 재생 중…" : "부하 부활"}</b>
-              <i>광고 시청 · {raid.fallenMinions}기</i>
+              <b>{raid.adBusy ? t("ad_playing") : t("ad_revive")}</b>
+              <i>{t("ad_watch")} · {raid.fallenMinions}</i>
             </button>
           )}
         </div>
@@ -587,38 +606,37 @@ export default function App() {
         <div className="modal-backdrop" onClick={raid.dismissResult}>
           <div className="modal narrow" onClick={(e) => e.stopPropagation()}>
             <header className="modal-head">
-              <h2>{raid.result.outcome === "repelled" ? "격퇴 성공" : "코어 돌파당함"}</h2>
-              <button className="icon-btn" onClick={raid.dismissResult} aria-label="닫기">×</button>
+              <h2>{raid.result.outcome === "repelled" ? t("result_repelled") : t("result_breached")}</h2>
+              <button className="icon-btn" onClick={raid.dismissResult} aria-label="close">×</button>
             </header>
             <p className="modal-note">
               {raid.result.outcome === "repelled"
-                ? "모험가들이 물러났습니다. 다음에는 더 강해져서 돌아옵니다."
-                : "코어가 털렸습니다. 던전 구조와 부하는 그대로 남아 있습니다."}
+                ? t("result_repelled_note")
+                : t("result_breached_note")}
             </p>
             {raid.result.capturedNames && raid.result.capturedNames.length > 0 && (
               <p className="modal-note owned">
-                생포: {raid.result.capturedNames.join(", ")} — 감옥에서 전향을 기다립니다.
+                {t("result_captured")}: {raid.result.capturedNames.join(", ")} — {t("result_captured_note")}
               </p>
             )}
             {raid.result.lootGained && raid.result.lootGained.length > 0 && (
               <p className="modal-note">
-                노획: {raid.result.lootGained.map((l) => `T${l.tier} 무기`).join(", ")}
+                {t("result_loot")}: {raid.result.lootGained.map((l) => `T${l.tier} ${t("weapon")}`).join(", ")}
               </p>
             )}
             {raid.result.local ? (
               <p className="modal-note warn">
-                로컬 전용 모드라 보상과 기록이 반영되지 않습니다. 배포 후에는
-                골드·위협도·누적 전적이 서버에 저장됩니다.
+                {t("result_local")}
               </p>
             ) : (
               <ul className="result-list">
-                <li><span>보상</span><b>+{raid.result.reward}</b></li>
+                <li><span>{t("result_reward")}</span><b>+{raid.result.reward}</b></li>
                 {raid.result.plundered > 0 && (
-                  <li><span>약탈당한 골드</span><b className="bad">-{raid.result.plundered}</b></li>
+                  <li><span>{t("result_plundered")}</span><b className="bad">-{raid.result.plundered}</b></li>
                 )}
-                <li><span>위협도</span><b>{raid.result.threat}</b></li>
-                <li><span>누적 격퇴</span><b>{raid.result.wavesRepelled}</b></li>
-                <li><span>누적 돌파</span><b>{raid.result.coreBreaches}</b></li>
+                <li><span>{t("stat_threat")}</span><b>{raid.result.threat}</b></li>
+                <li><span>{t("result_waves")}</span><b>{raid.result.wavesRepelled}</b></li>
+                <li><span>{t("result_breaches")}</span><b>{raid.result.coreBreaches}</b></li>
               </ul>
             )}
           </div>
@@ -627,12 +645,12 @@ export default function App() {
 
       <aside className={hudOpen ? "hud" : "hud collapsed"}>
         <div className="hud-tabs">
-          <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>건설</button>
-          <button className={tab === "manage" ? "active" : ""} onClick={() => { audio.play("click"); setTab("manage"); }}>관리</button>
+          <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>{t("tab_build")}</button>
+          <button className={tab === "manage" ? "active" : ""} onClick={() => { audio.play("click"); setTab("manage"); }}>{t("tab_manage")}</button>
           <button className={tab === "research" ? "active" : ""} onClick={() => { audio.play("click"); setTab("research"); }}>
-            연구 {research.length}/{RESEARCH.length}
+            {t("tab_research")} {research.length}/{RESEARCH.length}
           </button>
-          <button className="hud-toggle" onClick={() => setHudOpen(!hudOpen)} aria-label={hudOpen ? "접기" : "펼치기"}>
+          <button className="hud-toggle" onClick={() => setHudOpen(!hudOpen)} aria-label="toggle">
             {hudOpen ? "▾" : "▴"}
           </button>
         </div>
@@ -641,22 +659,23 @@ export default function App() {
           {tab === "build" && (
             <>
               <div className="toolbar">
-                {TOOLS.map((t) => {
+                {TOOLS.map((entry) => {
                   const locked =
-                    (t.tool.kind === "minion" && !unlocked.unlockedMinions.includes(t.tool.type)) ||
-                    (t.tool.kind === "trap" && !unlocked.unlockedTraps.includes(t.tool.type)) ||
-                    (t.tool.kind === "room" && !unlocked.unlockedRooms.includes(t.tool.type));
+                    (entry.tool.kind === "minion" && !unlocked.unlockedMinions.includes(entry.tool.type)) ||
+                    (entry.tool.kind === "trap" && !unlocked.unlockedTraps.includes(entry.tool.type)) ||
+                    (entry.tool.kind === "room" && !unlocked.unlockedRooms.includes(entry.tool.type));
+                  const label = t(entry.label);
 
                   return (
                     <button
-                      key={t.id}
-                      className={toolId === t.id ? "tool active" : "tool"}
-                      onClick={() => { audio.play("click"); setToolId(t.id); }}
+                      key={entry.id}
+                      className={toolId === entry.id ? "tool active" : "tool"}
+                      onClick={() => { audio.play("click"); setToolId(entry.id); }}
                       disabled={raid.raiding || locked}
-                      title={locked ? "연구로 해금해야 합니다" : undefined}
+                      title={locked ? t("locked_hint") : undefined}
                     >
-                      <b>{locked ? `🔒 ${t.label}` : t.label}</b>
-                      <i>{t.cost === null ? "무료" : `${t.cost}G`}</i>
+                      <b>{locked ? `🔒 ${label}` : label}</b>
+                      <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
                     </button>
                   );
                 })}
@@ -664,10 +683,10 @@ export default function App() {
 
               <p className="hint">{toolHint}</p>
               <p className="hint small">
-                부하 {minions.length}/{effects.minionCap} · 함정 {traps.length}/{MAX_TRAPS} · 방 {rooms.length}/{MAX_ROOMS}
-                {effects.jailCapacity > 0 && ` · 감옥 ${prisoners.length}/${effects.jailCapacity}`}
+                {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
+                {effects.jailCapacity > 0 && ` · ${t("count_jail")} ${prisoners.length}/${effects.jailCapacity}`}
               </p>
-              <p className="hint small">드래그 팬 · 휠/핀치 줌 · Q/E 90° 회전</p>
+              <p className="hint small">{t("controls")}</p>
 
               <div className="actions">
                 <button
@@ -675,24 +694,24 @@ export default function App() {
                   onClick={() => { audio.play("raidStart"); void raid.startRaid(); }}
                   disabled={raid.raiding || raid.starting || !raid.pathExists || hasUnsaved}
                 >
-                  {raid.starting ? "준비 중…" : "침입 시작"}
+                  {raid.starting ? t("preparing") : t("start_raid")}
                 </button>
               </div>
-              {!raid.pathExists && <p className="hint small warn">입구에서 코어까지 길이 이어져야 합니다.</p>}
-              {hasUnsaved && <p className="hint small warn">저장하지 않은 변경이 있습니다.</p>}
+              {!raid.pathExists && <p className="hint small warn">{t("need_path")}</p>}
+              {hasUnsaved && <p className="hint small warn">{t("unsaved_changes")}</p>}
 
               <div className="actions">
-                <button onClick={() => void save.saveNow()} disabled={!hasUnsaved}>지금 저장</button>
+                <button onClick={() => void save.saveNow()} disabled={!hasUnsaved}>{t("save_now")}</button>
                 <button className="danger" onClick={() => void save.resetGame()} disabled={raid.raiding}>
-                  던전 초기화
+                  {t("settings_reset")}
                 </button>
               </div>
               {adNotice && <p className="hint small">{adNotice}</p>}
 
               <p className="hint small">
-                {hover ? `타일 (${hover.x}, ${hover.y})` : "타일 위에 커서를 올려보세요"}
-                {pendingDigs > 0 && ` · 굴착 대기 ${pendingDigs}칸`}
-                {lastSavedAt && ` · 저장 ${new Date(lastSavedAt).toLocaleTimeString()}`}
+                {hover ? `${t("tile")} (${hover.x}, ${hover.y})` : t("hover_hint")}
+                {pendingDigs > 0 && ` · ${t("pending_digs")} ${pendingDigs}`}
+                {lastSavedAt && ` · ${t("saved_at")} ${new Date(lastSavedAt).toLocaleTimeString()}`}
               </p>
             </>
           )}
@@ -700,16 +719,16 @@ export default function App() {
           {tab === "manage" && (
             <>
               {loot.length === 0 && prisoners.length === 0 && adventurers.length === 0 && (
-                <p className="hint">아직 관리할 것이 없습니다. 침입을 한 번 막아보세요.</p>
+                <p className="hint">{t("manage_empty")}</p>
               )}
 
               {loot.length > 0 && (
                 <>
-                  <h3 className="section">노획 장비 {loot.length}</h3>
+                  <h3 className="section">{t("manage_loot")} {loot.length}</h3>
                   {minions.map((minion) => (
                     <label key={minion.id} className="equip-row">
                       <span>
-                        {MINION_LABEL[minion.type]}
+                        {t(MINION_LABEL[minion.type] as StringKey)}
                         {minion.type === "convert" && minion.level ? ` Lv${minion.level}` : ""}
                         {` (${minion.x},${minion.y})`}
                       </span>
@@ -718,7 +737,7 @@ export default function App() {
                         disabled={raid.raiding}
                         onChange={(e) => save.equipWeapon(minion.id, e.target.value || null)}
                       >
-                        <option value="">없음</option>
+                        <option value="">{t("manage_none")}</option>
                         {loot.map((item) => (
                           <option key={item.id} value={item.id}>
                             T{item.tier} (+{Math.round(15 * item.tier)}%)
@@ -732,10 +751,10 @@ export default function App() {
 
               {prisoners.length > 0 && (
                 <>
-                  <h3 className="section">감옥 {prisoners.length}/{effects.jailCapacity}</h3>
+                  <h3 className="section">{t("manage_jail")} {prisoners.length}/{effects.jailCapacity}</h3>
                   {prisoners.map((p) => (
                     <p key={p.advId} className="hint small">
-                      {p.name} Lv{p.level} — 전향까지 {remaining(p.convertsAt)}
+                      {p.name} Lv{p.level} — {t("converts_in", { t: remaining(p.convertsAt, t) })}
                     </p>
                   ))}
                 </>
@@ -743,17 +762,17 @@ export default function App() {
 
               {adventurers.length > 0 && (
                 <>
-                  <h3 className="section">숙적 {adventurers.filter((a) => a.state !== "converted").length}</h3>
+                  <h3 className="section">{t("manage_nemesis")} {adventurers.filter((a) => a.state !== "converted").length}</h3>
                   {adventurers.map((a) => (
                     <p key={a.id} className="hint small">
-                      {a.name} Lv{a.level} · {a.raids}회 ·{" "}
+                      {a.name} Lv{a.level} · {t("times", { n: a.raids })} ·{" "}
                       {a.state === "captured"
-                        ? "감옥"
+                        ? t("state_jailed")
                         : a.state === "converted"
-                          ? "전향함"
+                          ? t("state_converted")
                           : a.returnsAt > Date.now()
-                            ? `${remaining(a.returnsAt)} 후 재도전`
-                            : "대기 중"}
+                            ? t("returns_in", { t: remaining(a.returnsAt, t) })
+                            : t("state_waiting")}
                     </p>
                   ))}
                 </>
@@ -764,21 +783,26 @@ export default function App() {
           {tab === "research" && (
             <>
               {researchError && (
-                <p className="hint small warn">{RESEARCH_ERROR[researchError] ?? researchError}</p>
+                <p className="hint small warn">
+                  {RESEARCH_ERROR[researchError] ? t(RESEARCH_ERROR[researchError]) : researchError}
+                </p>
               )}
               {RESEARCH.map((node) => {
                 const owned = research.includes(node.id);
                 const available = isAvailable(node, research);
                 const missing = (node.requires ?? [])
                   .filter((id) => !research.includes(id))
-                  .map((id) => RESEARCH_BY_ID.get(id)?.label ?? id);
+                  .map((id) => {
+                    const label = RESEARCH_BY_ID.get(id)?.label;
+                    return label ? t(label as StringKey) : id;
+                  });
 
                 return (
                   <div key={node.id} className={owned ? "research owned" : "research"}>
                     <div className="research-head">
-                      <b>{node.label}</b>
+                      <b>{t(node.label as StringKey)}</b>
                       {owned ? (
-                        <span className="ok">보유</span>
+                        <span className="ok">{t("research_owned")}</span>
                       ) : (
                         <button
                           disabled={!available || gold < node.cost || raid.raiding}
@@ -792,9 +816,9 @@ export default function App() {
                         </button>
                       )}
                     </div>
-                    <p className="hint small">{node.note}</p>
+                    <p className="hint small">{t(node.note as StringKey)}</p>
                     {!owned && missing.length > 0 && (
-                      <p className="hint small warn">선행: {missing.join(", ")}</p>
+                      <p className="hint small warn">{t("research_requires")}: {missing.join(", ")}</p>
                     )}
                   </div>
                 );
@@ -851,5 +875,6 @@ export default function App() {
         />
       )}
     </div>
+    </LocaleProvider>
   );
 }

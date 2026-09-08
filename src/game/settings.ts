@@ -6,11 +6,14 @@
  * and writing them does not need a server round trip.
  */
 
+import { detectLocale, type Locale } from "../i18n/strings";
+
 export type Quality = "low" | "high";
 
 export interface Settings {
   muted: boolean;
   quality: Quality;
+  locale: Locale;
   /** Set once the player has seen the opening explanation. */
   introSeen: boolean;
   /** Set when the player dismisses the step-by-step hints. */
@@ -22,18 +25,22 @@ const KEY = "dw.settings";
 export const DEFAULT_SETTINGS: Settings = {
   muted: false,
   quality: "high",
+  locale: "en",
   introSeen: false,
   tutorialDone: false,
 };
 
 export function loadSettings(): Settings {
+  // First run follows the browser's language; after that the player's choice
+  // wins, including a deliberate switch back to the browser default.
+  const base: Settings = { ...DEFAULT_SETTINGS, locale: detectLocale() };
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    if (!raw) return base;
+    return { ...base, ...(JSON.parse(raw) as Partial<Settings>) };
   } catch {
     // Private browsing, blocked storage, or corrupt JSON.
-    return { ...DEFAULT_SETTINGS };
+    return base;
   }
 }
 

@@ -1,3 +1,5 @@
+import { useT } from "../i18n";
+
 interface Props {
   /** True when the dungeon has already been played. */
   hasProgress: boolean;
@@ -29,39 +31,34 @@ export function TitleScreen({
   onLeaderboard,
   onShop,
 }: Props) {
+  const t = useT();
+
   return (
     <div className="title">
       <div className="title-inner">
-        <p className="title-kicker">모험가가 아니라, 던전이 되어라</p>
+        <p className="title-kicker">{t("title_kicker")}</p>
         <h1 className="title-name">DUNGEON WARDEN</h1>
-        <p className="title-line">
-          방을 파고 함정을 놓고 부하를 세워, 몇 번이고 다시 찾아오는 모험가를 막아내세요.
-          쓰러뜨린 자는 장비를 남기고, 사로잡은 자는 당신의 편이 됩니다.
-        </p>
+        <p className="title-line">{t("title_line")}</p>
 
         {hasProgress && summary && (
           <div className="title-save">
-            <span>위협도 {summary.threat}</span>
-            <span>격퇴 {summary.wavesRepelled}</span>
-            <span>돌파 {summary.coreBreaches}</span>
+            <span>{t("stat_threat")} {summary.threat}</span>
+            <span>{t("board_repelled")} {summary.wavesRepelled}</span>
+            <span>{t("board_breaches")} {summary.coreBreaches}</span>
           </div>
         )}
 
         <button className="title-start" onClick={onStart} disabled={loading}>
-          {loading ? "던전을 불러오는 중…" : hasProgress ? "이어하기" : "던전 파기 시작"}
+          {loading ? t("title_loading") : hasProgress ? t("title_continue") : t("title_start")}
         </button>
 
         <div className="title-menu">
-          <button onClick={onSettings}>설정</button>
-          <button onClick={onLeaderboard}>순위표</button>
-          <button onClick={onShop}>상점</button>
+          <button onClick={onSettings}>{t("menu_settings")}</button>
+          <button onClick={onLeaderboard}>{t("menu_leaderboard")}</button>
+          <button onClick={onShop}>{t("menu_shop")}</button>
         </div>
 
-        {offline && (
-          <p className="title-note">
-            로컬 전용 모드입니다. 진행이 저장되지 않습니다.
-          </p>
-        )}
+        {offline && <p className="title-note">{t("title_offline")}</p>}
       </div>
     </div>
   );

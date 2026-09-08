@@ -1,3 +1,5 @@
+import type { StringKey } from "../i18n/strings";
+
 export const TILE = {
   ROCK: 0,
   FLOOR: 1,
@@ -89,12 +91,12 @@ export type WardenSkill = "blessing" | "rally" | "detonate";
 
 export type AdventurerClass = "knight" | "barbarian" | "rogue" | "mage" | "ranger";
 
-export const ADVENTURER_LABEL: Record<AdventurerClass, string> = {
-  knight: "기사",
-  barbarian: "바바리안",
-  rogue: "로그",
-  mage: "메이지",
-  ranger: "레인저",
+export const ADVENTURER_LABEL: Record<AdventurerClass, StringKey> = {
+  knight: "adv_knight",
+  barbarian: "adv_barbarian",
+  rogue: "adv_rogue",
+  mage: "adv_mage",
+  ranger: "adv_ranger",
 };
 
 export interface PartyMember {
@@ -205,10 +207,11 @@ export const MINION_COST: Record<MinionType, number> = {
   convert: 0,
 };
 
-export const MINION_LABEL: Record<MinionType, string> = {
-  warrior: "스켈레톤 워리어",
-  mage: "스켈레톤 메이지",
-  convert: "전향한 모험가",
+/** Translation keys rather than text, so content names follow the locale. */
+export const MINION_LABEL: Record<MinionType, StringKey> = {
+  warrior: "minion_warrior",
+  mage: "minion_mage",
+  convert: "minion_convert",
 };
 
 export const TRAP_COST: Record<TrapType, number> = {
@@ -218,11 +221,11 @@ export const TRAP_COST: Record<TrapType, number> = {
   flame: 55,
 };
 
-export const TRAP_LABEL: Record<TrapType, string> = {
-  spike: "가시 함정",
-  arrow: "화살 함정",
-  rockfall: "낙석 함정",
-  flame: "화염 함정",
+export const TRAP_LABEL: Record<TrapType, StringKey> = {
+  spike: "trap_spike",
+  arrow: "trap_arrow",
+  rockfall: "trap_rockfall",
+  flame: "trap_flame",
 };
 
 export const MAX_TRAPS = 10;
@@ -236,28 +239,28 @@ export const ROOM_COST: Record<RoomType, number> = {
   jail: 150,
 };
 
-export const ROOM_LABEL: Record<RoomType, string> = {
-  treasury: "보물방",
-  vault: "창고",
-  barracks: "병영",
-  altar: "제단",
-  workshop: "작업장",
-  jail: "감옥",
+export const ROOM_LABEL: Record<RoomType, StringKey> = {
+  treasury: "room_treasury",
+  vault: "room_vault",
+  barracks: "room_barracks",
+  altar: "room_altar",
+  workshop: "room_workshop",
+  jail: "room_jail",
 };
 
-export const ROOM_DESCRIPTION: Record<RoomType, string> = {
-  treasury: "침입자를 끌어들이고 격퇴 시 추가 골드. 위협도가 오릅니다.",
-  vault: "돌파당했을 때 약탈량 감소.",
-  barracks: "부하 배치 한도 +2.",
-  altar: "쓰러진 부하의 부활 대기 단축.",
-  workshop: "함정 재장전 속도 증가.",
-  jail: "제압한 모험가를 생포해 가둡니다. 시간이 지나면 내 편이 됩니다.",
+export const ROOM_DESCRIPTION: Record<RoomType, StringKey> = {
+  treasury: "room_treasury_desc",
+  vault: "room_vault_desc",
+  barracks: "room_barracks_desc",
+  altar: "room_altar_desc",
+  workshop: "room_workshop_desc",
+  jail: "room_jail_desc",
 };
 
 export const MAX_ROOMS = 6;
 
-export const SKILL_LABEL: Record<WardenSkill, string> = {
-  blessing: "어둠의 가호",
-  rally: "집결",
-  detonate: "강제 발동",
+export const SKILL_LABEL: Record<WardenSkill, StringKey> = {
+  blessing: "skill_blessing",
+  rally: "skill_rally",
+  detonate: "skill_detonate",
 };

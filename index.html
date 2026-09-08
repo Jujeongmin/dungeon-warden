@@ -68,9 +68,15 @@
     <div id="root">
       <div class="boot">
         <div class="boot-title">DUNGEON WARDEN</div>
-        <div class="boot-sub">던전을 준비하는 중…</div>
+        <div class="boot-sub" id="boot-sub">Preparing the dungeon…</div>
       </div>
     </div>
+    <script>
+      // Shown before the bundle loads, so it cannot use the React translator.
+      if ((navigator.language || "").toLowerCase().startsWith("ko")) {
+        document.getElementById("boot-sub").textContent = "던전을 준비하는 중…";
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,4 +1,6 @@
-import type { Quality, Settings } from "../game/settings";
+import { useT } from "../i18n";
+import { LOCALE_LABEL, type Locale } from "../i18n/strings";
+import type { Settings } from "../game/settings";
 
 interface Props {
   settings: Settings;
@@ -9,10 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-const QUALITY_LABEL: Record<Quality, string> = {
-  high: "높음",
-  low: "낮음 (성능 우선)",
-};
+const LOCALES: Locale[] = ["ko", "en"];
 
 export function SettingsDialog({
   settings,
@@ -22,47 +21,57 @@ export function SettingsDialog({
   resetDisabled,
   onClose,
 }: Props) {
+  const t = useT();
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal narrow" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
-          <h2>설정</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="닫기">×</button>
+          <h2>{t("menu_settings")}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="close">×</button>
         </header>
 
         <div className="setting-row">
-          <span>소리</span>
+          <span>{t("settings_language")}</span>
+          <select
+            value={settings.locale}
+            onChange={(e) => onChange({ locale: e.target.value as Locale })}
+          >
+            {LOCALES.map((locale) => (
+              <option key={locale} value={locale}>{LOCALE_LABEL[locale]}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="setting-row">
+          <span>{t("settings_sound")}</span>
           <button onClick={() => onChange({ muted: !settings.muted })}>
-            {settings.muted ? "꺼짐" : "켜짐"}
+            {settings.muted ? t("settings_off") : t("settings_on")}
           </button>
         </div>
 
         <div className="setting-row">
-          <span>그래픽 품질</span>
+          <span>{t("settings_quality")}</span>
           <button
             onClick={() => onChange({ quality: settings.quality === "high" ? "low" : "high" })}
           >
-            {QUALITY_LABEL[settings.quality]}
+            {settings.quality === "high" ? t("settings_quality_high") : t("settings_quality_low")}
           </button>
         </div>
-        <p className="hint small">
-          낮음은 렌더 해상도를 1배로 고정합니다. 모바일에서 프레임이 떨어질 때 쓰세요.
-        </p>
+        <p className="hint small">{t("settings_quality_note")}</p>
 
         <div className="setting-row">
-          <span>튜토리얼</span>
-          <button onClick={onReplayTutorial}>다시 보기</button>
+          <span>{t("settings_tutorial")}</span>
+          <button onClick={onReplayTutorial}>{t("settings_replay")}</button>
         </div>
 
         <div className="setting-row danger-row">
-          <span>던전 초기화</span>
+          <span>{t("settings_reset")}</span>
           <button className="danger" disabled={resetDisabled} onClick={onResetDungeon}>
-            초기화
+            {t("settings_reset_action")}
           </button>
         </div>
-        <p className="hint small warn">
-          던전 구조·부하·연구가 모두 사라집니다. 되돌릴 수 없습니다.
-        </p>
+        <p className="hint small warn">{t("settings_reset_note")}</p>
       </div>
     </div>
   );
