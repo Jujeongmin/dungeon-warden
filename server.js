@@ -1404,4 +1404,59 @@ class Server {
   async ping() {
     return { pong: Date.now(), account: $sender.account };
   }
+
+  /**
+   * Reports which host capabilities the sandbox actually exposes.
+   *
+   * Rewarded-ad payouts need an outbound HTTP call to the Verse8 verifier, and
+   * `fetch` turned out to be absent. This says what, if anything, can replace
+   * it. Returns only capability names — no state, no secrets.
+   */
+  async capabilities() {
+    const names = [
+      "fetch",
+      "XMLHttpRequest",
+      "Request",
+      "Response",
+      "Headers",
+      "WebSocket",
+      "require",
+      "process",
+      "Buffer",
+      "crypto",
+      "TextEncoder",
+      "setTimeout",
+      "$http",
+      "$fetch",
+      "$net",
+      "$request",
+      "$verse8",
+      "$ads",
+      "$lock",
+      "$asset",
+      "$global",
+      "$sender",
+    ];
+
+    const found = {};
+    for (const name of names) {
+      try {
+        found[name] = typeof globalThis[name];
+      } catch (error) {
+        found[name] = "error";
+      }
+    }
+
+    // Anything else the platform injected that is not a standard JS global.
+    let injected = [];
+    try {
+      injected = Object.getOwnPropertyNames(globalThis).filter(
+        (key) => key.startsWith("$") || key.startsWith("agent8") || key.startsWith("verse"),
+      );
+    } catch (error) {
+      injected = ["enumeration_failed"];
+    }
+
+    return { found, injected };
+  }
 }

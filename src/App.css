@@ -10,6 +10,36 @@
 
 * { box-sizing: border-box; }
 
+/* The browser's default scrollbar is a bright slab that cuts through a dark
+   dungeon UI. These are thin, dim, and only visible against the panel they
+   belong to. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 124, 102, 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(140, 124, 102, 0.4);
+  border-radius: 99px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 164, 76, 0.55);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;

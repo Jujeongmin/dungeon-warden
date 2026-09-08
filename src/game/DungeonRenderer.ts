@@ -133,7 +133,8 @@ export class DungeonRenderer {
 
   /** Per-unit animation state, only populated when a model has clips. */
   private mixers = new Map<string, { mixer: THREE.AnimationMixer; current: string | null; actions: Map<string, THREE.AnimationAction> }>();
-  private clock = new THREE.Clock();
+  /** THREE.Clock is deprecated, and a timestamp is all the loop needs. */
+  private lastTick = performance.now();
 
   /** Transient combat effects: hit flashes and trap rings. */
   private flashes = new Map<string, number>();
@@ -843,7 +844,11 @@ export class DungeonRenderer {
     if (this.disposed) return;
     this.frameId = requestAnimationFrame(this.loop);
 
-    const delta = this.clock.getDelta();
+    const now = performance.now();
+    // Clamped so a backgrounded tab does not resume with a huge jump.
+    const delta = Math.min((now - this.lastTick) / 1000, 0.25);
+    this.lastTick = now;
+
     for (const entry of this.mixers.values()) entry.mixer.update(delta);
     this.updateEffects(delta);
 

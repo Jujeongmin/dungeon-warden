@@ -18,3 +18,12 @@ export function installDevTools(handle: Record<string, unknown>): void {
     sim: { RaidSim, SIM_DT, findPath, MINION_STATS, ADVENTURER_STATS, scaledAdventurer },
   };
 }
+
+/**
+ * Lets the console call any server function directly, which is how the
+ * server-side paths get exercised without building UI for each one.
+ */
+export function installServerProbe(call: (fn: string, args: unknown[]) => Promise<unknown>): void {
+  if (!import.meta.env.DEV) return;
+  (window as unknown as Record<string, unknown>).__call = call;
+}

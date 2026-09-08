@@ -5,6 +5,7 @@ import { maybeShowInterstitial, showGoldRefillAd, AD_PLACEMENT } from "./ads";
 import { addCost, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
+import { installServerProbe } from "./devtools";
 import {
   DIG_COST,
   EMPTY_ENTITLEMENTS,
@@ -109,6 +110,12 @@ export function useDungeonSave() {
 
   const effects = roomEffects(rooms);
   const unlocked = researchEffects(research);
+
+  // Dev-only console access to the server, for exercising functions that have
+  // no UI path yet.
+  useEffect(() => {
+    installServerProbe((fn, args) => server.remoteFunction(fn, args as unknown[]));
+  }, [server]);
 
   const applyLoad = useCallback((result: LoadResult) => {
     const grid = new Grid(result.dungeon.grid);

@@ -1,13 +1,76 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>dungeon-warden</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#14120f" />
+    <title>Dungeon Warden</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #14120f;
+        color: #efe7d8;
+        font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      /* Shown until React mounts. The 3D scene and its models take a moment,
+         and a black rectangle reads as a broken embed. */
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: #14120f;
+      }
+
+      .boot-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+      }
+
+      .boot-sub {
+        font-size: 0.8rem;
+        color: #a4998a;
+      }
+    </style>
+    <script>
+      // Verse8 embeds the game in an iframe and asks it how tall it is.
+      // Without this the shell cannot size the frame correctly.
+      (function () {
+        function reportGameSize() {
+          const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          const width = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth);
+
+          window.parent.postMessage(
+            { type: 'GAME_SIZE_RESPONSE', height: height, width: width },
+            '*',
+          );
+        }
+
+        window.addEventListener('load', reportGameSize);
+        window.addEventListener('resize', reportGameSize);
+        window.addEventListener('message', function (event) {
+          if (event.data && event.data.type === 'REQUEST_GAME_SIZE') {
+            reportGameSize();
+          }
+        });
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot">
+        <div class="boot-title">DUNGEON WARDEN</div>
+        <div class="boot-sub">던전을 준비하는 중…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
