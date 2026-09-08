@@ -148,6 +148,7 @@ export class DungeonRenderer {
   private hovered: { x: number; y: number } | null = null;
   private frameId = 0;
   private resizeObserver: ResizeObserver;
+  private resizeFrame = 0;
   private disposed = false;
 
   // pointer state
@@ -203,7 +204,17 @@ export class DungeonRenderer {
     // place once they land, so the game is playable while they load.
     void this.preloadModels();
 
-    this.resizeObserver = new ResizeObserver(() => this.resize());
+    // Resizing touches layout and the GL drawing buffer. Doing that inside the
+    // observer callback is what makes Chrome report "ResizeObserver loop
+    // completed with undelivered notifications", so the work is coalesced into
+    // the next frame instead — several observations collapse into one resize.
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.resizeFrame !== 0) return;
+      this.resizeFrame = requestAnimationFrame(() => {
+        this.resizeFrame = 0;
+        if (!this.disposed) this.resize();
+      });
+    });
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.resize();
 
@@ -972,6 +983,7 @@ export class DungeonRenderer {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.frameId);
+    cancelAnimationFrame(this.resizeFrame);
     this.resizeObserver.disconnect();
     window.removeEventListener("keydown", this.onKeyDown);
 

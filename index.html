@@ -44,9 +44,18 @@
       // Verse8 embeds the game in an iframe and asks it how tall it is.
       // Without this the shell cannot size the frame correctly.
       (function () {
-        function reportGameSize() {
-          const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-          const width = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth);
+        var lastWidth = -1;
+        var lastHeight = -1;
+
+        function reportGameSize(force) {
+          var height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          var width = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth);
+
+          // The shell sizes the frame from this message, which resizes us in
+          // turn. Reporting only real changes keeps that from ping-ponging.
+          if (force !== true && width === lastWidth && height === lastHeight) return;
+          lastWidth = width;
+          lastHeight = height;
 
           window.parent.postMessage(
             { type: 'GAME_SIZE_RESPONSE', height: height, width: width },
@@ -54,11 +63,11 @@
           );
         }
 
-        window.addEventListener('load', reportGameSize);
-        window.addEventListener('resize', reportGameSize);
+        window.addEventListener('load', function () { reportGameSize(true); });
+        window.addEventListener('resize', function () { reportGameSize(false); });
         window.addEventListener('message', function (event) {
           if (event.data && event.data.type === 'REQUEST_GAME_SIZE') {
-            reportGameSize();
+            reportGameSize(true);
           }
         });
       })();
