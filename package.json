@@ -1,31 +1,32 @@
 {
-    "name":  "dungeon-warden",
-    "private":  true,
-    "version":  "0.0.0",
-    "type":  "module",
-    "scripts":  {
-                    "dev":  "vite",
-                    "build":  "tsc -b \u0026\u0026 vite build",
-                    "lint":  "oxlint",
-                    "preview":  "vite preview",
-                    "assets":  "node scripts/build-asset-manifest.mjs"
-                },
-    "dependencies":  {
-                         "@agent8/gameserver":  "^1.10.2",
-                         "@verse8/ads":  "^0.5.0",
-                         "@verse8/platform":  "^2.1.0",
-                         "react":  "^18.3.1",
-                         "react-dom":  "^18.3.1",
-                         "three":  "^0.185.1"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^24.13.3",
-                            "@types/react":  "^18.3.31",
-                            "@types/react-dom":  "^18.3.7",
-                            "@types/three":  "^0.185.4",
-                            "@vitejs/plugin-react":  "^6.1.0",
-                            "oxlint":  "^1.79.0",
-                            "typescript":  "~6.0.2",
-                            "vite":  "^8.2.2"
-                        }
+  "name": "dungeon-warden",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -b",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "assets": "node scripts/build-asset-manifest.mjs"
+  },
+  "dependencies": {
+    "@agent8/gameserver": "^1.10.2",
+    "@verse8/ads": "^0.5.0",
+    "@verse8/platform": "^2.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@types/three": "^0.185.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
 }

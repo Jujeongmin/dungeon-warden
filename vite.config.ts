@@ -12,6 +12,18 @@ export default defineConfig({
   // src/game/assets/publicUrl.ts for the same reason.
   base: "./",
 
+  // @agent8/gameserver lists react as a peer dependency, so whether it ends up
+  // sharing our copy or getting one of its own is decided by the order Vite
+  // discovers and pre-bundles deps in — which differs between a warm local
+  // cache and a cold container. Two React copies means "Invalid hook call",
+  // which unmounts the tree and leaves a blank page. Pinning both sides makes
+  // that deterministic. The SDK has to be *included* rather than excluded: it
+  // ships CJS dependencies (lz4js) that do not load unbundled.
+  resolve: { dedupe: ["react", "react-dom"] },
+  optimizeDeps: {
+    include: ["@agent8/gameserver", "react", "react-dom", "react/jsx-runtime"],
+  },
+
   server: {
     watch: {
       // public/assets holds ~530 CC0 model, texture and audio files. They are
