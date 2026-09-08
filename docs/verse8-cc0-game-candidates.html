@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verse8 CC0 에셋 역기획 — 게임 후보 10</title>
+<style>
+:root{
+  --bg:#f7f6f3; --panel:#ffffff; --ink:#1a1a1a; --muted:#6b6b6b;
+  --line:#e2e0da; --accent:#c2410c; --accent2:#0f766e; --chip:#efece5;
+  --ok:#15803d; --warn:#b45309;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141414; --panel:#1d1d1d; --ink:#ececec; --muted:#a0a0a0;
+    --line:#2f2f2f; --accent:#fb923c; --accent2:#5eead4; --chip:#262626;
+    --ok:#4ade80; --warn:#fbbf24;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.65 "Pretendard","Noto Sans KR",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 20px 100px}
+h1{font-size:clamp(26px,4vw,40px);line-height:1.2;margin:0 0 6px;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 32px;font-size:14px}
+h2{font-size:22px;margin:56px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line);letter-spacing:-.01em}
+h3{font-size:17px;margin:22px 0 8px}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent2);
+  border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px}
+.note b{color:var(--accent2)}
+.game{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:24px;margin:28px 0;overflow:hidden}
+.ghead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.num{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.08em}
+.gname{font-size:24px;font-weight:800;margin:0;letter-spacing:-.02em}
+.tag{font-size:11px;font-weight:700;background:var(--chip);color:var(--muted);
+  padding:3px 9px;border-radius:99px;letter-spacing:.04em}
+.oneline{color:var(--muted);font-size:15px;margin:2px 0 18px;font-style:italic}
+.shots{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;margin-bottom:18px}
+.shots img{height:190px;width:auto;border-radius:8px;border:1px solid var(--line);
+  background:#0e0e0e;flex:0 0 auto;image-rendering:auto}
+.shots.pixel img{image-rendering:pixelated}
+dl{margin:0;display:grid;grid-template-columns:130px 1fr;gap:6px 16px;font-size:14px}
+dt{font-weight:700;color:var(--muted);font-size:12.5px;letter-spacing:.02em;padding-top:2px}
+dd{margin:0}
+dd ul{margin:2px 0;padding-left:18px}
+dd li{margin:2px 0}
+.loop{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+  background:var(--chip);padding:10px 12px;border-radius:8px;line-height:1.8}
+.stars{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 18px;
+  margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);font-size:13px}
+.stars div{display:flex;justify-content:space-between;gap:8px}
+.stars span:first-child{color:var(--muted)}
+.st{letter-spacing:2px;color:var(--accent)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:1000px;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--chip);font-size:12px;letter-spacing:.03em;position:sticky;top:0}
+tbody tr:last-child td{border-bottom:none}
+.pick{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:16px 20px;margin:12px 0}
+.pick b{color:var(--accent);display:block;font-size:13px;letter-spacing:.04em;margin-bottom:4px}
+.excl{font-size:14px}
+.excl li{margin:6px 0}
+.ok{color:var(--ok);font-weight:700}
+.warn{color:var(--warn);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>CC0 에셋 역기획 — Verse8 웹게임 후보 10</h1>
+<p class="sub">에셋 우선 조사 → 구성 분석 → 게임 도출 · 2026-09-08 조사 기준 · 구현 미착수</p>
+
+<h2>0. Verse8 환경 확인 결과 (공식 문서 기준)</h2>
+<div class="note">
+<b>확인 출처</b> — <a href="https://docs.verse8.io/ko/docs">docs.verse8.io/ko/docs</a> 및 하위 문서를 직접 조회함.
+<ul>
+<li><b>기본 스택</b>: <code>npm create vite@latest my-app -- --template react-ts</code> + <code>npm install @agent8/gameserver</code> (Node 18+). 즉 <b>Vite + React + TypeScript</b>가 공식 전제. → 요청하신 전제와 일치.</li>
+<li><b>서버</b>: 프로젝트 루트에 <code>server.js</code>, <code>class Server { }</code> 형태. <span class="warn">export 금지</span> (<code>module.exports</code>/<code>export default</code> 사용 불가). 파일명 고정.</li>
+<li><b>내장 변수</b>: <code>$global</code>(전역 상태·컬렉션), <code>$room</code>(룸 상태), <code>$sender</code>(요청자 account/roomId/guest 여부).</li>
+<li><span class="warn">setTimeout / setInterval 사용 금지</span> → 반복 로직은 <code>$roomTick(deltaMillis, roomId)</code> 사용. 클래스 레벨 변수는 요청마다 초기화되므로 상수 용도로만.</li>
+<li><b>클라이언트 호출</b>: <code>useGameServer()</code> 훅 → <code>server.remoteFunction("fn", [args])</code>. 표준 호출 약 10회/초 제한, 고빈도(이동 등)는 <code>throttle</code> + <code>throttleKey</code>, 반환 불필요 시 <code>needResponse:false</code>.</li>
+<li><b>배포</b>: <code>npx -y @agent8/deploy</code> → <code>VITE_AGENT8_VERSE</code> 환경변수 생성.</li>
+<li><b>Leaderboard</b>: 별도 서비스가 아니라 GameServer 컬렉션 기반. <code>submitScore()</code> / <code>getTopRankings()</code>(상위 20) / <code>getMyBestRank()</code> / <code>getMyAllRankings()</code>를 server.js에 구현. <b>→ 리더보드를 쓰면 Game Server + Auth가 자동으로 세트</b>.</li>
+<li><b>Auth</b>: <code>@verse8/platform</code>의 <code>Verse8.getUser()</code> — URL <code>?auth=</code> 토큰 파싱·서명 검증.</li>
+<li><b>Local Cache</b>: <code>@verse8/local-cache</code>, best-effort. <span class="warn">진행도·인벤토리 저장 금지</span>(언제든 삭제될 수 있음). 용도는 시드 기반 지형, 디코딩된 에셋, 룩업 테이블 등 재생성 가능한 데이터. 게임당 64MB soft cap.</li>
+<li><b>Ads</b>: <code>@verse8/ads</code> — <code>showRewarded()</code> 결과 <code>rewarded/dismissed/failed</code>. <span class="warn">반드시 유저 제스처로만 호출</span>, 보상값은 UX 힌트일 뿐이므로 가치 있는 보상은 서버에서 <code>requestId</code> 검증.</li>
+<li><b>VXShop</b>: 서버 이벤트 핸들러 <code>$onItemPurchased(data)</code>.</li>
+</ul>
+<b>설계 원칙 (아래 10개 전부 적용)</b> — 영구 진행도는 Local Cache가 아니라 <b>Global User State</b>에, 반복 서버 로직은 <b>$roomTick</b>에, 렌더링 라이브러리는 Vite 번들에 그대로 들어가므로 Phaser/Pixi/Three 모두 배포 구조와 충돌 없음(전부 클라이언트 사이드).
+</div>
+
+<h2>0-1. 라이선스 검증에서 <span class="warn">탈락</span>시킨 에셋</h2>
+<ul class="excl">
+<li><b>Quaternius</b> (quaternius.com) — 흔히 CC0로 알려져 있으나 <a href="https://quaternius.com/license.html">공식 라이선스 페이지</a> 확인 결과 <b>Quaternius Asset License(QAL)</b>. "We retain all intellectual property rights", 재배포 금지. <b>CC0 아님 → 전면 제외.</b></li>
+<li><b>Tiny Swords / Pixel Frog</b> — itch 페이지 라이선스가 커스텀(재배포·재판매 금지). CC0 아님 → 제외.</li>
+<li><b>game-icons.net</b> (CC BY 3.0), <b>LPC 스프라이트</b> (CC-BY-SA) — 저작자 표시 필요 → 제외.</li>
+</ul>
+<div class="note">
+참고 — <b>ansimuz</b> 팩(후보 10)은 itch 라이선스 필드가 <b>CC0 1.0</b>으로 명시되어 있으나, 본문에 "에셋 팩 자체를 재배포하지 말아 달라"는 요청이 함께 적혀 있습니다. 게임에 사용하는 것은 문제 없지만, 후보 중 유일하게 문구가 100% 깔끔하지 않은 항목이라 명시해 둡니다.
+</div>
+
+<!-- ============ 1 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">01</span><h3 class="gname">STEEL LINE</h3>
+<span class="tag">2D 벡터</span><span class="tag">Tower Defense</span></div>
+<p class="oneline">경로는 정해져 있고, 남은 골드로 어느 칸을 포기할지 고르는 20초짜리 결단의 반복.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/tower-defense-top-down/430e5bc349-1677693729/preview.png" alt="Kenney Tower Defense Top-down">
+<img src="https://kenney.nl/media/pages/assets/ui-pack/ab9e396e4d-1718203978/preview.png" alt="Kenney UI Pack">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Tower Defense (Top-Down)</b> — Kenney · 2D 벡터 · 300개 · 경로/지형 타일, 타워 베이스 + <b>포탑 헤드 분리</b>, 적 유닛(탱크·병력), 총알·폭발</li>
+<li><b>UI Pack</b> — Kenney · 430개 · 버튼/패널/슬라이더 &nbsp;|&nbsp; <b>Game Icons</b> 105개 &nbsp;|&nbsp; <b>Music Jingles</b> 85개</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/tower-defense-top-down">kenney.nl/assets/tower-defense-top-down</a> ·
+<a href="https://kenney.nl/assets/ui-pack">ui-pack</a> ·
+<a href="https://kenney.nl/assets/game-icons">game-icons</a> ·
+<a href="https://kenney.nl/assets/music-jingles">music-jingles</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 에셋 페이지 License 항목이 "Creative Commons CC0". Kenney는 전 에셋 CC0 정책.</dd>
+<dt>에셋→게임 도출</dt><dd>이 팩은 <b>포탑 헤드가 베이스와 별도 파일</b>이다. 즉 베이스는 고정하고 헤드만 <code>rotation</code>을 주면 조준 연출이 코드 3줄로 끝난다. 여기에 경로 전용 타일과 진행 방향이 다른 적 유닛이 이미 들어 있다 → 이 그림들이 할 수 있는 행동은 "고정 배치물이 지나가는 대상을 향해 회전하며 쏜다" 하나이고, 그게 곧 타워 디펜스다.</dd>
+<dt>Core Loop</dt><dd class="loop">타워 배치 → 웨이브 방어 → 골드 획득 → 업그레이드/신규 타워 → 보스 웨이브 → 최고 웨이브 기록</dd>
+<dt>플레이 방식</dt><dd>탑다운 고정 맵. 하단 타워 트레이에서 타워를 집어 빈 칸에 놓는다. 웨이브 시작 버튼을 누르면 적이 경로를 따라 이동. 라이프 0이면 종료, 목표는 무한 웨이브 최고 기록.</dd>
+<dt>핵심 재미</dt><dd>맵을 매판 셔플하고 웨이브마다 "골드 2배 위험 웨이브 / 안전 웨이브" 선택을 넣어, 같은 맵이라도 리스크 선택이 달라진다. 판당 5~8분.</dd>
+<dt>PC 조작</dt><dd>마우스 클릭 · 드래그 배치</dd>
+<dt>모바일 조작</dt><dd>탭 배치 · 롱프레스 업그레이드 (PC와 동일 게임)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 적/탄환 수백 개를 WebGL 배칭으로 처리, UI는 React DOM에 UI Pack 이미지를 얹어 반응형 처리가 쉬움.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> — 리더보드 계정 식별</li>
+<li>Game Server: <b>사용</b> — 점수 제출/랭킹 (리더보드 전제조건)</li>
+<li>Global User State: <b>사용</b> — 해금한 타워 종류</li>
+<li>Leaderboard: <b>사용</b> — 최고 도달 웨이브</li>
+<li>Local Cache: 미사용 · Room: 미사용(싱글) · VXShop: 미사용</li>
+<li>Ads: <b>선택적</b> — 게임오버 시 1회 부활 (보상은 서버에서 requestId 검증)</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>거의 없음. 숫자 폰트·데미지 텍스트는 코드 렌더링.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- ============ 2 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">02</span><h3 class="gname">VOID DRIFT</h3>
+<span class="tag">2D 벡터</span><span class="tag">Arcade / Shmup</span></div>
+<p class="oneline">한 손가락으로 끌고 다니며 3분 안에 기체를 만들어 죽는 종스크롤 슈터.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/space-shooter-remastered/41561bfade-1677669432/preview.png" alt="Kenney Space Shooter Remastered">
+<img src="https://kenney.nl/media/pages/assets/simple-space/76f4e4cdb2-1677578137/preview.png" alt="Kenney Simple Space">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Space Shooter Remastered</b> — Kenney · 2D 벡터 · 295개 · 플레이어/적 기체 다수, <b>피격 단계별 손상 스프라이트</b>, 레이저 색상별, 파워업, 운석</li>
+<li><b>Simple Space</b> — Kenney · 48개 · 심플 아이콘형 함선·별</li>
+<li><b>UI Pack</b> / <b>Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/space-shooter-remastered">space-shooter-remastered</a> ·
+<a href="https://kenney.nl/assets/simple-space">simple-space</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 두 페이지 모두 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>팩 안에 <b>같은 기체의 damage1/damage2/damage3 스프라이트</b>가 들어 있다. 이건 "HP가 있고 눈에 보이게 깎인다"는 시스템을 그리라고 만든 리소스다. 여기에 색깔별 레이저와 파워업 아이콘이 이미 세트로 있으니 → 무기 업그레이드 + 피격 시각화가 있는 아케이드 슈터가 정확히 이 팩이 표현하려는 행동이다.</dd>
+<dt>Core Loop</dt><dd class="loop">비행/사격 → 격추 → 파워업 3택 → 적 밀도 상승 → 보스 → 격추/사망 → 기록 등록</dd>
+<dt>플레이 방식</dt><dd>세로 스크롤. 사격은 자동, 플레이어는 회피와 파워업 선택만 한다. 30초마다 무기 선택 카드 3장이 뜨고 조합에 따라 빌드가 갈린다. 목표는 생존 점수.</dd>
+<dt>핵심 재미</dt><dd>매판 다른 무기 조합(관통/유도/확산). 판이 3분으로 짧아 "한 판만 더"가 성립. 리더보드가 그대로 동기.</dd>
+<dt>PC 조작</dt><dd>마우스 이동(기체가 커서 추종) + 자동 발사 · 스페이스 폭탄</dd>
+<dt>모바일 조작</dt><dd>화면 드래그 이동 + 자동 발사 · 폭탄 버튼 1개 — PC와 완전히 동일한 게임</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 탄막·파티클 수천 개 스프라이트 배칭에 최적. Phaser의 물리엔진은 불필요(원형 충돌만 직접 구현).</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b> — 점수 제출/검증</li>
+<li>Leaderboard: <b>사용</b> — 최고 점수 (핵심 동기)</li>
+<li>Global User State: <b>사용</b> — 해금 기체, 누적 재화</li>
+<li>Ads: <b>사용</b> — 게임오버 컨티뉴 1회 (유저 탭으로만 호출)</li>
+<li>Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>없음.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★★</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- ============ 3 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">03</span><h3 class="gname">CRYPT WAVE</h3>
+<span class="tag">픽셀 16×16</span><span class="tag">Survival Roguelite</span></div>
+<p class="oneline">움직이기만 하면 되는 던전 생존물 — 죽기 직전까지 무기 조합을 굴린다.</p>
+<div class="shots pixel">
+<img src="https://img.itch.zone/aW1hZ2UvMzA5MDI4LzExOTQ3NzgyLmdpZg==/original/W0SIsQ.gif" alt="0x72 DungeonTileset II heroes">
+<img src="https://img.itch.zone/aW1hZ2UvMzA5MDI4LzE1MTgyMTEuZ2lm/original/MDU%2FdN.gif" alt="0x72 undead">
+<img src="https://img.itch.zone/aW1hZ2UvMzA5MDI4LzE1MTgyMjkuZ2lm/original/qGmWJo.gif" alt="0x72 orcs">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>16x16 DungeonTileset II</b> — 0x72 · 픽셀아트 · <b>애니메이션 포함</b> 영웅 4종(기사/궁수/마법사 등), 적 10종 이상(고블린·오크·좀비·리자드·데몬·언데드), 무기 스프라이트 분리, 벽/바닥/애니메이션 횃불/함정/보물상자</li>
+<li><b>16x16+ Robot Tileset</b> — 0x72 (선택, 후반 챕터용 · 캐릭터 9종)</li>
+<li><b>UI Pack / Game Icons / Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://0x72.itch.io/dungeontileset-ii">0x72.itch.io/dungeontileset-ii</a> ·
+<a href="https://0x72.itch.io/16x16-robot-tileset">16x16-robot-tileset</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — itch 페이지 본문 원문: "You can use this tileset for whatever you like (CC-0). Credit is not necessary…". itch 라이선스 필드도 CC0 1.0.</dd>
+<dt>에셋→게임 도출</dt><dd>이 팩의 특징은 <b>적 종류가 캐릭터 수보다 압도적으로 많다</b>는 것(영웅 4 : 적 10+). 게다가 각 적이 idle/run 프레임을 갖고 있고 무기는 캐릭터와 분리되어 있다. 적 종류가 많다 = 웨이브 다양성이 공짜, 무기 분리 = 궤도/휘두르기 무기를 스프라이트 회전만으로 표현 가능. 이 두 조건이 정확히 맞아떨어지는 장르가 "다수의 적 + 다수의 무기" 생존물이다.</dd>
+<dt>Core Loop</dt><dd class="loop">이동 회피 → 자동 공격 → 경험치 → 무기/패시브 3택 → 웨이브 강화 → 엘리트 → 사망 → 생존 시간 기록 → 영구 강화</dd>
+<dt>플레이 방식</dt><dd>탑다운 던전 한 방. 공격은 전부 자동, 플레이어는 이동만 한다. 1분마다 적 구성이 바뀌고 5분에 엘리트가 등장. 목표는 생존 시간.</dd>
+<dt>핵심 재미</dt><dd>무기 6종 × 패시브 6종의 조합 빌드. 사망 시 얻은 재화로 영구 강화 → 다음 판이 실제로 더 멀리 간다.</dd>
+<dt>PC 조작</dt><dd>WASD 이동 (공격 자동)</dd>
+<dt>모바일 조작</dt><dd>Virtual Joystick 1개 (공격 자동) — 조작이 이동뿐이라 PC/모바일 차이가 사실상 0</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 적 200+ 동시 렌더 + 픽셀 퍼펙트(<code>SCALE_MODES.NEAREST</code>) 처리에 적합.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b></li>
+<li>Leaderboard: <b>사용</b> — 최장 생존 시간</li>
+<li>Global User State: <b>사용</b> — 영구 강화 레벨, 해금 캐릭터 (계정 단위 성장이 있으므로 필수)</li>
+<li>Ads: <b>선택적</b> — 부활 1회</li>
+<li>Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>보스급 대형 스프라이트가 없음 → 기존 데몬/오크를 2~3배 스케일 + 색조 변경으로 대체하거나, 보스를 "엘리트 다수 동시 등장"으로 설계해 회피 가능.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★★</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- ============ 4 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">04</span><h3 class="gname">APEX LAP</h3>
+<span class="tag">3D 로우폴리</span><span class="tag">Racing / Time Attack</span></div>
+<p class="oneline">0.1초를 줄이려고 같은 코너를 스무 번 도는, 고스트와의 1:1 타임어택.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/racing-kit/dc5ecd9a41-1677580942/preview.png" alt="Kenney Racing Kit">
+<img src="https://kenney.nl/media/pages/assets/car-kit/5db5e6a1c7-1761348592/2073910.jpg" alt="Kenney Car Kit">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Racing Kit</b> — Kenney · 3D · 110개 · <b>모듈형 트랙 타일</b>(직선/코너/시케인/경사), 가드레일, 표지, 관중 요소</li>
+<li><b>Car Kit</b> — Kenney · 3D · 45개 · 차량 다수 + <b>카트 레이서</b> + 파손 파편</li>
+<li><b>Skyboxes</b> — Kenney (배경) &nbsp;|&nbsp; <b>UI Pack</b></li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/racing-kit">racing-kit</a> ·
+<a href="https://kenney.nl/assets/car-kit">car-kit</a> ·
+<a href="https://kenney.nl/assets/skyboxes">skyboxes</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>Racing Kit이 <b>모듈형 트랙 타일</b>이라는 점이 결정적이다. 타일을 배열로 이어 붙이면 트랙이 만들어지고, 같은 배열로 주행 경로(스플라인)를 자동 생성할 수 있다 → <b>레벨 디자인 비용이 0</b>이고 트랙을 코드로 무한 생성할 수 있다. 3D 에셋으로 만들 수 있는 것 중 추가 아트가 가장 덜 드는 장르가 레이싱인 이유.</dd>
+<dt>Core Loop</dt><dd class="loop">트랙 주행 → 랩타임 기록 → 내 고스트/1위 고스트와 재대결 → 차량 해금 → 새 트랙 → 기록 갱신</dd>
+<dt>플레이 방식</dt><dd>3인칭 추격 카메라. 랩 1~2바퀴짜리 짧은 트랙 5개. 이전 주행이 반투명 고스트 차량으로 함께 달린다. 목표는 트랙별 베스트 랩.</dd>
+<dt>핵심 재미</dt><dd>고스트 대결의 즉각적 피드백. 트랙별 리더보드가 있어 "1등 고스트 다운로드 → 추격"이 성립.</dd>
+<dt>PC 조작</dt><dd>WASD / 방향키 + Shift 드리프트</dd>
+<dt>모바일 조작</dt><dd>자동 가속 + 화면 좌/우 터치존 조향 + 드리프트 버튼 (조작 단순화, 게임성 동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — glTF 3D 모델을 그대로 로드. 물리는 아케이드 차량 모델(속도·조향각·그립)을 직접 구현해 물리엔진 의존 제거 → 번들 가볍고 결정론적이라 고스트 재현이 정확.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b></li>
+<li>Leaderboard: <b>사용</b> — 트랙별 베스트 랩</li>
+<li>Global User State: <b>사용</b> — 해금 차량, 내 고스트 리플레이 데이터(입력 시퀀스, 수 KB)</li>
+<li>Local Cache: <b>사용 가능</b> — 다운로드한 타인 고스트 리플레이 캐싱 (재생성 가능한 파생 데이터라 공식 용도에 부합)</li>
+<li>Ads / VXShop / Room: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>랩타임 HUD 정도. 트랙 노면 텍스처는 Kenney Prototype Textures로 대체 가능.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★★☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★☆☆</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★☆☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- ============ 5 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">05</span><h3 class="gname">BONE ARENA</h3>
+<span class="tag">3D 로우폴리</span><span class="tag">Action Roguelite</span></div>
+<p class="oneline">방 하나, 스켈레톤 한 무리, 문 세 개 — 어디까지 내려갈 수 있는지만 묻는 3D 액션.</p>
+<div class="shots">
+<img src="https://img.itch.zone/aW1nLzIzODA4Mjg4LnBuZw==/original/WI%2FL4z.png" alt="KayKit Adventurers">
+<img src="https://img.itch.zone/aW1nLzI4NTI5NzA1LnBuZw==/original/dFv80t.png" alt="KayKit Dungeon Remastered">
+<img src="https://img.itch.zone/aW1nLzExNjQyOTY0LnBuZw==/original/tRQM0J.png" alt="KayKit props">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>KayKit — Character Pack: Adventurers</b> · Kay Lousberg · 3D · <b>리깅+애니메이션 완료</b> 캐릭터 5종(기사/바바리안/로그/메이지/레인저) + 무기·방패 25종 · .gltf/.fbx</li>
+<li><b>KayKit — Character Pack: Skeletons</b> · 스켈레톤 4종 + 무기 10종 (적 라인업)</li>
+<li><b>KayKit — Dungeon Pack (Remastered)</b> · 200+ 모듈형 벽/바닥/계단/문/상자/함정/배너</li>
+<li><b>KayKit — Character Animations (Legacy)</b> · 24종 애니메이션 (추가 동작 보강용)</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kaylousberg.itch.io/kaykit-adventurers">kaykit-adventurers</a> ·
+<a href="https://kaylousberg.itch.io/kaykit-skeletons">kaykit-skeletons</a> ·
+<a href="https://kaylousberg.itch.io/kaykit-dungeon-remastered">kaykit-dungeon-remastered</a> ·
+<a href="https://kaylousberg.itch.io/kaykit-animations">kaykit-animations</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 itch 페이지 라이선스 표기 "Creative Commons Zero v1.0 Universal — Free for personal and commercial use, no attribution required." (무료 티어 기준. EXTRA/SOURCE 유료 티어는 사용하지 않아도 게임 성립)</dd>
+<dt>에셋→게임 도출</dt><dd>웹 3D에서 가장 비싼 것은 <b>리깅된 캐릭터 애니메이션</b>인데, KayKit은 그게 이미 되어 있고 무기가 손 본에 붙는 구조다. 그리고 던전 팩이 <b>모듈형 벽/바닥</b> → 방을 코드로 조립 가능. "애니메이션된 아군 5 + 애니메이션된 적 4 + 조립 가능한 방"이라는 구성은 정확히 방 단위로 진행하는 3D 액션 로그라이트의 재료 목록이다.</dd>
+<dt>Core Loop</dt><dd class="loop">방 입장 → 스켈레톤 웨이브 처치 → 문 3택(무기/유물/회복) → 다음 방 → 엘리트 방 → 사망 → 도달 층 기록</dd>
+<dt>플레이 방식</dt><dd>고정 각도 3인칭. 한 방을 클리어하면 문 3개 중 하나를 골라 다음 방으로. 무기(검/도끼/활/지팡이)에 따라 공격 패턴이 바뀐다. 목표는 최고 도달 층.</dd>
+<dt>핵심 재미</dt><dd>실제로 "3D 게임"으로 보이는 비주얼 퀄리티 + 매판 다른 무기/유물 조합. 판당 6~10분.</dd>
+<dt>PC 조작</dt><dd>WASD 이동 + 마우스 조준 + 좌클릭 공격 + Space 회피롤</dd>
+<dt>모바일 조작</dt><dd>Virtual Joystick + 공격 버튼(가장 가까운 적 자동 조준) + 회피 버튼</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — glTF의 애니메이션 클립을 <code>AnimationMixer</code>로 바로 재생 가능해 캐릭터 파이프라인이 사실상 공짜. 충돌은 원기둥 근사로 직접 처리(물리엔진 불필요).</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b></li>
+<li>Leaderboard: <b>사용</b> — 최고 도달 층</li>
+<li>Global User State: <b>사용</b> — 해금 캐릭터 5종, 영구 스탯</li>
+<li>Ads: <b>선택적</b> — 부활 1회 · Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>보스 모델 없음(무료 티어에 Skeleton Golem 미포함) → 스켈레톤 스케일 업 + 라이트/파티클로 대체.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★★☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★☆☆</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★☆☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- ============ 6 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">06</span><h3 class="gname">CRAWL TACTICS</h3>
+<span class="tag">픽셀 32×32</span><span class="tag">Deckbuilder / Auto-battler</span></div>
+<p class="oneline">매일 같은 시드, 같은 몬스터 — 다른 건 당신이 고른 카드 15장뿐.</p>
+<div class="shots pixel">
+<img src="https://opengameart.org/sites/default/files/styles/medium/public/DungeonCrawl_ProjectUtumnoTileset_0.png" alt="Dungeon Crawl Project Utumno tileset">
+<img src="https://opengameart.org/sites/default/files/styles/medium/public/tiles_tiny_sample_2.png" alt="Dungeon Crawl tiles sample">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Dungeon Crawl 32x32 tiles</b> — DCSS 팀 / Chris Hamons 관리 (OpenGameArt) · 픽셀 32×32 · <b>3,000+ 타일</b> (몬스터 수백 종, 무기·방어구·물약·스크롤 아이템 수백 종, 주문 이펙트, GUI 요소, 플레이어 아바타) + ProjectUtumno 확장 3,000+</li>
+<li><b>UI Pack / Game Icons / Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd><a href="https://opengameart.org/content/dungeon-crawl-32x32-tiles">opengameart.org/content/dungeon-crawl-32x32-tiles</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — OpenGameArt 페이지 License 항목 "CC0 (Public Domain)". 크레딧은 "as a courtesy"이며 필수 아님.</dd>
+<dt>에셋→게임 도출</dt><dd>이 팩은 <b>애니메이션이 전혀 없는 정적 타일</b>이다. 액션 게임에는 약점이지만, 반대로 <b>몬스터·아이템 아이콘이 수천 개</b>다. 정적 아이콘의 개수 자체가 콘텐츠가 되는 장르 = 카드/오토배틀러. 이 팩에서는 "몬스터 200종을 카드 200장으로" 같은 설계가 추가 그래픽 0으로 가능하다. 즉 <b>약점이 장점이 되는 유일한 장르</b>를 골랐다.</dd>
+<dt>Core Loop</dt><dd class="loop">전투(자동 해결) → 보상 카드 3택 → 덱 편성 → 상점/제련 → 엘리트 → 보스 → 층수·점수 기록</dd>
+<dt>플레이 방식</dt><dd>맵 노드를 골라 진행. 전투는 카드 배치 후 자동 해결되어 한 전투가 15초. 매일 <b>전 유저 동일 시드</b>가 배포되어 같은 조건에서 덱 구성만 겨룬다. 목표는 오늘 시드의 최고 점수.</dd>
+<dt>핵심 재미</dt><dd>일일 시드 = 남과 직접 비교되는 경쟁. "저 사람은 같은 카드로 어떻게 더 갔지"가 재플레이 동기.</dd>
+<dt>PC 조작</dt><dd>마우스 클릭·드래그</dd>
+<dt>모바일 조작</dt><dd>탭·드래그 (완전히 동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript (DOM/CSS만)</b> — 캔버스 불필요. 카드 UI는 DOM이 반응형·접근성·애니메이션 모두 유리하고, 타일은 <code>background-position</code>으로 스프라이트시트에서 잘라 쓰면 끝. 셋 중 가장 빠르게 만들 수 있는 구조.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b> — 시드 발급 및 점수 검증</li>
+<li><b>Global State: 사용</b> — 오늘의 일일 시드를 <code>$global</code>에 저장·공유 (이 게임의 핵심 축)</li>
+<li>Leaderboard: <b>사용</b> — 일일 시드 랭킹 (매일 리셋)</li>
+<li>Global User State: <b>사용</b> — 해금 카드 풀, 연속 참여일</li>
+<li>Local Cache / Room / Ads / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>카드 프레임 배경만 CSS로 제작(이미지 불필요).</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★★</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- ============ 7 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">07</span><h3 class="gname">DAILY CRATE</h3>
+<span class="tag">2D 벡터</span><span class="tag">Puzzle</span></div>
+<p class="oneline">하루 한 문제, 최소 이동수 경쟁 — 2분이면 끝나고 내일 또 온다.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/sokoban/58e3c8f489-1677579114/preview.png" alt="Kenney Sokoban">
+<img src="https://kenney.nl/media/pages/assets/game-icons/349f36a54d-1677661575/preview.png" alt="Kenney Game Icons">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Sokoban</b> — Kenney · 2D 벡터 · 100개 · 4방향 캐릭터, <b>색상별 크레이트</b>, 목표 지점, 벽/바닥 타일</li>
+<li><b>UI Pack / Game Icons / Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd><a href="https://kenney.nl/assets/sokoban">kenney.nl/assets/sokoban</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>이 팩은 소코반 <b>규칙 전용으로 그려진</b> 에셋이다. "크레이트 + 목표 지점 + 4방향 캐릭터"라는 세 요소가 곧 규칙이라, 게임 디자인을 새로 할 필요조차 없다. 색상별 크레이트가 있으니 <b>색 매칭</b>이라는 변형 규칙까지 그림이 먼저 제안하고 있다.</dd>
+<dt>Core Loop</dt><dd class="loop">일일 퍼즐 입장 → 이동/되감기 → 클리어(이동수) → 랭킹 확인 → 다음 날</dd>
+<dt>플레이 방식</dt><dd>격자 맵에서 크레이트를 밀어 같은 색 목표 지점에 올린다. 무제한 되감기. 매일 서버가 검증된 시드로 퍼즐 1개를 배포. 목표는 최소 이동수.</dd>
+<dt>핵심 재미</dt><dd>Wordle형 일일 루틴. 세션 2분, 부담 0, 전원이 같은 문제를 푸니 순위가 명확.</dd>
+<dt>PC 조작</dt><dd>방향키/WASD 이동, Z 되감기, R 리셋</dd>
+<dt>모바일 조작</dt><dd>스와이프 이동 + 되감기/리셋 버튼</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript (DOM / CSS Grid)</b> — 격자 게임은 캔버스가 오히려 손해. 상태가 2차원 배열 하나라 로직이 100줄 수준 → <b>가장 빨리 완성되는 후보</b>.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b></li>
+<li><b>Global State: 사용</b> — 오늘의 퍼즐 시드 (모든 유저 공통)</li>
+<li>Leaderboard: <b>사용</b> — 일일 최소 이동수 / 클리어 시간</li>
+<li>Global User State: <b>사용</b> — 연속 클리어 스트릭</li>
+<li>Local Cache / Room / Ads / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>없음.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★☆☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- ============ 8 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">08</span><h3 class="gname">MINI DINER</h3>
+<span class="tag">3D 미니어처</span><span class="tag">Simulation / Idle</span></div>
+<p class="oneline">작은 3D 가게 하나를 계속 키우는, 켜 두면 돌아가는 경영 시뮬레이션.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/mini-market/00f33430ac-1729865126/preview.png" alt="Kenney Mini Market">
+<img src="https://kenney.nl/media/pages/assets/food-kit/7a37477a9c-1719418523/preview.png" alt="Kenney Food Kit">
+<img src="https://kenney.nl/media/pages/assets/mini-characters/357d1a9452-1721210569/preview.png" alt="Kenney Mini Characters">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Mini Market</b> — Kenney · 3D · 20개 · 매대/카운터/진열대, 애니메이션 · 색상 배리에이션</li>
+<li><b>Food Kit</b> — Kenney · 3D · <b>200개</b> · 음식·재료·주방 도구 모델</li>
+<li><b>Mini Characters</b> — Kenney · 3D · 25개 · <b>리깅+애니메이션</b> 손님 캐릭터</li>
+<li><b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/mini-market">mini-market</a> ·
+<a href="https://kenney.nl/assets/food-kit">food-kit</a> ·
+<a href="https://kenney.nl/assets/mini-characters">mini-characters</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 세 페이지 모두 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>Food Kit의 <b>음식 모델 200개</b>가 결정적이다. 보통 경영 시뮬은 "메뉴 해금"이 진행도인데, 그 메뉴 200종이 이미 모델로 존재한다 = <b>게임의 콘텐츠 분량이 곧 에셋 개수</b>. 여기에 애니메이션 손님과 매장 집기가 세트로 있으니, 이 세 팩이 표현할 수 있는 행동은 "손님이 와서 음식을 산다"이고 그게 곧 가게 경영이다.</dd>
+<dt>Core Loop</dt><dd class="loop">주문 접수 → 재료 조합/조리 → 서빙 → 수익 → 메뉴·설비 해금 → 손님 증가 → 일일 매출 정산</dd>
+<dt>플레이 방식</dt><dd>고정 카메라 3D 디오라마 가게. 손님 말풍선의 주문을 보고 해당 음식을 탭해 서빙. 수익으로 새 메뉴/조리기구/좌석을 해금하면 손님 회전이 빨라진다. 목표는 일일 매출 갱신.</dd>
+<dt>핵심 재미</dt><dd>수치가 계속 커지는 성장 곡선 + 200종 메뉴 수집. 오프라인 수익으로 재접속 동기 생성.</dd>
+<dt>PC 조작</dt><dd>마우스 클릭 (raycast 선택)</dd>
+<dt>모바일 조작</dt><dd>탭 (완전히 동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — 에셋 원본이 3D 모델이라 그대로 사용. 카메라 고정 + 오브젝트 수 적음 → 모바일 성능 부담 낮음. UI는 React DOM.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b> — 오프라인 수익 정산을 서버 시각 기준으로 계산(클라 시계 조작 방지)</li>
+<li><b>Global User State: 사용(핵심)</b> — 가게 진행도·해금·재화. <span class="warn">Local Cache는 진행도 저장 금지</span>가 문서에 명시되어 있으므로 반드시 이쪽.</li>
+<li>Leaderboard: <b>사용</b> — 일일 매출 순위</li>
+<li>Ads: <b>사용</b> — 수익 2배 보상형 광고 (아이들 장르와 궁합)</li>
+<li>VXShop: <b>선택 가능</b> — 가게 스킨/데코 판매 (인게임 상품이 자연스러운 유일한 후보)</li>
+<li>Room / Local Cache: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>가게 바닥/벽 텍스처 일부, 말풍선 UI(코드로 처리 가능).</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★☆</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- ============ 9 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">09</span><h3 class="gname">BLACK TIDE</h3>
+<span class="tag">2D 벡터</span><span class="tag">Action / Naval Arcade</span></div>
+<p class="oneline">돛을 올린 채 좌우 포문을 번갈아 여는, 탑다운 해상 생존.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/pirate-pack/31ba98d029-1677579010/preview.png" alt="Kenney Pirate Pack">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Pirate Pack</b> — Kenney · 2D 벡터 탑다운 · 190개 · <b>선체와 돛이 분리된 함선 스프라이트</b>, 물 타일, 섬/암초, 통·상자, 대포알, 깃발</li>
+<li><b>UI Pack / Game Icons / Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd><a href="https://kenney.nl/assets/pirate-pack">kenney.nl/assets/pirate-pack</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>선체와 돛/포탑이 <b>별개 파일</b>이라 레이어를 겹쳐 배를 조립할 수 있다 = <b>선박 커스터마이즈가 그래픽 추가 없이 성립</b>. 물 타일은 무한 타일링이 되므로 스크롤 배경도 공짜. "회전하며 나아가고 측면으로 쏘는 물체"라는 이 팩의 행동에서 나오는 결론이 측면 포격 해전이다.</dd>
+<dt>Core Loop</dt><dd class="loop">항해 → 적선 격침 → 전리품 획득 → 선체/포/돛 업그레이드 → 폭풍·보스 함대 → 침몰 → 항해 거리 기록</dd>
+<dt>플레이 방식</dt><dd>탑다운 무한 바다. 배는 관성으로 움직이고 포는 좌현/우현으로만 발사 → 각도를 만드는 조타가 실력 요소. 목표는 항해 거리와 격침 수.</dd>
+<dt>핵심 재미</dt><dd>선체 3종 × 포 3종 × 돛 3종의 시각적 조합(부품이 그림으로 보임) + 조타 숙련의 성장.</dd>
+<dt>PC 조작</dt><dd>WASD 조타 + 마우스 좌/우 클릭으로 좌현·우현 포격</dd>
+<dt>모바일 조작</dt><dd>Virtual Joystick 조타 + 화면 좌/우 포격 버튼 2개</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 물 타일 무한 스크롤과 회전 스프라이트 컨테이너(선체+돛 겹치기)에 <code>Container</code> 구조가 그대로 맞음.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b></li>
+<li>Leaderboard: <b>사용</b> — 항해 거리 / 격침 수</li>
+<li>Global User State: <b>사용</b> — 해금 선박 부품</li>
+<li>Ads: <b>선택적</b> — 전리품 2배</li>
+<li>Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>폭발·물보라 이펙트 → 코드 파티클(원·사각 알파 페이드)로 대체.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★☆</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- ============ 10 ============ -->
+<div class="game">
+<div class="ghead"><span class="num">10</span><h3 class="gname">NEON SPRINT</h3>
+<span class="tag">픽셀 16×16</span><span class="tag">Platformer / Runner</span></div>
+<p class="oneline">멈추지 않는 사이버펑크 거리에서 점프·슬라이드·베기로 버티는 거리 경쟁.</p>
+<div class="shots pixel">
+<img src="https://img.itch.zone/aW1nLzI2NjA1ODE4LmdpZg==/original/sy3WqX.gif" alt="ansimuz Warped City">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Warped City</b> — ansimuz · 픽셀아트 · <b>3레이어 패럴랙스 배경</b>, 16×16 타일셋, <b>애니메이션 10종 주인공</b>(idle/run/jump/attack/hurt 등), 애니메이션 적 2종, 차량 4종, 소품·이펙트, Phaser 데모 포함</li>
+<li><b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd><a href="https://ansimuz.itch.io/warped-city">ansimuz.itch.io/warped-city</a></dd>
+<dt>CC0 확인</dt><dd><span class="warn">부분 확인</span> — itch 라이선스 필드 "Creative Commons Zero v1.0 Universal". 다만 본문에 팩 자체의 재배포 자제 요청이 병기되어 있어, 후보 중 유일하게 문구가 완전히 깔끔하지는 않음. 게임 내 사용은 문제 없음.</dd>
+<dt>에셋→게임 도출</dt><dd>주인공 애니메이션이 10종이나 갖춰졌는데 <b>적은 2종뿐</b>이다. 이 비대칭이 장르를 결정한다 — 적 다양성이 필요한 액션 캠페인은 불가능하고, <b>플레이어 동작이 주인공이고 적은 장애물 역할</b>인 러너/플랫포머가 맞다. 3레이어 패럴랙스는 스크롤 속도감을 위해 그려진 것이라 러너와 정확히 같은 목적이다.</dd>
+<dt>Core Loop</dt><dd class="loop">자동 전진 → 점프/슬라이드/공격 → 청크 통과 → 속도 상승 → 사망 → 거리 기록 → 스킨 해금</dd>
+<dt>플레이 방식</dt><dd>가로 스크롤. 미리 만든 20~30개 구간 청크를 난이도순으로 랜덤 연결. 속도가 계속 올라간다. 목표는 최장 거리.</dd>
+<dt>핵심 재미</dt><dd>손맛 있는 픽셀 애니메이션 + 30초~2분 초단타 세션. 실패 즉시 재시작.</dd>
+<dt>PC 조작</dt><dd>Space 점프 · ↓ 슬라이드 · 좌클릭/X 공격</dd>
+<dt>모바일 조작</dt><dd>화면 좌측 탭 = 점프, 우측 탭 = 공격, 아래 스와이프 = 슬라이드</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 타일 청크 재활용 스크롤 + <code>TilingSprite</code> 패럴랙스가 기본 기능으로 제공. (원본에 Phaser 데모가 있어 Phaser도 가능하나, UI를 React로 붙일 거면 Pixi가 더 가벼움)</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li>Auth: <b>사용</b> · Game Server: <b>사용</b></li>
+<li>Leaderboard: <b>사용</b> — 최장 거리</li>
+<li>Global User State: <b>사용</b> — 해금 스킨, 누적 코인</li>
+<li>Ads: <b>선택적</b> — 1회 부활</li>
+<li>Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>적 2종은 부족 → 색상 변형 + 속도 변형으로 3~4종처럼 운용하거나, ansimuz의 다른 CC0 팩 애드온 병합 필요.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★☆☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★★☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>반복 플레이</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<h2>11. 최종 비교표</h2>
+<div class="tablewrap">
+<table>
+<thead><tr>
+<th>게임</th><th>핵심 에셋</th><th>아트</th><th>장르</th>
+<th>구현</th><th>에셋 완성도</th><th>추가 필요</th><th>모바일</th><th>반복성</th><th>Verse8</th><th>핵심 Verse8 기능</th>
+</tr></thead>
+<tbody>
+<tr><td>01 STEEL LINE</td><td>Kenney Tower Defense</td><td>2D 벡터</td><td>Tower Defense</td>
+<td>★★☆☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★★</td><td>★★★★☆</td><td>★★★★★</td><td>Leaderboard, Global User State</td></tr>
+<tr><td>02 VOID DRIFT</td><td>Kenney Space Shooter Remastered</td><td>2D 벡터</td><td>Arcade Shmup</td>
+<td>★★☆☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★★</td><td>★★★★★</td><td>★★★★★</td><td>Leaderboard, Ads(컨티뉴)</td></tr>
+<tr><td>03 CRYPT WAVE</td><td>0x72 DungeonTileset II</td><td>픽셀</td><td>Survival Roguelite</td>
+<td>★★★☆☆</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★★★★</td><td>★★★★★</td><td>★★★★★</td><td>Global User State(영구성장), Leaderboard</td></tr>
+<tr><td>04 APEX LAP</td><td>Kenney Racing Kit + Car Kit</td><td>3D</td><td>Racing</td>
+<td>★★★★☆</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★★☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>Leaderboard(트랙별), Local Cache(고스트)</td></tr>
+<tr><td>05 BONE ARENA</td><td>KayKit Adventurers/Skeletons/Dungeon</td><td>3D</td><td>Action Roguelite</td>
+<td>★★★★☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>Leaderboard(층), Global User State</td></tr>
+<tr><td>06 CRAWL TACTICS</td><td>Dungeon Crawl 32×32 (OGA)</td><td>픽셀</td><td>Deckbuilder</td>
+<td>★★★☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★★</td><td>★★★★★</td><td>★★★★★</td><td>Global State(일일시드), Leaderboard</td></tr>
+<tr><td>07 DAILY CRATE</td><td>Kenney Sokoban</td><td>2D 벡터</td><td>Puzzle</td>
+<td>★☆☆☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★★</td><td>★★★★☆</td><td>★★★★☆</td><td>Global State(일일퍼즐), Leaderboard</td></tr>
+<tr><td>08 MINI DINER</td><td>Kenney Mini Market + Food Kit</td><td>3D</td><td>Idle / Simulation</td>
+<td>★★★☆☆</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>★★★★★</td><td>Global User State, Ads, VXShop</td></tr>
+<tr><td>09 BLACK TIDE</td><td>Kenney Pirate Pack</td><td>2D 벡터</td><td>Naval Action</td>
+<td>★★★☆☆</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>★★★★☆</td><td>Leaderboard, Global User State</td></tr>
+<tr><td>10 NEON SPRINT</td><td>ansimuz Warped City</td><td>픽셀</td><td>Platformer Runner</td>
+<td>★★☆☆☆</td><td>★★★☆☆</td><td>★★★☆☆</td><td>★★★★★</td><td>★★★★☆</td><td>★★★★☆</td><td>Leaderboard, Ads(부활)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>12. 최종 추천</h2>
+<div class="pick"><b>가장 빠르게 제작 가능</b>
+<b>07 DAILY CRATE</b> — 상태가 2차원 배열 하나, 캔버스도 물리도 불필요. 에셋이 규칙 전용으로 그려져 있어 디자인 결정조차 거의 없다. 하루 이틀이면 배포 가능한 수준.</div>
+
+<div class="pick"><b>에셋 완성도가 가장 높음</b>
+<b>06 CRAWL TACTICS</b> (2D 기준) — 몬스터·아이템·이펙트·GUI까지 3,000+ 타일. 콘텐츠를 아무리 늘려도 그래픽이 먼저 바닥나지 않는다.<br>
+3D 기준으로는 <b>05 BONE ARENA</b> — 리깅·애니메이션된 캐릭터 9종 + 무기 35종 + 모듈 던전 200개가 단일 아트 스타일로 통일되어 있다.</div>
+
+<div class="pick"><b>추가 에셋이 가장 적게 필요</b>
+<b>01 STEEL LINE</b> — 타워 베이스/헤드 분리, 경로 타일, 적 유닛, 폭발까지 한 팩에 다 있고 UI는 Kenney UI Pack이 그대로 붙는다. 새로 그릴 것이 사실상 없음.</div>
+
+<div class="pick"><b>모바일에 가장 적합</b>
+<b>02 VOID DRIFT</b> — 조작이 "한 손가락 드래그" 하나뿐이고 사격은 자동. PC의 마우스 추종과 동작이 완전히 같아 두 플랫폼이 다른 게임이 되지 않는다. 세로 화면과도 맞음.</div>
+
+<div class="pick"><b>Verse8 기능과 가장 잘 어울림</b>
+<b>06 CRAWL TACTICS</b> — <code>$global</code>에 일일 시드를 두고 전 유저가 같은 조건에서 경쟁 → Global State와 Leaderboard가 억지가 아니라 게임의 핵심 규칙 자체다. Game Server가 시드 발급과 점수 검증을 동시에 맡아 서버 구조도 단순.<br>
+수익화 기능까지 포함하면 <b>08 MINI DINER</b>가 Ads·VXShop·Global User State를 전부 자연스럽게 쓴다.</div>
+
+<div class="pick"><b>반복 플레이 가능성이 가장 높음</b>
+<b>03 CRYPT WAVE</b> — 판당 5~10분, 사망이 곧 영구 강화 재화, 매판 다른 빌드. 장르 자체가 반복을 전제로 설계된 구조.</div>
+
+<div class="pick"><b>전체 추천</b>
+<b>02 VOID DRIFT</b> — 이유 세 가지. (1) 에셋 295개가 손상 단계 스프라이트까지 갖춰 추가 제작이 0에 수렴한다. (2) 구현 난이도가 낮은데 결과물이 "완성된 게임"으로 보인다 — 작지만 완성도 높은 게임이라는 조건에 가장 정확히 맞는다. (3) Leaderboard + Ads 컨티뉴가 Verse8 기능을 억지 없이 쓰고, PC/모바일 조작이 동일하다.<br><br>
+차순위: <b>01 STEEL LINE</b>(가장 안전한 선택), <b>06 CRAWL TACTICS</b>(Verse8 기능 활용도 최고, 콘텐츠 확장 여력 최대).</div>
+
+</div>
+</body>
+</html>

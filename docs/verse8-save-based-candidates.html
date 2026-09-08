@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>저장형 웹게임 후보 10 — CC0 역기획 v2</title>
+<style>
+:root{
+  --bg:#f7f6f3; --panel:#ffffff; --ink:#1a1a1a; --muted:#6b6b6b;
+  --line:#e2e0da; --accent:#1d4ed8; --accent2:#0f766e; --chip:#eeecE6;
+  --ok:#15803d; --warn:#b45309;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141414; --panel:#1d1d1d; --ink:#ececec; --muted:#a0a0a0;
+    --line:#2f2f2f; --accent:#7dabff; --accent2:#5eead4; --chip:#262626;
+    --ok:#4ade80; --warn:#fbbf24;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.65 "Pretendard","Noto Sans KR",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 20px 100px}
+h1{font-size:clamp(26px,4vw,40px);line-height:1.2;margin:0 0 6px;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 32px;font-size:14px}
+h2{font-size:22px;margin:56px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line);letter-spacing:-.01em}
+h3{font-size:17px;margin:22px 0 8px}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent2);
+  border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px}
+.note b{color:var(--accent2)}
+.changed{border-left-color:var(--accent)}
+.changed b{color:var(--accent)}
+.game{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:24px;margin:28px 0;overflow:hidden}
+.ghead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.num{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.08em}
+.gname{font-size:24px;font-weight:800;margin:0;letter-spacing:-.02em}
+.tag{font-size:11px;font-weight:700;background:var(--chip);color:var(--muted);
+  padding:3px 9px;border-radius:99px;letter-spacing:.04em}
+.tag.hot{background:var(--accent);color:#fff}
+.oneline{color:var(--muted);font-size:15px;margin:2px 0 18px;font-style:italic}
+.shots{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;margin-bottom:18px}
+.shots img{height:190px;width:auto;border-radius:8px;border:1px solid var(--line);
+  background:#0e0e0e;flex:0 0 auto}
+.shots.pixel img{image-rendering:pixelated}
+dl{margin:0;display:grid;grid-template-columns:135px 1fr;gap:6px 16px;font-size:14px}
+dt{font-weight:700;color:var(--muted);font-size:12.5px;letter-spacing:.02em;padding-top:2px}
+dd{margin:0}
+dd ul{margin:2px 0;padding-left:18px}
+dd li{margin:2px 0}
+.loop{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+  background:var(--chip);padding:10px 12px;border-radius:8px;line-height:1.8}
+.save{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:13px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.7;white-space:pre-wrap}
+.stars{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 18px;
+  margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);font-size:13px}
+.stars div{display:flex;justify-content:space-between;gap:8px}
+.stars span:first-child{color:var(--muted)}
+.st{letter-spacing:2px;color:var(--accent)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:1040px;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--chip);font-size:12px;letter-spacing:.03em;position:sticky;top:0}
+tbody tr:last-child td{border-bottom:none}
+.pick{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:16px 20px;margin:12px 0}
+.pick b{color:var(--accent);display:block;font-size:13px;letter-spacing:.04em;margin-bottom:4px}
+.ok{color:var(--ok);font-weight:700}
+.warn{color:var(--warn);font-weight:700}
+ul.plain{font-size:14px}
+ul.plain li{margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>저장형 웹게임 후보 10 — CC0 에셋 역기획 v2</h1>
+<p class="sub">기준 변경: 1회성 기록 경쟁 폐기 → 세이브 기반 누적 진행 · 2026-09-08 · 구현 미착수</p>
+
+<div class="note changed">
+<b>v1에서 무엇을 바꿨나</b>
+<ul class="plain">
+<li>v1의 10개 중 <b>8개가 런 기반 기록 경쟁</b>(리더보드가 곧 동기)이었음 → 전부 폐기.</li>
+<li>v2는 전부 <b>세션이 끝나도 상태가 남고, 다음 접속에서 이어서 커지는</b> 구조만 남김. 사망/게임오버로 리셋되는 설계 없음.</li>
+<li>Verse8 매핑도 뒤집힘 — <b>Global User State가 중심축</b>, Leaderboard는 있어도 곁다리(누적 지표 자랑용)이거나 아예 미사용.</li>
+<li>v1에서 유일하게 저장형이었던 <b>08 MINI DINER를 01로 승격</b>하고 설계를 더 깊게 짬.</li>
+<li>각 후보에 <b>예상 총 플레이타임</b>과 <b>세이브 스키마</b>를 명시. 이게 이번 기준의 핵심 판단 근거.</li>
+</ul>
+</div>
+
+<h2>0. 저장형 게임의 Verse8 설계 규칙 (공식 문서 기준)</h2>
+<div class="note">
+<b>확인 출처</b> — <a href="https://docs.verse8.io/ko/docs">docs.verse8.io/ko/docs</a> 직접 조회.
+<ul class="plain">
+<li><b>세이브는 반드시 Global User State</b>. <code>@verse8/local-cache</code> 문서는 "player state data like progress or inventory"에 <span class="warn">사용 금지</span>를 명시(스토리지 압박 시 언제든 삭제됨). 저장형 게임에서 Local Cache는 세이브 저장소가 될 수 없고, 지형 청크·디코딩 에셋 같은 <b>재생성 가능한 파생 데이터 캐시</b>로만 쓸 수 있음.</li>
+<li><b>저장 빈도 설계 필수</b>. <code>server.remoteFunction()</code> 표준 호출이 <b>약 10회/초</b> 제한. 저장형은 매 클릭마다 저장하면 안 되고, ①30~60초 주기 오토세이브 ②화면 전환·건설 완료 같은 <b>의미 있는 체크포인트</b> ③<code>visibilitychange</code>(탭 이탈) 시점 3가지로 묶어서 저장. 중간 조작은 클라 메모리에만.</li>
+<li><b>오프라인 진행은 서버 시각 기준</b>. 클라 <code>Date.now()</code>를 믿으면 시계 조작으로 무한 자원. 마지막 저장 시각을 서버에 두고 <code>lastSeenAt</code> 차이를 서버에서 계산.</li>
+<li><b>반복 로직은 <code>$roomTick(deltaMillis, roomId)</code></b>. <code>setTimeout</code>/<code>setInterval</code> 사용 금지가 문서에 명시. 다만 <b>싱글 저장형은 룸이 필요 없음</b> — 성장·생산은 "접속 시 경과시간으로 한 번에 계산"하는 방식이 더 싸고 안전. 아래 10개 중 룸이 필요한 후보는 없음.</li>
+<li><b>server.js 형식 고정</b>: 루트에 <code>server.js</code>, <code>class Server { }</code>, export 금지. 클래스 변수는 요청마다 초기화되므로 상수 용도로만.</li>
+<li><b>세이브 검증</b>: 클라가 보낸 상태 전체를 그대로 신뢰하지 말 것. 저장형은 자원 수치가 곧 게임이라, 서버에서 최소한의 정합성 검사(음수 금지, 시간당 최대 증가량 상한)를 넣는 편이 안전.</li>
+<li>스택 전제 확정: <code>npm create vite@latest my-app -- --template react-ts</code> + <code>npm install @agent8/gameserver</code>, 배포 <code>npx -y @agent8/deploy</code>.</li>
+</ul>
+</div>
+
+<div class="note">
+<b>라이선스 재확인 / 제외</b> — <b>Quaternius</b>는 공식 라이선스가 CC0가 아닌 커스텀 QAL(재배포 금지, 저작권 보유)이라 전면 제외. <b>Pixel Frog(Tiny Swords)</b> 커스텀, <b>game-icons.net</b> CC BY, <b>LPC</b> CC-BY-SA 제외. 아래 10개에 쓰인 에셋은 전부 원본 페이지 라이선스 표기를 직접 확인한 CC0.
+</div>
+
+<!-- 1 -->
+<div class="game">
+<div class="ghead"><span class="num">01</span><h3 class="gname">MINI DINER</h3>
+<span class="tag hot">v1 08번 승격</span><span class="tag">3D 미니어처</span><span class="tag">경영 시뮬</span></div>
+<p class="oneline">음식 200종을 하나씩 열어가며 가게를 키우는, 접속할 때마다 조금씩 커져 있는 식당.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/mini-market/00f33430ac-1729865126/preview.png" alt="Kenney Mini Market">
+<img src="https://kenney.nl/media/pages/assets/food-kit/7a37477a9c-1719418523/preview.png" alt="Kenney Food Kit">
+<img src="https://kenney.nl/media/pages/assets/mini-characters/357d1a9452-1721210569/preview.png" alt="Kenney Mini Characters">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Food Kit</b> — Kenney · 3D · <b>200개</b> · 음식·재료·조리도구 모델</li>
+<li><b>Mini Market</b> — Kenney · 3D · 20개 · 매대/카운터/진열대 (애니메이션·색상 배리에이션)</li>
+<li><b>Mini Characters</b> — Kenney · 3D · 25개 · <b>리깅+애니메이션</b> 손님</li>
+<li><b>Mini Arcade</b> 20개(가게 장식), <b>UI Pack</b> 430개, <b>Game Icons</b> 105개 — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/food-kit">food-kit</a> ·
+<a href="https://kenney.nl/assets/mini-market">mini-market</a> ·
+<a href="https://kenney.nl/assets/mini-characters">mini-characters</a> ·
+<a href="https://kenney.nl/assets/mini-arcade">mini-arcade</a> ·
+<a href="https://kenney.nl/assets/ui-pack">ui-pack</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 페이지 License 항목 "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>Food Kit의 <b>음식 모델 200개</b>가 그대로 진행도가 된다. 보통 경영 시뮬은 "메뉴 해금 트리"를 만들려면 아이콘을 200개 그려야 하는데, 여기서는 이미 3D 모델로 존재한다. 즉 <b>플레이타임의 길이가 에셋 개수만큼 이미 확보되어 있는</b> 유일한 조합이다. 저장형 기준에서 이게 결정적.</dd>
+<dt>Core Loop</dt><dd class="loop">주문 접수 → 조리·서빙 → 수익 → 메뉴/설비/좌석 해금 → 손님 회전 증가 → 신규 구역 확장 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ money, day, unlockedRecipes[], stations[], seats,
+  staff[], decorLayout[], reputation, lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>해금·구매 즉시 + 60초 오토세이브 + 탭 이탈 시. 오프라인 수익은 재접속 시 서버가 <code>now - lastSeenAt</code>으로 1회 계산(상한 8시간).</dd>
+<dt>예상 플레이타임</dt><dd><b>15~25시간</b> — 메뉴 200종을 4단계 티어로 나눠 배치. 세션 하나는 5~10분이라 모바일에서 끊어 하기 좋음.</dd>
+<dt>플레이 방식</dt><dd>고정 카메라 3D 디오라마. 손님 말풍선 주문을 보고 재료를 탭해 조합·서빙. 수익으로 설비를 늘리면 동시 처리 수가 올라간다. 게임오버 없음, 리셋 없음.</dd>
+<dt>PC / 모바일</dt><dd>마우스 클릭(raycast) / 탭 — 동일한 게임</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — 에셋이 glTF 원본이라 변환 불필요, 카메라 고정·오브젝트 수 적어 모바일 부담 낮음. UI는 React DOM(UI Pack 이미지).</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 세이브 전체</li>
+<li><b>Game Server: 사용</b> — 오프라인 수익 서버 시각 계산 + 자원 정합성 검사</li>
+<li>Auth: <b>사용</b> — 세이브 소유자 식별(계정 없으면 저장형이 성립 안 함)</li>
+<li>Ads: <b>사용</b> — 오프라인 수익 2배 (아이들 장르와 궁합, 유저 탭에서만 호출)</li>
+<li>VXShop: <b>사용 가능</b> — 가게 스킨·데코 (10개 중 상품화가 가장 자연스러움)</li>
+<li>Leaderboard: 선택 — 주간 매출 (없어도 게임 성립)</li>
+<li>Local Cache / Room: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>가게 바닥·벽 텍스처 일부. 말풍선 UI는 DOM으로 처리.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>플레이타임</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- 2 -->
+<div class="game">
+<div class="ghead"><span class="num">02</span><h3 class="gname">HEX KINGDOM</h3>
+<span class="tag">3D 로우폴리</span><span class="tag">도시 건설 / 4X-lite</span></div>
+<p class="oneline">헥사 타일 한 칸씩 왕국을 넓히는, 저장되는 3D 영지 건설.</p>
+<div class="shots">
+<img src="https://img.itch.zone/aW1nLzE1OTAzNjg1LnBuZw==/original/9RR%2FOi.png" alt="KayKit Medieval Hexagon">
+<img src="https://img.itch.zone/aW1nLzExNjQyOTY0LnBuZw==/original/tRQM0J.png" alt="KayKit style">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>KayKit — Medieval Hexagon Pack</b> · Kay Lousberg · 3D · <b>200+</b> · 헥사 지형 타일(도로·강·해안·바다), <b>건물 4색 배리에이션</b>(대장간·제재소·교회·선술집·시장·풍차·물레방아·광산·우물·주택·병영·궁수훈련장), 자연 프롭(나무·바위·언덕·산·구름) · .gltf/.fbx/.obj · 1024² 그라디언트 아틀라스 1장</li>
+<li><b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd><a href="https://kaylousberg.itch.io/kaykit-medieval-hexagon">kaylousberg.itch.io/kaykit-medieval-hexagon</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — itch 페이지 라이선스 "Creative Commons Zero v1.0 Universal". 무료 티어만으로 게임 성립(유닛은 Extra 티어라 사용하지 않는 설계).</dd>
+<dt>에셋→게임 도출</dt><dd>헥사 타일과 건물이 <b>1:1로 대응하도록</b> 그려져 있다(한 타일 = 한 건물). 이건 "타일에 무엇을 지을지 고른다"는 규칙을 에셋이 먼저 강제하는 구조다. 게다가 건물이 <b>4색 배리에이션</b>이라 소속·등급 표현이 공짜. 텍스처가 아틀라스 1장이라 드로우콜도 적어 웹 3D에 유리. 정확히 헥사 도시 건설의 재료 목록.</dd>
+<dt>Core Loop</dt><dd class="loop">타일 개척 → 건물 배치 → 자원 생산(목재·석재·식량·금) → 인구 증가 → 상위 건물 해금 → 영토 확장 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ tiles:[{q,r,terrain,building,level}],
+  resources:{wood,stone,food,gold}, population,
+  unlockedBuildings[], era, lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>건물 배치/업그레이드 즉시 + 60초 오토세이브. 생산량은 저장하지 않고 <b>타일 배열에서 서버가 재계산</b> → 자원 조작 방어가 자동으로 됨.</dd>
+<dt>예상 플레이타임</dt><dd><b>20~30시간</b> — 건물 15종 × 3티어 + 지형 제약으로 배치 퍼즐성이 생겨 후반까지 늘어남.</dd>
+<dt>플레이 방식</dt><dd>비스듬한 3D 뷰. 회색 미개척 타일을 탭해 개척하고 건물을 놓는다. 인접 보너스(제재소는 숲 옆, 물레방아는 강 옆)가 있어 배치가 곧 전략. 전투·패배 없음.</dd>
+<dt>PC 조작</dt><dd>드래그 팬 · 휠 줌 · 클릭 배치</dd>
+<dt>모바일 조작</dt><dd>드래그 팬 · 핀치 줌 · 탭 배치 (동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — glTF 인스턴싱으로 헥사 수백 개를 저비용 렌더. 헥사 좌표(축좌표 q,r)는 순수 함수라 로직이 단순하고 세이브도 배열 하나.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 맵 전체 + 자원</li>
+<li><b>Game Server: 사용</b> — 자원 생산량 서버 재계산, 오프라인 누적</li>
+<li>Auth: <b>사용</b></li>
+<li><b>Local Cache: 사용</b> — 지형 시드로 생성한 맵 메시 캐싱(재생성 가능한 파생 데이터라 공식 용도에 정확히 부합)</li>
+<li>Leaderboard: 선택 — 총 인구 랭킹</li>
+<li>Ads / VXShop / Room: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>거의 없음. 자원 아이콘은 Kenney Game Icons.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★☆</span></div>
+<div><span>플레이타임</span><span class="st">★★★★★</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- 3 -->
+<div class="game">
+<div class="ghead"><span class="num">03</span><h3 class="gname">DUNGEON WARDEN</h3>
+<span class="tag">3D 로우폴리</span><span class="tag">던전 경영</span></div>
+<p class="oneline">방을 파고 함정을 놓고 스켈레톤을 배치해, 쳐들어오는 모험가를 막는 던전 사장님 게임.</p>
+<div class="shots">
+<img src="https://img.itch.zone/aW1nLzI4NTI5NzA1LnBuZw==/original/dFv80t.png" alt="KayKit Dungeon Remastered">
+<img src="https://img.itch.zone/aW1nLzIzODA4Mjg4LnBuZw==/original/WI%2FL4z.png" alt="KayKit Adventurers">
+<img src="https://img.itch.zone/aW1nLzExNjQyOTY3LnBuZw==/original/lJlLOW.png" alt="KayKit props">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>KayKit — Dungeon Pack (Remastered)</b> · 3D · <b>200+</b> · 모듈형 벽·바닥·계단·문, 상자·통·탁자, <b>함정</b>, 배너</li>
+<li><b>KayKit — Character Pack: Skeletons</b> · 스켈레톤 4종(리깅·애니) + 무기 10종 → <b>내 부하</b></li>
+<li><b>KayKit — Character Pack: Adventurers</b> · 5종(기사·바바리안·로그·메이지·레인저) → <b>침입자</b></li>
+<li><b>KayKit — Character Animations</b> · 24종 애니메이션</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kaylousberg.itch.io/kaykit-dungeon-remastered">dungeon-remastered</a> ·
+<a href="https://kaylousberg.itch.io/kaykit-skeletons">skeletons</a> ·
+<a href="https://kaylousberg.itch.io/kaykit-adventurers">adventurers</a> ·
+<a href="https://kaylousberg.itch.io/kaykit-animations">animations</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 네 페이지 모두 "Creative Commons Zero v1.0 Universal — Free for personal and commercial use, no attribution required".</dd>
+<dt>에셋→게임 도출</dt><dd>같은 제작자가 <b>모험가 팩과 스켈레톤 팩을 따로</b> 냈다는 점이 핵심이다. 스타일이 동일한 두 진영이 이미 존재하고, 던전 팩에는 <b>함정과 모듈형 방</b>이 들어 있다. "방을 조립하고, 한쪽 진영을 배치하고, 다른 쪽 진영이 들어온다" — 이 세 에셋이 합쳐지면 나오는 결론이 던전 경영이다. 던전 크롤러로 만들면 모험가 5종이 낭비되지만, 경영으로 뒤집으면 <b>침입자 다양성</b>으로 전부 쓰인다.</dd>
+<dt>Core Loop</dt><dd class="loop">방 굴착 → 함정·부하 배치 → 침입 웨이브 방어(자동 전투) → 전리품 → 던전 확장·부하 승급 → 더 강한 모험가 등장 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ grid:[[roomType]], traps[], minions:[{type,level,pos}],
+  gold, dungeonDepth, threatLevel, researched[], lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>굴착·배치 즉시 + 웨이브 종료 시. 웨이브 결과는 서버가 배치 데이터로 재계산해 검증.</dd>
+<dt>예상 플레이타임</dt><dd><b>12~20시간</b> — 방 8종 × 함정 6종 × 부하 4종 승급 트리. 패배해도 골드만 잃고 던전은 유지(리셋 없음).</dd>
+<dt>플레이 방식</dt><dd>단면 3D 던전 뷰. 건설 페이즈에 방·함정·부하를 배치하고, 준비 버튼을 누르면 모험가가 입구부터 진입해 자동 전투. 관전+응급 스킬 사용. 실패해도 던전 구조는 남는다.</dd>
+<dt>PC / 모바일</dt><dd>클릭 배치 · 드래그 팬 / 탭 배치 · 핀치 줌 — 동일</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — glTF 애니메이션을 <code>AnimationMixer</code>로 바로 재생. 자동 전투라 정밀 물리 불필요(그리드 경로탐색 + 원기둥 충돌).</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 던전 구조 전체</li>
+<li><b>Game Server: 사용</b> — 웨이브 결과 검증, 골드 정합성</li>
+<li>Auth: <b>사용</b> · Ads: <b>선택</b> — 전리품 2배</li>
+<li>Leaderboard: 선택 — 최대 방어 웨이브(누적 지표)</li>
+<li>Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>보스급 모험가 모델 없음 → Adventurers 스케일 업 + 이펙트로 대체.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★★☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★☆</span></div>
+<div><span>플레이타임</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★☆☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- 4 -->
+<div class="game">
+<div class="ghead"><span class="num">04</span><h3 class="gname">ISO METRO</h3>
+<span class="tag">2D 아이소메트릭</span><span class="tag">도시·교통 시뮬</span></div>
+<p class="oneline">도로를 깔고 구역을 지정해 도시를 키우는, 클래식한 2D 아이소 시티빌더.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/isometric-tiles-city/7a380d24eb-1677695022/preview.png" alt="Kenney Isometric Tiles City">
+<img src="https://kenney.nl/media/pages/assets/isometric-tiles-buildings/cdbefb2c03-1677694977/preview.png" alt="Kenney Isometric Tiles Buildings">
+<img src="https://kenney.nl/media/pages/assets/isometric-tiles-landscape/3d2ca98635-1677695068/preview.png" alt="Kenney Isometric Tiles Landscape">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Isometric Tiles City</b> 128개 · <b>Isometric Tiles Buildings</b> 128개 · <b>Isometric Tiles Landscape</b> 128개 · <b>Isometric Tiles Vehicles</b> · <b>Isometric Roads</b> / <b>Isometric Roads Water</b> — 전부 Kenney, 동일 아이소 스타일</li>
+<li><b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/isometric-tiles-city">iso-tiles-city</a> ·
+<a href="https://kenney.nl/assets/isometric-tiles-buildings">iso-tiles-buildings</a> ·
+<a href="https://kenney.nl/assets/isometric-tiles-landscape">iso-tiles-landscape</a> ·
+<a href="https://kenney.nl/assets/isometric-roads">iso-roads</a> ·
+<a href="https://kenney.nl/assets/isometric-tiles-vehicles">iso-tiles-vehicles</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 페이지 License "Creative Commons CC0". 같은 제작자·동일 스타일 5팩 조합.</dd>
+<dt>에셋→게임 도출</dt><dd><b>도로 타일이 연결 형태별로 전부 그려져 있다</b>(직선·커브·T자·교차·다리). 이건 "인접 상태를 보고 타일을 자동 선택하는" 오토타일링을 하라고 만든 구성이다. 도로를 그리는 순간 도시가 생기고, 건물 타일 128개가 그 위에 올라간다. 3D 없이 도시 규모감을 낼 수 있는 가장 싼 방법.</dd>
+<dt>Core Loop</dt><dd class="loop">도로 건설 → 주거/상업/공업 구역 지정 → 인구 유입 → 세수 → 공공시설 해금 → 지도 확장 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ grid:[[{tile,zone,level}]], money, population,
+  happiness, unlockedTiers[], mapSize, lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>건설 즉시(디바운스 2초) + 60초 오토세이브. 인구·세수는 그리드에서 서버 재계산.</dd>
+<dt>예상 플레이타임</dt><dd><b>15~25시간</b> — 건물 티어 4단계 + 지도 확장 3단계.</dd>
+<dt>플레이 방식</dt><dd>2D 아이소 그리드. 도구를 골라 드래그로 도로를 긋고 구역을 칠한다. 인구가 늘면 건물 타일이 자동으로 상위 티어로 교체(성장이 눈에 보임). 실패 조건 없음.</dd>
+<dt>PC 조작</dt><dd>드래그 팬 · 휠 줌 · 드래그 건설</dd>
+<dt>모바일 조작</dt><dd>드래그 팬 · 핀치 줌 · 도구 선택 후 드래그 건설 (동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 아이소 타일 수천 장을 <code>ParticleContainer</code>/배칭으로 처리. 3D보다 모바일 성능이 안전하고 로딩도 빠름.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 그리드 압축 저장(RLE)</li>
+<li><b>Game Server: 사용</b> — 인구·세수 재계산 및 검증</li>
+<li>Auth: <b>사용</b> · Leaderboard: 선택 — 최대 인구</li>
+<li>Local Cache / Ads / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>없음. 다만 그리드가 커지면 세이브 용량 관리(RLE 압축) 설계가 필요.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★☆</span></div>
+<div><span>플레이타임</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- 5 -->
+<div class="game">
+<div class="ghead"><span class="num">05</span><h3 class="gname">TINY FARM</h3>
+<span class="tag">픽셀 16×16</span><span class="tag">농장 시뮬</span></div>
+<p class="oneline">심고 기다리고 수확하는, 매일 잠깐씩 들르는 픽셀 농장.</p>
+<div class="shots pixel">
+<img src="https://kenney.nl/media/pages/assets/tiny-farm/16901f996e-1782913581/preview.png" alt="Kenney Tiny Farm">
+<img src="https://kenney.nl/media/pages/assets/tiny-town/fc6adf02eb-1674742335/preview.png" alt="Kenney Tiny Town">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Tiny Farm</b> — Kenney · 픽셀 16×16 · 130개 · 밭·작물 성장 단계·농기구·가축·창고</li>
+<li><b>Tiny Town</b> — Kenney · 픽셀 16×16 · 130개 · 마을 건물·상점·NPC (판매·확장 지역)</li>
+<li><b>Tiny Dungeon</b> 130개 (선택: 광산 지역) · <b>UI Pack / Game Icons / Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/tiny-farm">tiny-farm</a> ·
+<a href="https://kenney.nl/assets/tiny-town">tiny-town</a> ·
+<a href="https://kenney.nl/assets/tiny-dungeon">tiny-dungeon</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 페이지 License "Creative Commons CC0". Tiny 시리즈 3팩이 동일 16×16 규격·팔레트라 섞어 써도 어긋나지 않음.</dd>
+<dt>에셋→게임 도출</dt><dd>Tiny Farm에는 <b>작물의 성장 단계 스프라이트</b>가 들어 있다. 성장 단계를 그려 놨다는 건 "시간이 지나야 완성된다"는 규칙을 전제한 에셋이고, 그건 곧 <b>저장형 게임 전용 리소스</b>다. 기록 경쟁형으로는 쓸 수 없고 농장/대기형으로만 성립한다.</dd>
+<dt>Core Loop</dt><dd class="loop">밭 갈기 → 파종 → (실시간 대기) → 수확 → 판매 → 밭·가축·설비 확장 → 상위 작물 해금 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ plots:[{crop,plantedAt,watered}], animals[],
+  inventory{}, coins, unlockedSeeds[], buildings[],
+  farmSize, lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>파종·수확·구매 즉시 + 탭 이탈 시. <b>작물 성장은 저장하지 않고 <code>plantedAt</code>과 서버 시각의 차이로 판정</b> → 오프라인 진행이 자동으로 해결되고 조작도 막힌다.</dd>
+<dt>예상 플레이타임</dt><dd><b>20~40시간</b> — 대기 시간이 구조에 내장된 장르라 플레이타임이 가장 길게 뽑히는 후보. 하루 5분 접속 패턴에 최적.</dd>
+<dt>플레이 방식</dt><dd>탑다운 픽셀 농장. 타일을 탭해 갈고 심고 수확. 마을에서 판매하고 씨앗·설비를 산다. 게임오버 없음.</dd>
+<dt>PC 조작</dt><dd>클릭 / 드래그로 여러 칸 작업 · 단축키 도구 전환</dd>
+<dt>모바일 조작</dt><dd>탭 / 드래그 · 하단 도구 바 (동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 픽셀 퍼펙트(<code>NEAREST</code>) + 타일맵. 로직이 단순해 캔버스 대신 DOM도 가능하나, 타일 수가 많아지면 Pixi가 안전.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> · <b>Game Server: 사용</b> — 성장 판정을 서버 시각으로</li>
+<li>Auth: <b>사용</b></li>
+<li>Ads: <b>사용</b> — 성장 즉시 완료 1회 / 보너스 씨앗</li>
+<li>VXShop: 선택 — 장식·희귀 씨앗</li>
+<li>Leaderboard / Local Cache / Room: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>없음.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>플레이타임</span><span class="st">★★★★★</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- 6 -->
+<div class="game">
+<div class="ghead"><span class="num">06</span><h3 class="gname">STATION SEVEN</h3>
+<span class="tag">3D 로우폴리</span><span class="tag">기지 관리 시뮬</span></div>
+<p class="oneline">모듈을 하나씩 붙여 우주정거장을 키우고 승무원을 굴리는 관리 게임.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/space-station-kit/8fe239bfdb-1712749912/preview.png" alt="Kenney Space Station Kit">
+<img src="https://kenney.nl/media/pages/assets/modular-space-kit/7b9c52d41e-1771146080/preview.png" alt="Kenney Modular Space Kit">
+<img src="https://kenney.nl/media/pages/assets/blocky-characters/4ace046751-1749547441/preview.png" alt="Kenney Blocky Characters">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Space Station Kit</b> — Kenney · 3D · 90개 · 정거장 내부 모듈</li>
+<li><b>Modular Space Kit</b> — Kenney · 3D · 40개 · 모듈 연결부·색상 배리에이션·애니메이션</li>
+<li><b>Blocky Characters</b> — Kenney · 3D · 20개 · <b>리깅+애니메이션</b> 승무원</li>
+<li><b>Space Kit</b> 150개(외부 우주선·소행성) · <b>UI Pack Sci-Fi</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/space-station-kit">space-station-kit</a> ·
+<a href="https://kenney.nl/assets/modular-space-kit">modular-space-kit</a> ·
+<a href="https://kenney.nl/assets/blocky-characters">blocky-characters</a> ·
+<a href="https://kenney.nl/assets/space-kit">space-kit</a> ·
+<a href="https://kenney.nl/assets/ui-pack-sci-fi">ui-pack-sci-fi</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>이름 그대로 <b>모듈형</b>이다. 연결부가 규격화되어 있어 "모듈을 붙여 구조를 키운다"는 행동이 에셋 설계에 이미 들어 있다. 여기에 애니메이션 승무원이 붙으면, 구조물이 커질수록 안에서 움직이는 사람이 늘어나는 시각적 성장 피드백이 공짜로 생긴다. 이건 확장형 관리 시뮬 외에 다른 답이 없다.</dd>
+<dt>Core Loop</dt><dd class="loop">모듈 건설 → 전력·산소·식량 밸런스 → 승무원 배정 → 연구 해금 → 상위 모듈 → 정거장 확장 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ modules:[{type,x,y,rot,level}], crew:[{role,assignedTo,skill}],
+  power, oxygen, food, credits, research[], lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>건설·배정 즉시 + 60초 오토세이브. 자원 수지는 모듈 배열에서 서버가 재계산.</dd>
+<dt>예상 플레이타임</dt><dd><b>15~25시간</b> — 모듈 12종 × 연구 트리 20노드. 자원 밸런스가 후반 난이도를 자연스럽게 만듦.</dd>
+<dt>플레이 방식</dt><dd>단면/탑다운 3D. 빈 격자에 모듈을 붙이면 전력·산소 소비가 늘고, 승무원을 어디에 배정하느냐로 효율이 갈린다. 자원이 마이너스면 모듈이 꺼질 뿐 게임오버는 없음.</dd>
+<dt>PC / 모바일</dt><dd>클릭 배치·드래그 팬 / 탭 배치·핀치 줌 — 동일</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — 격자 스냅 배치라 물리엔진 불필요. 승무원 이동은 그리드 경로탐색 + <code>AnimationMixer</code>.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> · <b>Game Server: 사용</b> — 자원 수지 재계산</li>
+<li>Auth: <b>사용</b> · Ads: 선택 — 긴급 물자 보급</li>
+<li>Leaderboard / Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>자원 게이지 UI(UI Pack Sci-Fi로 대부분 해결).</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★★☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★☆☆</span></div>
+<div><span>플레이타임</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★☆☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- 7 -->
+<div class="game">
+<div class="ghead"><span class="num">07</span><h3 class="gname">CRAWL COMPENDIUM</h3>
+<span class="tag">픽셀 32×32</span><span class="tag">수집 · 파티 육성 RPG</span></div>
+<p class="oneline">몬스터를 잡고 도감을 채우고 파티를 키우는, 끝이 아주 먼 수집형 RPG.</p>
+<div class="shots pixel">
+<img src="https://opengameart.org/sites/default/files/styles/medium/public/DungeonCrawl_ProjectUtumnoTileset_0.png" alt="Dungeon Crawl Project Utumno tileset">
+<img src="https://opengameart.org/sites/default/files/styles/medium/public/tiles_tiny_sample_2.png" alt="Dungeon Crawl tiles sample">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Dungeon Crawl 32×32 tiles</b> — DCSS 팀 / Chris Hamons 관리 (OpenGameArt) · 픽셀 32×32 · <b>3,000+ 타일</b> — 몬스터 수백 종, 무기·방어구·물약·스크롤 수백 종, 주문 이펙트, GUI, 플레이어 아바타 · ProjectUtumno 확장 3,000+</li>
+<li><b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd><a href="https://opengameart.org/content/dungeon-crawl-32x32-tiles">opengameart.org/content/dungeon-crawl-32x32-tiles</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — OpenGameArt 페이지 License "CC0 (Public Domain)". 크레딧은 "as a courtesy"이며 필수 아님.</dd>
+<dt>에셋→게임 도출</dt><dd>이 팩의 정체성은 <b>개수</b>다. 몬스터 수백 종·아이템 수백 종이 정적 아이콘으로 존재한다. 애니메이션이 없어 액션에는 약하지만, <b>도감·수집·장비 조합</b>처럼 "종류가 많을수록 재미있어지는" 구조에서는 이게 곧 콘텐츠 볼륨이다. 저장형 기준에서는 <b>플레이타임을 에셋이 직접 보장</b>하는 후보.</dd>
+<dt>Core Loop</dt><dd class="loop">스테이지 탐험 → 몬스터 처치·포획 → 도감 등록 → 장비 획득·강화 → 파티 편성 → 신규 지역 해금 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ party:[{monsterId,level,exp,equip[]}], compendium:{id:count},
+  inventory[], gold, unlockedZones[], questFlags{}, lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>스테이지 클리어·도감 신규 등록·강화 시점. 세이브가 자주 일어나지 않아 호출 제한에 여유가 큼.</dd>
+<dt>예상 플레이타임</dt><dd><b>30~50시간</b> — 도감 200종 목표만으로도 장기 목표가 성립. 10개 중 플레이타임이 가장 김.</dd>
+<dt>플레이 방식</dt><dd>지역 선택 → 스테이지 진입 → 턴제 전투(파티 4 vs 적 3). 전투 후 도감이 채워지고 장비가 나온다. 패배해도 골드 일부만 잃고 파티·도감은 유지.</dd>
+<dt>PC / 모바일</dt><dd>클릭 / 탭 — 완전히 동일</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript (DOM/CSS만)</b> — 캔버스 불필요. 타일은 <code>background-position</code>으로 스프라이트시트에서 잘라 쓰고, 도감·인벤토리·전투 UI 전부 DOM이 유리(반응형·스크롤·접근성). 10개 중 <b>가장 빨리 만들 수 있는 구조</b>.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 파티·도감·인벤토리</li>
+<li><b>Game Server: 사용</b> — 전투 결과 검증, 드랍 롤을 서버에서 수행(클라 롤은 조작 가능)</li>
+<li>Auth: <b>사용</b></li>
+<li>Leaderboard: 선택 — <b>도감 완성률</b>(누적 지표라 저장형과 충돌 없음)</li>
+<li>Ads / Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>없음. 카드/도감 프레임은 CSS.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★★</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★☆☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>플레이타임</span><span class="st">★★★★★</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★★</span></div>
+</div>
+</div>
+
+<!-- 8 -->
+<div class="game">
+<div class="ghead"><span class="num">08</span><h3 class="gname">AQUA HAVEN</h3>
+<span class="tag">2D 벡터</span><span class="tag">수족관 육성 · 컬렉션</span></div>
+<p class="oneline">수조를 늘리고 물고기를 모으고 꾸미는, 조용한 컬렉션 게임.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/fish-pack/087a70e885-1747237949/preview.png" alt="Kenney Fish Pack">
+<img src="https://kenney.nl/media/pages/assets/ui-pack/ab9e396e4d-1718203978/preview.png" alt="Kenney UI Pack">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Fish Pack</b> — Kenney · 2D 벡터 · <b>120개</b> · 물고기·수중 생물 (v2.0에서 <b>벡터 원본 파일 추가</b> → 색상 변형 자유)</li>
+<li><b>Foliage Sprites</b>(수초) · <b>UI Pack</b> · <b>Game Icons</b> · <b>Music Jingles</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/fish-pack">fish-pack</a> ·
+<a href="https://kenney.nl/assets/foliage-sprites">foliage-sprites</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>물고기 120종이 있고 <b>벡터 원본이 함께 제공</b>된다. 벡터라는 건 색을 코드로 바꿔도 깨지지 않는다는 뜻 = <b>희귀도 변종(색 변이)을 무한히 생성 가능</b>. 수집형 게임의 핵심인 "같은 종의 레어 컬러"가 추가 그래픽 0으로 성립한다. 이 조합에서 나오는 답이 수족관 컬렉션.</dd>
+<dt>Core Loop</dt><dd class="loop">먹이 주기 → 성장 → 번식/변종 발견 → 도감 등록 → 판매 수익 → 수조·장식 확장 → 신규 종 해금 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ tanks:[{decor[],fish:[{species,tint,size,bornAt}]}],
+  coins, compendium:{speciesId:{variants[]}},
+  unlockedSpecies[], lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>구매·번식·판매 즉시 + 탭 이탈 시. 성장은 <code>bornAt</code>과 서버 시각의 차이로 판정.</dd>
+<dt>예상 플레이타임</dt><dd><b>15~30시간</b> — 120종 × 색 변종 수집. 세션 3~5분의 가벼운 접속형.</dd>
+<dt>플레이 방식</dt><dd>가로 수조 화면. 물고기가 자유 유영(간단한 boids), 탭하면 정보. 먹이·수질을 관리하고 번식으로 새 변종을 노린다. 죽음/패배 없음(방치해도 성장만 멈춤).</dd>
+<dt>PC / 모바일</dt><dd>클릭 / 탭 — 동일. 세로 화면에도 잘 맞음</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 물고기 수백 마리 유영은 스프라이트 배칭 + <code>tint</code> 속성으로 색 변종을 <b>런타임에 생성</b>(에셋 추가 없이 희귀도 구현).</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> · <b>Game Server: 사용</b> — 번식 롤·성장 판정</li>
+<li>Auth: <b>사용</b> · Ads: <b>사용</b> — 먹이 보충 / 변종 확률 부스트</li>
+<li>VXShop: 선택 — 수조 테마·장식</li>
+<li>Leaderboard / Local Cache / Room: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>수조 유리·배경 그라디언트(CSS/셰이더로 처리 가능).</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★☆☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★★</span></div>
+<div><span>플레이타임</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★★★</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- 9 -->
+<div class="game">
+<div class="ghead"><span class="num">09</span><h3 class="gname">IRON REALM</h3>
+<span class="tag">2D 탑다운</span><span class="tag">턴제 전략 캠페인</span></div>
+<p class="oneline">영지를 넓히며 한 턴씩 진행하는, 세이브가 남는 중세 전략.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/medieval-rts/7dfb3c0141-1677693582/preview.png" alt="Kenney Medieval RTS">
+<img src="https://kenney.nl/media/pages/assets/medieval-rts/fdf8b5d6e5-1677693585/sample.png" alt="Kenney Medieval RTS sample">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Medieval RTS</b> — Kenney · 2D 탑다운 · <b>120개</b> · 지형 타일·건물·유닛·깃발 (RTS 규격으로 그려진 세트)</li>
+<li><b>Tiny Battle</b> 190개(유닛 보강, 선택) · <b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/medieval-rts">medieval-rts</a> ·
+<a href="https://kenney.nl/assets/tiny-battle">tiny-battle</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>RTS용으로 그려진 세트지만, <b>실시간 RTS는 웹에서 바이브코딩으로 만들기에 가장 위험한 장르</b>(경로탐색·유닛 그룹 제어·성능). 같은 에셋을 <b>턴제 그리드</b>로 돌리면 유닛·건물·지형이 전부 그대로 쓰이면서 구현 난이도가 한 단계 내려가고, 턴제라 <b>중간 저장이 자연스럽다</b>. 에셋은 그대로 두고 규칙만 바꿔 저장형으로 만든 케이스.</dd>
+<dt>Core Loop</dt><dd class="loop">턴 시작 → 자원 수급 → 유닛 생산·이동 → 중립/적 영지 점령 → 건물 건설 → 턴 종료(저장) → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ turn, map:[[{terrain,owner,building}]],
+  units:[{type,hp,x,y,owner}], resources{},
+  techs[], campaignChapter, lastSeenAt }</dd>
+<dt>저장 시점</dt><dd><b>턴 종료마다 1회</b> — 저장형 중 호출 빈도가 가장 낮고 구조가 가장 깔끔하다. 언제 껐다 켜도 정확히 그 턴에서 재개.</dd>
+<dt>예상 플레이타임</dt><dd><b>10~20시간</b> — 챕터 8개 캠페인 + 무한 정복 모드.</dd>
+<dt>플레이 방식</dt><dd>그리드 맵. 유닛을 탭해 이동·공격, 도시에서 생산, 턴 종료. AI가 응수한다. 패배해도 챕터 재시작이며 캠페인 진행과 연구는 유지.</dd>
+<dt>PC 조작</dt><dd>클릭 선택·이동 · 드래그 팬 · 스페이스 턴 종료</dd>
+<dt>모바일 조작</dt><dd>탭 선택·이동 · 드래그 팬 · 턴 종료 버튼 (동일)</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + PixiJS</b> — 타일 렌더는 Pixi, 유닛 정보·생산 패널은 React DOM. 턴제라 프레임 부담이 없어 저사양 모바일에서도 안전.</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 맵·유닛·캠페인 진행</li>
+<li><b>Game Server: 사용</b> — 턴 결과 검증</li>
+<li>Auth: <b>사용</b></li>
+<li>Leaderboard / Ads / Local Cache / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>유닛 종류가 많지 않아 후반 유닛은 Tiny Battle 병합 또는 색 변형으로 보강 필요.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★☆☆</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★☆☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★★☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★★★☆</span></div>
+<div><span>플레이타임</span><span class="st">★★★☆☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★★☆☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★★☆</span></div>
+</div>
+</div>
+
+<!-- 10 -->
+<div class="game">
+<div class="ghead"><span class="num">10</span><h3 class="gname">CASTAWAY</h3>
+<span class="tag">3D 로우폴리</span><span class="tag">생존 · 제작</span></div>
+<p class="oneline">섬에서 자원을 모으고 제작하고 거처를 넓히는, 이어서 하는 생존 게임.</p>
+<div class="shots">
+<img src="https://kenney.nl/media/pages/assets/survival-kit/ae48c674e0-1712149231/preview.png" alt="Kenney Survival Kit">
+<img src="https://kenney.nl/media/pages/assets/nature-kit/2d81fc716e-1677698893/preview.png" alt="Kenney Nature Kit">
+<img src="https://kenney.nl/media/pages/assets/blocky-characters/4ace046751-1749547441/preview.png" alt="Kenney Blocky Characters">
+</div>
+<dl>
+<dt>사용 에셋</dt><dd>
+<ul>
+<li><b>Survival Kit</b> — Kenney · 3D · 80개 · 도구·자원·캠프 구조물 (v2.0에서 40모델 추가, 애니메이션 포함)</li>
+<li><b>Nature Kit</b> — Kenney · 3D · <b>330개</b> · 나무·바위·지형·식생</li>
+<li><b>Blocky Characters</b> — Kenney · 3D · 20개 · 리깅+애니메이션 플레이어</li>
+<li><b>Food Kit</b>(요리) · <b>UI Pack / Game Icons</b> — Kenney</li>
+</ul></dd>
+<dt>원본 링크</dt><dd>
+<a href="https://kenney.nl/assets/survival-kit">survival-kit</a> ·
+<a href="https://kenney.nl/assets/nature-kit">nature-kit</a> ·
+<a href="https://kenney.nl/assets/blocky-characters">blocky-characters</a></dd>
+<dt>CC0 확인</dt><dd><span class="ok">확인됨</span> — 각 페이지 License "Creative Commons CC0".</dd>
+<dt>에셋→게임 도출</dt><dd>Nature Kit <b>330개</b>는 "지형을 코드로 흩뿌리면 섬이 완성된다"는 뜻이다. 여기에 Survival Kit의 도구·자원·캠프 구조물이 붙으면 <b>채집 → 제작 → 건설</b>이라는 사슬이 그대로 나온다. 자원 모델과 완성품 모델이 한 팩 안에 같이 있는 구성이라 제작 트리를 에셋만으로 설계할 수 있다.</dd>
+<dt>Core Loop</dt><dd class="loop">자원 채집 → 도구 제작 → 상위 자원 접근 → 거처 건설 → 식량·체력 관리 → 섬 확장 탐험 → 반복</dd>
+<dt>세이브 스키마</dt><dd class="save">{ islandSeed, harvested:[nodeId], inventory{},
+  builtStructures:[{type,x,z,rot}], playerPos,
+  hunger, health, craftedRecipes[], lastSeenAt }</dd>
+<dt>저장 시점</dt><dd>제작·건설 즉시 + 60초 오토세이브 + 탭 이탈 시. <b>섬 지형은 저장하지 않고 <code>islandSeed</code>로 재생성</b> → 세이브 용량이 작게 유지된다.</dd>
+<dt>예상 플레이타임</dt><dd><b>10~18시간</b> — 제작 트리 4티어 + 섬 3개.</dd>
+<dt>플레이 방식</dt><dd>3인칭 3D. 나무·바위를 탭/클릭해 채집, 제작대에서 도구를 만들고, 거처를 짓는다. 굶으면 기절 후 캠프에서 부활(진행 유지, 리셋 없음).</dd>
+<dt>PC 조작</dt><dd>WASD 이동 + 마우스 시점 + 클릭 상호작용</dd>
+<dt>모바일 조작</dt><dd>Virtual Joystick + 상호작용 버튼(가장 가까운 대상 자동 타겟) — 시점은 자동 추적으로 단순화</dd>
+<dt>기술 구조</dt><dd><b>React + TypeScript + Three.js</b> — Nature Kit 330모델을 <code>InstancedMesh</code>로 배치해야 모바일에서 성능이 나옴(이 후보의 유일한 기술 리스크).</dd>
+<dt>Verse8 연동</dt><dd>
+<ul>
+<li><b>Global User State: 사용 (핵심)</b> — 인벤토리·건축물·시드</li>
+<li><b>Game Server: 사용</b> — 시드 발급, 자원 정합성</li>
+<li>Auth: <b>사용</b></li>
+<li><b>Local Cache: 사용</b> — 시드로 생성한 섬 지형 메시 캐싱 (공식 권장 용도에 정확히 부합)</li>
+<li>Ads: 선택 · Leaderboard / Room / VXShop: 미사용</li>
+</ul></dd>
+<dt>추가 제작</dt><dd>UI 아이콘 일부. 3인칭 이동·인스턴싱 때문에 10개 중 기술 난이도가 가장 높음.</dd>
+</dl>
+<div class="stars">
+<div><span>구현 난이도</span><span class="st">★★★★★</span></div>
+<div><span>에셋 완성도</span><span class="st">★★★★☆</span></div>
+<div><span>추가 에셋 필요</span><span class="st">★★☆☆☆</span></div>
+<div><span>모바일 적합도</span><span class="st">★★☆☆☆</span></div>
+<div><span>플레이타임</span><span class="st">★★★★☆</span></div>
+<div><span>바이브코딩</span><span class="st">★★☆☆☆</span></div>
+<div><span>Verse8 적합도</span><span class="st">★★★☆☆</span></div>
+</div>
+</div>
+
+<h2>11. 최종 비교표</h2>
+<div class="tablewrap">
+<table>
+<thead><tr>
+<th>게임</th><th>핵심 에셋</th><th>아트</th><th>장르</th><th>예상 플레이타임</th>
+<th>구현</th><th>에셋 완성도</th><th>추가 필요</th><th>모바일</th><th>Verse8</th><th>핵심 Verse8 기능</th>
+</tr></thead>
+<tbody>
+<tr><td>01 MINI DINER</td><td>Kenney Food Kit + Mini Market</td><td>3D</td><td>경영 시뮬</td><td>15~25h</td>
+<td>★★★☆☆</td><td>★★★★★</td><td>★★☆☆☆</td><td>★★★★★</td><td>★★★★★</td><td>Global User State, Ads, VXShop</td></tr>
+<tr><td>02 HEX KINGDOM</td><td>KayKit Medieval Hexagon</td><td>3D</td><td>도시 건설</td><td>20~30h</td>
+<td>★★★☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★☆</td><td>★★★★★</td><td>Global User State, Local Cache(지형)</td></tr>
+<tr><td>03 DUNGEON WARDEN</td><td>KayKit Dungeon + Skeletons + Adventurers</td><td>3D</td><td>던전 경영</td><td>12~20h</td>
+<td>★★★★☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>Global User State, Game Server 검증</td></tr>
+<tr><td>04 ISO METRO</td><td>Kenney Isometric Tiles 5종</td><td>2D 아이소</td><td>도시·교통</td><td>15~25h</td>
+<td>★★★☆☆</td><td>★★★★☆</td><td>★☆☆☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>Global User State(RLE 압축)</td></tr>
+<tr><td>05 TINY FARM</td><td>Kenney Tiny Farm + Tiny Town</td><td>픽셀</td><td>농장 시뮬</td><td>20~40h</td>
+<td>★★☆☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★★</td><td>★★★★★</td><td>Global User State, Ads, 서버 시각 성장</td></tr>
+<tr><td>06 STATION SEVEN</td><td>Kenney Space Station + Modular Space Kit</td><td>3D</td><td>기지 관리</td><td>15~25h</td>
+<td>★★★★☆</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★★☆☆</td><td>★★★★☆</td><td>Global User State, 자원 재계산</td></tr>
+<tr><td>07 CRAWL COMPENDIUM</td><td>Dungeon Crawl 32×32 (OGA)</td><td>픽셀</td><td>수집 RPG</td><td>30~50h</td>
+<td>★★☆☆☆</td><td>★★★★★</td><td>★☆☆☆☆</td><td>★★★★★</td><td>★★★★★</td><td>Global User State, 서버 드랍 롤</td></tr>
+<tr><td>08 AQUA HAVEN</td><td>Kenney Fish Pack (벡터)</td><td>2D 벡터</td><td>육성 컬렉션</td><td>15~30h</td>
+<td>★★☆☆☆</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★★★★</td><td>★★★★☆</td><td>Global User State, Ads</td></tr>
+<tr><td>09 IRON REALM</td><td>Kenney Medieval RTS</td><td>2D 탑다운</td><td>턴제 전략</td><td>10~20h</td>
+<td>★★★☆☆</td><td>★★★☆☆</td><td>★★★☆☆</td><td>★★★★☆</td><td>★★★★☆</td><td>Global User State(턴 단위 저장)</td></tr>
+<tr><td>10 CASTAWAY</td><td>Kenney Survival Kit + Nature Kit</td><td>3D</td><td>생존 제작</td><td>10~18h</td>
+<td>★★★★★</td><td>★★★★☆</td><td>★★☆☆☆</td><td>★★☆☆☆</td><td>★★★☆☆</td><td>Global User State, Local Cache(시드 지형)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>12. 최종 추천</h2>
+
+<div class="pick"><b>가장 빠르게 제작 가능</b>
+<b>07 CRAWL COMPENDIUM</b> — 캔버스도 3D도 물리도 없는 순수 DOM. 턴제라 프레임 루프조차 필요 없고, 저장 시점이 스테이지 단위라 세이브 설계가 가장 단순하다. 그런데 플레이타임은 10개 중 가장 길다.</div>
+
+<div class="pick"><b>에셋 완성도가 가장 높음</b>
+<b>07</b>(2D, 3,000+ 타일) / <b>02 HEX KINGDOM</b>(3D, 건물 4색 배리에이션 200+) / <b>01 MINI DINER</b>(음식 모델 200개). 셋 다 "그래픽이 먼저 바닥나지 않는" 조합.</div>
+
+<div class="pick"><b>추가 에셋이 가장 적게 필요</b>
+<b>02 HEX KINGDOM</b> — 지형·건물·자연 프롭이 한 팩에 동일 스타일로 들어 있고 아틀라스 1장이라 색·톤 보정조차 필요 없다.</div>
+
+<div class="pick"><b>모바일에 가장 적합</b>
+<b>05 TINY FARM</b> / <b>07</b> — 둘 다 탭만으로 완결되고, 세션을 5분에서 끊어도 손해가 없다. 저장형 + 모바일의 정석 조합.</div>
+
+<div class="pick"><b>플레이타임이 가장 길게 보장되는 게임</b>
+<b>07 CRAWL COMPENDIUM (30~50h)</b> — 도감 200종이라는 목표가 에셋 개수로 이미 확보되어 있음. 다음은 <b>05 TINY FARM (20~40h)</b>으로, 실시간 대기가 구조에 내장되어 있어 콘텐츠 대비 체류 시간이 가장 김.</div>
+
+<div class="pick"><b>Verse8 기능과 가장 잘 어울림</b>
+<b>05 TINY FARM</b> — 작물 성장을 <code>plantedAt</code> + 서버 시각으로 판정하는 구조가 Global User State와 Game Server를 정확히 문서 의도대로 쓴다. 시계 조작 방어와 오프라인 진행이 같은 코드로 해결되고, Ads(성장 즉시 완료)도 장르에 자연스럽다.<br>
+수익화까지 보면 <b>01 MINI DINER</b>가 Global User State + Ads + VXShop 세 개를 억지 없이 전부 쓴다.</div>
+
+<div class="pick"><b>전체적으로 가장 추천</b>
+<b>01 MINI DINER</b> — 이유 셋. (1) <b>이미 마음에 든다고 하신 방향</b>이고, 저장형 기준에서도 v1 후보 중 유일하게 살아남을 만큼 구조가 맞다. (2) Food Kit 200모델이 곧 해금 트리라 <b>플레이타임을 콘텐츠 제작 없이 확보</b>한다. (3) Verse8 기능 매핑이 가장 자연스럽다 — 세이브는 Global User State, 오프라인 수익은 Game Server 시각 계산, Ads는 수익 2배, VXShop은 가게 스킨.<br><br>
+다만 <b>더 빨리·더 길게</b>가 목표라면 <b>07 CRAWL COMPENDIUM</b>이 객관적으로 우위(구현 난이도 ★★, 플레이타임 30~50h). 3D 비주얼이 중요하면 <b>02 HEX KINGDOM</b>, 가장 안전한 저장형 정석은 <b>05 TINY FARM</b>.</div>
+
+</div>
+</body>
+</html>
