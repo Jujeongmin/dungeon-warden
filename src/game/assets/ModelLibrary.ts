@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { publicUrl } from "./publicUrl";
 
 interface ManifestEntry {
   url: string;
@@ -14,7 +15,7 @@ export interface LoadedModel {
   animations: THREE.AnimationClip[];
 }
 
-const MANIFEST_URL = "/assets/kaykit/manifest.json";
+const MANIFEST_URL = publicUrl("assets/kaykit/manifest.json");
 
 /**
  * Animation-only files.
@@ -102,7 +103,12 @@ export class ModelLibrary {
       const response = await fetch(MANIFEST_URL);
       if (!response.ok) return;
       const data = (await response.json()) as { models?: ManifestEntry[] };
-      this.entries = data.models ?? [];
+      // The manifest is written with root-absolute URLs; rebase them once here
+      // so every loader downstream gets a path that works under the verse.
+      this.entries = (data.models ?? []).map((entry) => ({
+        ...entry,
+        url: publicUrl(entry.url),
+      }));
     } catch {
       // No manifest yet — placeholders it is.
       this.entries = [];

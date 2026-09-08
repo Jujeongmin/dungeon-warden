@@ -8,6 +8,8 @@
  * names so swapping in files changes nothing else.
  */
 
+import { publicUrl } from "./assets/publicUrl";
+
 export type Cue =
   | "click"
   | "place"
@@ -74,7 +76,7 @@ const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   defeat: [/jingles.*lose/, /lose/, /^fail/, /^gameover/],
 };
 
-const MANIFEST_URL = "/assets/audio/manifest.json";
+const MANIFEST_URL = publicUrl("assets/audio/manifest.json");
 const STORAGE_KEY = "dw.muted";
 
 interface ManifestEntry {
@@ -145,7 +147,10 @@ class AudioEngine {
       const response = await fetch(MANIFEST_URL);
       if (response.ok) {
         const data = (await response.json()) as { sounds?: ManifestEntry[] };
-        this.entries = data.sounds ?? [];
+        this.entries = (data.sounds ?? []).map((entry) => ({
+          ...entry,
+          url: publicUrl(entry.url),
+        }));
       }
     } catch {
       this.entries = [];
