@@ -1376,4 +1376,41 @@ class Server {
 
     return { found, injected };
   }
+
+  /**
+   * Checks that $lock actually runs.
+   *
+   * It does not appear on globalThis, but neither does $sender, which plainly
+   * works — some contexts are injected into function scope instead. Purchase
+   * grants, conversions and research all rely on $lock for their
+   * read-modify-write, so a silent absence would mean those guards are not
+   * there at all.
+   */
+  async probeLock() {
+    const out = { onGlobalThis: typeof globalThis.$lock, inScope: typeof $lock };
+
+    try {
+      out.returned = await $lock(`probe:${$sender.account}`, async () => "ran");
+    } catch (error) {
+      out.error = String((error && error.message) || error);
+    }
+
+    // Nested different keys, the shape the purchase path uses.
+    try {
+      out.nested = await $lock(`probe-a:${$sender.account}`, async () =>
+        $lock(`probe-b:${$sender.account}`, async () => "nested-ran"),
+      );
+    } catch (error) {
+      out.nestedError = String((error && error.message) || error);
+    }
+
+    // What the shop context exposes, since it is undocumented.
+    try {
+      out.shop = typeof $shop === "undefined" ? "undefined" : Object.keys($shop);
+    } catch (error) {
+      out.shop = "error";
+    }
+
+    return out;
+  }
 }

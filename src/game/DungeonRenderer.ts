@@ -141,6 +141,10 @@ export class DungeonRenderer {
   private rings: Array<{ mesh: THREE.Mesh; life: number }> = [];
   private ringGeometry = new THREE.RingGeometry(0.2, 0.34, 20);
 
+  private landmarks: THREE.Object3D[] = [];
+  private pathMarkers: THREE.Object3D[] = [];
+  private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
+
   private hovered: { x: number; y: number } | null = null;
   private frameId = 0;
   private resizeObserver: ResizeObserver;
@@ -518,6 +522,67 @@ export class DungeonRenderer {
     if (this.floorMesh) this.scene.add(this.floorMesh);
 
     this.buildWalls(floorPositions);
+    this.buildLandmarks();
+  }
+
+  /**
+   * Puts a model on the entrance and the core.
+   *
+   * These two tiles decide every route in the game, and until now they were
+   * only a slightly different shade of floor. Stairs and a gold chest say what
+   * they are without a legend.
+   */
+  private buildLandmarks(): void {
+    const grid = this.grid;
+    if (!grid) return;
+
+    for (const object of this.landmarks) this.disposeObject(this.scene, object);
+    this.landmarks = [];
+
+    const spots: Array<{ key: string; x: number; y: number }> = [];
+    grid.forEach((x, y, tile) => {
+      if (tile === TILE.ENTRANCE) spots.push({ key: "entrance", x, y });
+      else if (tile === TILE.CORE) spots.push({ key: "core", x, y });
+    });
+
+    for (const spot of spots) {
+      const object = this.spawnModel(spot.key, 0.9);
+      if (!object) continue;
+      object.position.set(spot.x, FLOOR_HEIGHT + object.position.y, spot.y);
+      this.scene.add(object);
+      this.landmarks.push(object);
+    }
+  }
+
+  /**
+   * Draws the route a raiding party will walk.
+   *
+   * The entire game is shaping that route, and without seeing it the player is
+   * guessing where their minions and traps will actually matter.
+   */
+  setPathPreview(path: Array<{ x: number; y: number }> | null): void {
+    for (const marker of this.pathMarkers) this.disposeObject(this.scene, marker);
+    this.pathMarkers = [];
+
+    if (!path || path.length === 0) return;
+
+    for (let i = 0; i < path.length; i++) {
+      const step = path[i];
+      const mesh = new THREE.Mesh(
+        this.pathGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0xe8a44c,
+          transparent: true,
+          // Fades along the route so the direction of travel is readable.
+          opacity: 0.1 + 0.22 * (1 - i / path.length),
+          depthWrite: false,
+        }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(step.x, FLOOR_HEIGHT + 0.03, step.y);
+      this.scene.add(mesh);
+      this.pathMarkers.push(mesh);
+    }
   }
 
   /**
@@ -665,6 +730,29 @@ export class DungeonRenderer {
     this.rockMesh = null;
     this.floorMesh = null;
     this.wallMesh = null;
+  }
+
+  /** Counts of what is actually in the scene, for debugging from the console. */
+  debugStats(): Record<string, unknown> {
+    return {
+      modelsAvailable: this.models.available,
+      modelsLoaded: [...this.loaded.entries()].filter(([, m]) => m).map(([k]) => k),
+      sharedClips: this.sharedClips.length,
+      rockInstances: this.rockMesh?.count ?? 0,
+      floorInstances: this.floorMesh?.count ?? 0,
+      wallInstances: this.wallMesh?.count ?? 0,
+      landmarks: this.landmarks.length,
+      pathMarkers: this.pathMarkers.length,
+      units: this.unitMeshes.size,
+      markers: this.markerMeshes.size,
+      mixers: this.mixers.size,
+    };
+  }
+
+  /** Render resolution, dropped on low-end devices from the settings panel. */
+  setPixelRatio(ratio: number): void {
+    this.renderer.setPixelRatio(ratio);
+    this.resize();
   }
 
   rotate(direction: 1 | -1): void {
@@ -905,6 +993,12 @@ export class DungeonRenderer {
     }
     this.rings = [];
     this.ringGeometry.dispose();
+
+    this.setPathPreview(null);
+    this.pathGeometry.dispose();
+    for (const object of this.landmarks) this.disposeObject(this.scene, object);
+    this.landmarks = [];
+
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();
     this.roomGeometry.dispose();

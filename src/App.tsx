@@ -4,7 +4,8 @@ import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
 import { SKILL_STATS } from "./game/sim/traps";
-import { roomTiles } from "./game/rooms";
+import { roomTiles, lureTiles } from "./game/rooms";
+import { buildRaidPath } from "./game/sim/pathfinding";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, currentStep } from "./game/tutorial";
 import { audio } from "./game/audio";
@@ -12,6 +13,10 @@ import type { SimEvent } from "./game/sim/RaidSim";
 import { installDevTools } from "./game/devtools";
 import { ShopDialog } from "./ui/ShopDialog";
 import { LeaderboardDialog } from "./ui/LeaderboardDialog";
+import { TitleScreen } from "./ui/TitleScreen";
+import { SettingsDialog } from "./ui/SettingsDialog";
+import { IntroDialog } from "./ui/IntroDialog";
+import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import {
   DIG_COST,
   MAX_ROOMS,
@@ -98,8 +103,22 @@ export default function App() {
   const [researchError, setResearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("build");
   const [hudOpen, setHudOpen] = useState(true);
-  const [muted, setMuted] = useState(audio.isMuted);
-  const [tutorialOff, setTutorialOff] = useState(false);
+  const [settings, setSettings] = useState(loadSettings);
+  const [screen, setScreen] = useState<"title" | "game">("title");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
+
+  const patchSettings = useCallback((patch: Partial<Settings>) => {
+    setSettings((current) => {
+      const next = { ...current, ...patch };
+      saveSettings(next);
+      if (patch.muted !== undefined) audio.setMuted(patch.muted);
+      if (patch.quality !== undefined) {
+        rendererRef.current?.setPixelRatio(pixelRatioFor(patch.quality));
+      }
+      return next;
+    });
+  }, []);
 
   const save = useDungeonSave();
   const {
@@ -330,6 +349,18 @@ export default function App() {
     rendererRef.current?.setMarkers(markers);
   }, [markers]);
 
+  // The route is shown while building and hidden during a raid, where the
+  // adventurers themselves show it.
+  useEffect(() => {
+    if (!grid || !meta || raid.raiding) {
+      rendererRef.current?.setPathPreview(null);
+      return;
+    }
+    rendererRef.current?.setPathPreview(
+      buildRaidPath(grid, meta.entrance, meta.core, lureTiles(rooms)),
+    );
+  }, [grid, gridVersion, meta, rooms, raid.raiding]);
+
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
   const lastKilled = useRef(0);
@@ -363,6 +394,7 @@ export default function App() {
       raidState: raid.raidState,
       raidResult: raid.result,
       pathExists: raid.pathExists,
+      rendererStats: () => rendererRef.current?.debugStats() ?? null,
     });
   });
 
@@ -374,6 +406,28 @@ export default function App() {
     window.setTimeout(() => setAdNotice(null), 4000);
   }, [raid]);
 
+  // Apply saved preferences once the renderer exists.
+  useEffect(() => {
+    audio.setMuted(settings.muted);
+    rendererRef.current?.setPixelRatio(pixelRatioFor(settings.quality));
+    // Only on mount: later changes go through patchSettings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hasProgress =
+    (meta?.wavesRepelled ?? 0) + (meta?.coreBreaches ?? 0) > 0 ||
+    minions.length > 0 ||
+    research.length > 0;
+
+  const enterGame = useCallback(() => {
+    audio.play("click");
+    setScreen("game");
+    if (!settings.introSeen) {
+      setIntroOpen(true);
+      patchSettings({ introSeen: true });
+    }
+  }, [settings.introSeen, patchSettings]);
+
   const stepIndex = currentStep({
     grid,
     entrance: meta?.entrance ?? null,
@@ -384,7 +438,8 @@ export default function App() {
     wavesRepelled: meta?.wavesRepelled ?? 0,
     coreBreaches: meta?.coreBreaches ?? 0,
   });
-  const step = tutorialOff || stepIndex >= TUTORIAL.length ? null : TUTORIAL[stepIndex];
+  const step =
+    settings.tutorialDone || stepIndex >= TUTORIAL.length ? null : TUTORIAL[stepIndex];
 
   const toolHint = (() => {
     if (raid.pendingSkill) return `${SKILL_LABEL[raid.pendingSkill]} — 대상 타일을 선택하세요.`;
@@ -416,17 +471,34 @@ export default function App() {
           <span className={`status status-${status}`}>{STATUS_LABEL[status] ?? status}</span>
           <button
             className="icon-toggle"
-            onClick={() => { audio.setMuted(!muted); setMuted(!muted); }}
-            title={muted ? "소리 켜기" : "소리 끄기"}
-            aria-label={muted ? "소리 켜기" : "소리 끄기"}
+            onClick={() => patchSettings({ muted: !settings.muted })}
+            title={settings.muted ? "소리 켜기" : "소리 끄기"}
+            aria-label={settings.muted ? "소리 켜기" : "소리 끄기"}
           >
-            {muted ? "🔇" : "🔊"}
+            {settings.muted ? "🔇" : "🔊"}
           </button>
           <button className="shop-btn" onClick={() => { audio.play("click"); setBoardOpen(true); }}>
             순위표
           </button>
           <button className="shop-btn" onClick={() => { audio.play("click"); setShopOpen(true); }}>
             상점{entitlements.adsRemoved ? " ·광고 제거됨" : ""}
+          </button>
+          <button
+            className="icon-toggle"
+            onClick={() => { audio.play("click"); setSettingsOpen(true); }}
+            title="설정"
+            aria-label="설정"
+          >
+            ⚙
+          </button>
+          <button
+            className="icon-toggle"
+            onClick={() => { audio.play("click"); setScreen("title"); }}
+            title="타이틀로"
+            aria-label="타이틀로"
+            disabled={raid.raiding}
+          >
+            ⌂
           </button>
         </div>
       </header>
@@ -453,7 +525,13 @@ export default function App() {
           <div className="tutorial">
             <div className="tutorial-head">
               <b>{stepIndex + 1}/{TUTORIAL.length} · {step.title}</b>
-              <button className="icon-btn" onClick={() => setTutorialOff(true)} aria-label="튜토리얼 닫기">×</button>
+              <button
+                className="icon-btn"
+                onClick={() => patchSettings({ tutorialDone: true })}
+                aria-label="튜토리얼 닫기"
+              >
+                ×
+              </button>
             </div>
             <p>{step.body}</p>
           </div>
@@ -737,6 +815,41 @@ export default function App() {
       )}
 
       {boardOpen && <LeaderboardDialog account={account} onClose={() => setBoardOpen(false)} />}
+
+      {settingsOpen && (
+        <SettingsDialog
+          settings={settings}
+          onChange={patchSettings}
+          onReplayTutorial={() => {
+            patchSettings({ tutorialDone: false });
+            setSettingsOpen(false);
+            setIntroOpen(true);
+          }}
+          onResetDungeon={() => {
+            void save.resetGame();
+            setSettingsOpen(false);
+          }}
+          resetDisabled={raid.raiding}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {introOpen && <IntroDialog onClose={() => setIntroOpen(false)} />}
+
+      {/* Sits above the running scene, so the dungeon is already rendered and
+          warm by the time the player presses start. */}
+      {screen === "title" && (
+        <TitleScreen
+          hasProgress={hasProgress}
+          summary={meta}
+          loading={status === "connecting" || status === "loading"}
+          offline={isOffline}
+          onStart={enterGame}
+          onSettings={() => setSettingsOpen(true)}
+          onLeaderboard={() => setBoardOpen(true)}
+          onShop={() => setShopOpen(true)}
+        />
+      )}
     </div>
   );
 }
