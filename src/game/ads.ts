@@ -1,22 +1,38 @@
-import { Verse8Ads, type RewardedAdResult } from "@verse8/ads";
+import { Verse8Ads } from "@verse8/ads";
 
-/** Placement ids. `gold-refill` must match AD_REWARD_TABLE in server.js. */
+/**
+ * Placement ids.
+ *
+ * The rewarded placement pays out an effect inside the running raid, not
+ * currency. The Agent8 sandbox has no outbound HTTP — `fetch` is absent — so
+ * the documented server-side verification of a rewarded ad cannot run. Paying
+ * gold on an unverifiable signal would be an unbounded income source, whereas
+ * a one-off comeback inside a fight the client already simulates costs nothing
+ * that was not already the client's to give itself.
+ */
 export const AD_PLACEMENT = {
-  goldRefill: "gold-refill",
-  afterSave: "after-save",
+  reviveMinions: "revive-minions",
+  afterRaid: "after-raid",
 } as const;
 
 /**
- * Interstitials are the ads the `remove_ads` product takes away, so they need a
- * ceiling even for players who have not bought it. Rewarded ads are opt-in and
- * are never suppressed.
+ * Interstitials are the ads the `remove_ads` product takes away. Rewarded ads
+ * are opt-in and are never suppressed.
  */
 const INTERSTITIAL_MIN_INTERVAL_MS = 5 * 60_000;
 
 let lastInterstitialAt = 0;
 
-export function showGoldRefillAd(): Promise<RewardedAdResult> {
-  return Verse8Ads.showRewarded({ placementId: AD_PLACEMENT.goldRefill });
+/** True when the player watched the ad through to the reward. */
+export async function watchReviveAd(): Promise<boolean> {
+  try {
+    const result = await Verse8Ads.showRewarded({
+      placementId: AD_PLACEMENT.reviveMinions,
+    });
+    return result.status === "rewarded";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -31,7 +47,7 @@ export async function maybeShowInterstitial(adsRemoved: boolean): Promise<boolea
   lastInterstitialAt = now;
 
   try {
-    await Verse8Ads.showInterstitial({ placementId: AD_PLACEMENT.afterSave });
+    await Verse8Ads.showInterstitial({ placementId: AD_PLACEMENT.afterRaid });
     return true;
   } catch {
     // A failed interstitial must never block the game.

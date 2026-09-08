@@ -107,7 +107,6 @@ export default function App() {
     gridVersion,
     gold,
     entitlements,
-    adBusy,
     minions,
     traps,
     rooms,
@@ -367,22 +366,13 @@ export default function App() {
     });
   });
 
-  const onWatchAd = useCallback(async () => {
-    const result = await save.watchAdForGold();
-    const message: Record<string, string> = {
-      granted:
-        "reward" in result
-          ? `골드 ${result.reward} 지급됨${result.remaining !== undefined ? ` · 오늘 ${result.remaining}회 남음` : ""}`
-          : "골드 지급됨",
-      duplicate: "이미 지급된 보상입니다",
-      capped: "오늘 광고 보상을 모두 받았습니다. 내일 다시 오세요.",
-      dismissed: "광고를 끝까지 보지 않아 보상이 없습니다",
-      pending: "검증이 지연되고 있습니다. 잠시 후 다시 시도해 주세요",
-      failed: "광고를 재생할 수 없습니다",
-    };
-    setAdNotice(message[result.status] ?? null);
+  const onReviveAd = useCallback(async () => {
+    const revived = await raid.reviveWithAd();
+    setAdNotice(
+      revived > 0 ? `부하 ${revived}기가 다시 일어섰습니다` : "광고를 끝까지 봐야 부활합니다",
+    );
     window.setTimeout(() => setAdNotice(null), 4000);
-  }, [save]);
+  }, [raid]);
 
   const stepIndex = currentStep({
     grid,
@@ -503,6 +493,15 @@ export default function App() {
               </button>
             );
           })}
+
+          {/* One comeback per raid, and only when there is something to bring
+              back — an ad button that does nothing is worse than none. */}
+          {!raid.adUsed && raid.fallenMinions > 0 && (
+            <button className="skill ad" disabled={raid.adBusy} onClick={() => void onReviveAd()}>
+              <b>{raid.adBusy ? "광고 재생 중…" : "부하 부활"}</b>
+              <i>광고 시청 · {raid.fallenMinions}기</i>
+            </button>
+          )}
         </div>
       )}
 
@@ -608,11 +607,6 @@ export default function App() {
                 <button onClick={() => void save.saveNow()} disabled={!hasUnsaved}>지금 저장</button>
                 <button className="danger" onClick={() => void save.resetGame()} disabled={raid.raiding}>
                   던전 초기화
-                </button>
-              </div>
-              <div className="actions">
-                <button onClick={() => void onWatchAd()} disabled={adBusy || isOffline || raid.raiding}>
-                  {adBusy ? "광고 재생 중…" : "광고 보고 골드 +100"}
                 </button>
               </div>
               {adNotice && <p className="hint small">{adNotice}</p>}

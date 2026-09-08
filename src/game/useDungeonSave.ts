@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { Grid, createLocalDungeon } from "./grid";
-import { maybeShowInterstitial, showGoldRefillAd, AD_PLACEMENT } from "./ads";
+import { maybeShowInterstitial } from "./ads";
 import { addCost, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
@@ -16,7 +16,6 @@ import {
   ROOM_COST,
   TILE,
   TRAP_COST,
-  type AdClaimResult,
   type AdventurerRecord,
   type Dungeon,
   type Entitlements,
@@ -75,7 +74,6 @@ export function useDungeonSave() {
   const [error, setError] = useState<string | null>(null);
   const [gold, setGold] = useState(0);
   const [entitlements, setEntitlements] = useState<Entitlements>(EMPTY_ENTITLEMENTS);
-  const [adBusy, setAdBusy] = useState(false);
   const [pendingDigs, setPendingDigs] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [gridVersion, setGridVersion] = useState(0);
@@ -470,40 +468,6 @@ export function useDungeonSave() {
     }
   }, [server]);
 
-  const watchAdForGold = useCallback(async (): Promise<AdClaimResult> => {
-    if (!HAS_VERSE) return { status: "failed" };
-    if (adBusy) return { status: "failed" };
-
-    setAdBusy(true);
-    try {
-      const ad = await showGoldRefillAd();
-      if (ad.status !== "rewarded") {
-        return { status: ad.status === "dismissed" ? "dismissed" : "failed" };
-      }
-
-      // The verifier can still be settling. Server code cannot sleep, so the
-      // retry delay lives here.
-      for (let attempt = 0; attempt < 4; attempt++) {
-        const claim: AdClaimResult = await server.remoteFunction("claimAdReward", [
-          { requestId: ad.requestId, placementId: AD_PLACEMENT.goldRefill },
-        ]);
-        if (claim.status !== "pending") {
-          if (claim.status !== "dismissed" && claim.status !== "failed") {
-            setGold(claim.gold);
-          }
-          return claim;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-      }
-      return { status: "pending" };
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-      return { status: "failed" };
-    } finally {
-      setAdBusy(false);
-    }
-  }, [server, adBusy]);
-
   const resetGame = useCallback(async (): Promise<void> => {
     if (!HAS_VERSE) {
       applyLoad({
@@ -548,7 +512,6 @@ export function useDungeonSave() {
     gridVersion,
     gold,
     entitlements,
-    adBusy,
     minions,
     traps,
     rooms,
@@ -584,7 +547,6 @@ export function useDungeonSave() {
     saveNow,
     resetGame,
     refreshEntitlements,
-    watchAdForGold,
     maybeShowInterstitial: () => maybeShowInterstitial(entitlementsRef.current.adsRemoved),
   };
 }

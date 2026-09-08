@@ -5,7 +5,7 @@ import { buildRaidPath, findPath } from "./sim/pathfinding";
 import { lureTiles } from "./rooms";
 import { SKILL_STATS } from "./sim/traps";
 import type { ResearchEffects } from "./research";
-import { maybeShowInterstitial } from "./ads";
+import { maybeShowInterstitial, watchReviveAd } from "./ads";
 import type { Grid } from "./grid";
 import type { DungeonMeta } from "./useDungeonSave";
 import type {
@@ -73,6 +73,8 @@ export function useRaid({
   const [result, setResult] = useState<RaidFinishResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
+  const [adUsed, setAdUsed] = useState(false);
+  const [adBusy, setAdBusy] = useState(false);
 
   const simRef = useRef<RaidSim | null>(null);
   const raidIdRef = useRef<string | null>(null);
@@ -217,6 +219,7 @@ export function useRaid({
       }
 
       raidIdRef.current = start.raidId;
+      setAdUsed(false);
 
       // Minions still reviving sit this one out.
       const available = new Set(start.availableMinionIds ?? minions.map((m) => m.id));
@@ -302,6 +305,29 @@ export function useRaid({
     return next;
   }, [settle]);
 
+  /**
+   * The rewarded ad: one comeback per raid, putting fallen minions back on
+   * their feet. No server call — see the note in ads.ts for why the payout is
+   * an in-fight effect rather than currency.
+   */
+  const reviveWithAd = useCallback(async (): Promise<number> => {
+    const sim = simRef.current;
+    if (!sim || adUsed || adBusy || sim.fallenMinionCount === 0) return 0;
+
+    setAdBusy(true);
+    try {
+      const watched = await watchReviveAd();
+      if (!watched) return 0;
+
+      const revived = sim.reviveFallenMinions();
+      setAdUsed(true);
+      setRaidState({ ...sim.state });
+      return revived;
+    } finally {
+      setAdBusy(false);
+    }
+  }, [adUsed, adBusy]);
+
   const dismissResult = useCallback(() => {
     setResult(null);
     setRaidState(null);
@@ -324,5 +350,9 @@ export function useRaid({
     resolveSkillTarget,
     stepRaid,
     dismissResult,
+    reviveWithAd,
+    adUsed,
+    adBusy,
+    fallenMinions: simRef.current?.fallenMinionCount ?? 0,
   };
 }

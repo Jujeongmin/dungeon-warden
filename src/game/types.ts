@@ -180,14 +180,6 @@ export interface LoadResult {
   account?: string;
 }
 
-export type AdClaimResult =
-  | { status: "granted"; reward: number; gold: number; remaining?: number }
-  | { status: "duplicate"; gold: number }
-  | { status: "capped"; gold: number; remaining: number }
-  | { status: "pending" }
-  | { status: "dismissed" }
-  | { status: "failed" };
-
 /** Product ids, mirrored from PRODUCTS in server.js and the Verse8 dashboard. */
 export const PRODUCT_ID = {
   removeAds: "remove_ads",

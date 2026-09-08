@@ -261,6 +261,34 @@ export class RaidSim {
     };
   }
 
+  /** Minions that have fallen and could be brought back. */
+  get fallenMinionCount(): number {
+    return this.minions.filter((m) => !m.alive).length;
+  }
+
+  /**
+   * Puts every fallen minion back on its feet at half health.
+   *
+   * This is the rewarded-ad payout. It is deliberately an effect inside the
+   * simulation rather than currency: the client already drives the fight, so
+   * granting it needs no server verification, and the worst a cheater gets is
+   * one comeback they could have had by placing another minion.
+   */
+  reviveFallenMinions(): number {
+    if (this.status !== "running") return 0;
+
+    let revived = 0;
+    for (const minion of this.minions) {
+      if (minion.alive) continue;
+      minion.alive = true;
+      minion.hp = Math.max(1, Math.round(minion.maxHp * 0.5));
+      minion.cooldown = 0;
+      minion.action = "idle";
+      revived++;
+    }
+    return revived;
+  }
+
   /** Takes the events since the last call. */
   drainEvents(): SimEvent[] {
     const events = this.events;

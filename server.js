@@ -67,26 +67,26 @@ const BASE_REVIVE_MS = 3 * 60 * 1000;
 // Mirrored in src/game/research.ts. This copy is authoritative: the client's
 // only decides what to grey out.
 const RESEARCH = {
-  mage: { cost: 150, unlockMinion: "mage" },
-  trap_arrow: { cost: 120, unlockTrap: "arrow" },
-  trap_rock: { cost: 200, requires: ["trap_arrow"], unlockTrap: "rockfall" },
-  trap_flame: { cost: 280, requires: ["trap_rock"], unlockTrap: "flame" },
+  mage: { cost: 120, unlockMinion: "mage" },
+  trap_arrow: { cost: 90, unlockTrap: "arrow" },
+  trap_rock: { cost: 160, requires: ["trap_arrow"], unlockTrap: "rockfall" },
+  trap_flame: { cost: 220, requires: ["trap_rock"], unlockTrap: "flame" },
 
-  room_barracks: { cost: 180, unlockRoom: "barracks" },
-  room_vault: { cost: 200, unlockRoom: "vault" },
-  room_workshop: { cost: 220, requires: ["trap_arrow"], unlockRoom: "workshop" },
-  room_altar: { cost: 260, requires: ["room_barracks"], unlockRoom: "altar" },
-  room_jail: { cost: 300, requires: ["room_barracks"], unlockRoom: "jail" },
+  room_barracks: { cost: 150, unlockRoom: "barracks" },
+  room_vault: { cost: 160, unlockRoom: "vault" },
+  room_workshop: { cost: 180, requires: ["trap_arrow"], unlockRoom: "workshop" },
+  room_altar: { cost: 210, requires: ["room_barracks"], unlockRoom: "altar" },
+  room_jail: { cost: 240, requires: ["room_barracks"], unlockRoom: "jail" },
 
-  might1: { cost: 200, minionDamage: 0.1 },
-  might2: { cost: 400, requires: ["might1"], minionDamage: 0.2 },
-  vigor1: { cost: 200, minionHp: 0.15 },
-  vigor2: { cost: 400, requires: ["vigor1"], minionHp: 0.3 },
-  trap_power1: { cost: 250, requires: ["trap_arrow"], trapDamage: 0.2 },
-  trap_power2: { cost: 500, requires: ["trap_power1"], trapDamage: 0.4 },
+  might1: { cost: 160, minionDamage: 0.1 },
+  might2: { cost: 320, requires: ["might1"], minionDamage: 0.2 },
+  vigor1: { cost: 160, minionHp: 0.15 },
+  vigor2: { cost: 320, requires: ["vigor1"], minionHp: 0.3 },
+  trap_power1: { cost: 200, requires: ["trap_arrow"], trapDamage: 0.2 },
+  trap_power2: { cost: 400, requires: ["trap_power1"], trapDamage: 0.4 },
 
-  expand1: { cost: 500, expandTo: 16 },
-  expand2: { cost: 900, requires: ["expand1"], expandTo: 20 },
+  expand1: { cost: 420, expandTo: 16 },
+  expand2: { cost: 700, requires: ["expand1"], expandTo: 20 },
 };
 
 const BASE_MINIONS = ["warrior", "convert"];
@@ -96,7 +96,7 @@ const BASE_ROOMS = ["treasury"];
 /** Threat decays while the dungeon stays quiet, so a bad streak is survivable. */
 const THREAT_DECAY_MS = 20 * 60 * 1000;
 /** Each point of threat raises payouts, making a loud dungeon worth running. */
-const THREAT_REWARD_STEP = 0.05;
+const THREAT_REWARD_STEP = 0.08;
 const MAX_GRID_WIDTH = 20;
 
 /** Global collection backing the leaderboard. */
@@ -189,8 +189,11 @@ function expandGrid(dungeon, newWidth) {
 
 
 // Raid payouts. Kept on the server so a client cannot invent its own reward.
-const RAID_BASE_REWARD = 20;
-const RAID_REWARD_PER_KILL = 15;
+// Tuned against the research tree: a repelled raid should buy a meaningful
+// fraction of the next unlock, not a rounding error. At the old 20/15 a first
+// node cost roughly forty raids, which read as a wall rather than a goal.
+const RAID_BASE_REWARD = 35;
+const RAID_REWARD_PER_KILL = 25;
 const RAID_BREACH_REWARD_PER_KILL = 8;
 const RAID_PLUNDER_RATE = 0.15;
 const RAID_PLUNDER_CAP = 120;
@@ -230,28 +233,18 @@ const DEV_ACCOUNTS = [];
 // Remembering every purchase forever would grow the save without bound, and
 // only recent ids matter for replay protection.
 const MAX_TRACKED_PURCHASES = 50;
-const MAX_TRACKED_AD_CLAIMS = 50;
 
 // ---------------------------------------------------------------------------
 // Rewarded ads
 // ---------------------------------------------------------------------------
-// Reward amounts live on the server. The client's `result.reward` is a UX hint
-// and must never be trusted.
-const AD_REWARD_TABLE = {
-  "gold-refill": 100,
-};
-
-/**
- * Rewarded ads are capped per day.
- *
- * Without a cap, 100 gold a view is an unbounded income source and the entire
- * build economy stops meaning anything. The ad network's own fill limits are
- * not a substitute — they are not a game rule.
- */
-const AD_CLAIMS_PER_DAY = 10;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-const ADS_VERIFIER_URL = "https://ads-verifier.verse8.io/ads/status";
+// There is deliberately no server-side ad payout.
+//
+// The documented verification flow needs an outbound HTTP call to
+// ads-verifier.verse8.io, and the isolated-vm sandbox has no `fetch` — this was
+// measured, not assumed. Paying currency on a signal that cannot be verified is
+// an unbounded income source, so the rewarded ad instead grants an effect
+// inside the running raid, which the client already simulates. Nothing about a
+// reward reaches this file.
 
 function emptyEntitlements() {
   return { adsRemoved: false };
@@ -1263,82 +1256,6 @@ class Server {
       grantedPurchases: [],
     });
     return { entitlements: emptyEntitlements() };
-  }
-
-  // -------------------------------------------------------------------------
-  // Rewarded ads
-  // -------------------------------------------------------------------------
-
-  /**
-   * Credits a rewarded-ad payout after checking it with the Verse8 verifier.
-   *
-   * The client sends only the requestId. The amount comes from the server-side
-   * table, and the same requestId can never pay out twice.
-   *
-   * Returns { status: "pending" } when the verifier has not settled yet; the
-   * client retries, because server code cannot sleep (no setTimeout).
-   */
-  async claimAdReward({ requestId, placementId }) {
-    if (typeof requestId !== "string" || requestId.length === 0) {
-      throw new Error("BAD_REQUEST_ID");
-    }
-
-    const reward = AD_REWARD_TABLE[placementId];
-    if (!reward) throw new Error("UNKNOWN_PLACEMENT");
-
-    if (typeof fetch !== "function") {
-      // Never pay out an unverified reward. If this fires, the sandbox has no
-      // outbound fetch and the reward flow needs a different design.
-      throw new Error("VERIFY_UNAVAILABLE");
-    }
-
-    const response = await fetch(
-      `${ADS_VERIFIER_URL}?requestId=${encodeURIComponent(requestId)}`,
-    );
-    if (response.status === 202) return { status: "pending" };
-    if (!response.ok) throw new Error("VERIFY_FAILED");
-
-    const body = await response.json();
-    if (body.status === "pending") return { status: "pending" };
-    if (body.status !== "verified") {
-      return { status: body.status === "dismissed" ? "dismissed" : "failed" };
-    }
-
-    return await $lock(`adclaim:${$sender.account}`, async () => {
-      const state = (await $global.getMyState()) || {};
-      const claimed = state.grantedAdClaims || [];
-
-      if (claimed.indexOf(requestId) !== -1) {
-        return { status: "duplicate", gold: await $asset.get("gold") };
-      }
-
-      // Daily cap. The day bucket resets lazily, since there is no scheduler.
-      const day = Math.floor(Date.now() / DAY_MS);
-      const quota = state.adQuota && state.adQuota.day === day
-        ? state.adQuota
-        : { day, used: 0 };
-
-      if (quota.used >= AD_CLAIMS_PER_DAY) {
-        return {
-          status: "capped",
-          remaining: 0,
-          gold: await $asset.get("gold"),
-        };
-      }
-
-      await $asset.mint("gold", reward);
-      await $global.updateMyState({
-        grantedAdClaims: pushCapped(claimed, requestId, MAX_TRACKED_AD_CLAIMS),
-        adQuota: { day, used: quota.used + 1 },
-      });
-
-      return {
-        status: "granted",
-        reward,
-        remaining: AD_CLAIMS_PER_DAY - (quota.used + 1),
-        gold: await $asset.get("gold"),
-      };
-    });
   }
 
   // -------------------------------------------------------------------------
