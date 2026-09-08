@@ -10,3 +10,54 @@ body,
 #root {
   isolation: isolate;
 }
+
+/* Shown by ErrorBoundary when a render throws. Lives here rather than in
+   App.css because the panel replaces App entirely. */
+.crash {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: #14120f;
+  color: #efe7d8;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-align: center;
+}
+
+.crash h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+}
+
+.crash p {
+  margin: 0;
+  color: #a4998a;
+}
+
+.crash pre {
+  max-width: min(90vw, 640px);
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #3a3229;
+  border-radius: 6px;
+  background: #1c1915;
+  color: #d8a07a;
+  font-size: 0.8rem;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.crash button {
+  padding: 8px 18px;
+  border: 1px solid #5a4c3c;
+  border-radius: 6px;
+  background: #2a241d;
+  color: #efe7d8;
+  cursor: pointer;
+}
