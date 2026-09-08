@@ -17,6 +17,12 @@ export interface LoadedModel {
 
 const MANIFEST_URL = publicUrl("assets/kaykit/manifest.json");
 
+// Every KayKit .gltf in a pack points at the same texture and its own .bin, and
+// each load fetches them again on its own — one page load asked for
+// dungeon_texture.png thirteen times. three's loader cache is keyed by URL and
+// makes those duplicates free.
+THREE.Cache.enabled = true;
+
 /**
  * Animation-only files.
  *

@@ -12,6 +12,22 @@ export default defineConfig({
   // src/game/assets/publicUrl.ts for the same reason.
   base: "./",
 
+  server: {
+    watch: {
+      // public/assets holds ~530 CC0 model, texture and audio files. They are
+      // static art: watching them buys no HMR and costs one inotify watch each,
+      // which the Agent8 dev container cannot afford — its Vite process was
+      // dropping its socket and returning 500/503 until it restarted.
+      ignored: [
+        "**/.git/**",
+        "**/node_modules/**",
+        "**/public/assets/**",
+        "**/art-src/**",
+        "**/dist/**",
+      ],
+    },
+  },
+
   build: {
     outDir: "dist",
     // Skip gzip-size reporting: nobody here optimises by bundle size, and it
