@@ -12,10 +12,11 @@ dist
 dist-ssr
 *.local
 
-# Verse8 deploy writes this; never commit credentials or verse ids
-.env
-.env.*
-!.env.example
+# .env is tracked on purpose: it carries the verse identity that ties this
+# project to its deployed game, and .agent8.lock is the platform's copy of it.
+# Local-only overrides stay out.
+.env.local
+.env.*.local
 
 # Original KayKit archives (51 MB). The extracted models under
 # public/assets/kaykit are what the game actually serves.
