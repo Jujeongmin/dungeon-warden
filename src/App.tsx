@@ -5,9 +5,9 @@ import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
 import { SKILL_STATS } from "./game/sim/traps";
 import { OBSTACLE_STATS } from "./game/sim/obstacles";
-import { roomTiles, lureTiles } from "./game/rooms";
+import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
-import { blockedSet, coreOf, entranceOf } from "./game/arena";
+import { blockedSet, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, currentStep } from "./game/tutorial";
 import { audio } from "./game/audio";
@@ -128,6 +128,7 @@ type Tab = "build" | "manage" | "research";
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<DungeonRenderer | null>(null);
+  const hudRef = useRef<HTMLElement>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   /** Baked from the tool models once the pack loads; empty until then. */
@@ -417,6 +418,78 @@ export default function App() {
       return { id: o.id, type: o.type, x: o.x, y: o.y, hp: stats.hp, maxHp: stats.hp };
     });
   }, [raid.raidState, obstacles]);
+
+  /**
+   * The preview of what the next tap will place.
+   *
+   * This repeats rules the server also enforces, which is normally worth
+   * avoiding — but the point of a preview is to answer before the tap, and
+   * asking the server would answer after it. The server stays the authority:
+   * if these two ever disagree the save is refused and the client is the one
+   * that was wrong.
+   */
+  const ghostLegal = useCallback(
+    (x: number, y: number): boolean => {
+      if (!meta || !inArena(arena, x, y)) return false;
+      if (x === meta.entrance.x && y === meta.entrance.y) return false;
+      if (x === meta.core.x && y === meta.core.y) return false;
+
+      const taken = (tx: number, ty: number) =>
+        obstacles.some((o) => o.x === tx && o.y === ty) ||
+        minions.some((m) => m.x === tx && m.y === ty) ||
+        traps.some((tr) => tr.x === tx && tr.y === ty) ||
+        rooms.some((r) => roomCovers(r, tx, ty));
+
+      // A room claims a 2x2 block anchored here, so every tile of it must be
+      // clear and inside the room — not just the one under the cursor.
+      if (tool.kind === "room") {
+        return roomTiles({ x, y }).every(
+          (tile) =>
+            inArena(arena, tile.x, tile.y) &&
+            !taken(tile.x, tile.y) &&
+            !(tile.x === meta.entrance.x && tile.y === meta.entrance.y) &&
+            !(tile.x === meta.core.x && tile.y === meta.core.y),
+        );
+      }
+
+      return !taken(x, y);
+    },
+    [arena, meta, obstacles, minions, traps, rooms, tool],
+  );
+
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    const modelKey = TOOL_MODEL[toolId] ?? null;
+    if (!modelKey || raid.raiding || !hover) {
+      renderer.setGhost(null, true);
+      return;
+    }
+    renderer.setGhost(modelKey, ghostLegal(hover.x, hover.y));
+  }, [toolId, hover, raid.raiding, ghostLegal]);
+
+  /**
+   * Tell the camera how much of itself the HUD is covering.
+   *
+   * The canvas is full-screen and the panel floats on its lower part, so
+   * without this the board frames to the middle of the canvas — which on a
+   * phone is behind the panel, with the core out of sight. Measured rather
+   * than assumed, because the panel's height changes when it collapses and
+   * when the viewport does.
+   */
+  useEffect(() => {
+    const measure = () => {
+      const renderer = rendererRef.current;
+      const panel = hudRef.current;
+      if (!renderer || !panel) return;
+      const gap = window.innerHeight - panel.getBoundingClientRect().top;
+      renderer.setBottomInset(Math.max(0, gap));
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [hudOpen, tab, obstacles.length, minions.length, traps.length, rooms.length, research.length]);
 
   useEffect(() => {
     rendererRef.current?.setUnits(units);
@@ -717,7 +790,7 @@ export default function App() {
         </div>
       )}
 
-      <aside className={hudOpen ? "hud" : "hud collapsed"}>
+      <aside ref={hudRef} className={hudOpen ? "hud" : "hud collapsed"}>
         <div className="hud-tabs">
           <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>{t("tab_build")}</button>
           <button className={tab === "manage" ? "active" : ""} onClick={() => { audio.play("click"); setTab("manage"); }}>{t("tab_manage")}</button>

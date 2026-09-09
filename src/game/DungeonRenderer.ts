@@ -163,6 +163,14 @@ const TORCH_CHANCE = 0.22;
  */
 const MAX_TORCH_LIGHTS = 6;
 
+/** Stains on the two tiles that define the run: in, and what they came for. */
+const ENTRANCE_TINT = 0xff8a6a;
+const CORE_TINT = 0xffc766;
+
+/** The placement preview: legal here, and not. */
+const GHOST_OK = 0x8fe6a0;
+const GHOST_NO = 0xff7a6a;
+
 /**
  * A stable pseudo-random number for a tile.
  *
@@ -256,6 +264,15 @@ export class DungeonRenderer {
   private decor: THREE.Object3D[] = [];
   /** Lights belonging to the torch props; cleared with them. */
   private torchLights: THREE.PointLight[] = [];
+
+  /** Pixels of canvas hidden behind the HUD, so the board can frame above it. */
+  private bottomInset = 0;
+
+  /** The see-through preview of what the next tap places. */
+  private ghost: THREE.Object3D | null = null;
+  private ghostKey: string | null = null;
+  private ghostLegal = true;
+  private ghostLift = 0;
   private pathMarkers: THREE.Object3D[] = [];
   private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
 
@@ -374,6 +391,38 @@ export class DungeonRenderer {
    * in portrait is far narrower than the desktop pane, and a fixed distance
    * leaves the arena running off both edges there.
    */
+  /**
+   * How much of the canvas the HUD is sitting on.
+   *
+   * The canvas fills the screen and the HUD floats over its lower half, so a
+   * board centred in the canvas is centred behind the panel — on a phone that
+   * put the core, the thing the player is defending, out of sight. The camera
+   * frames into the band that is actually visible instead.
+   */
+  setBottomInset(pixels: number): void {
+    const next = Math.max(0, Math.round(pixels));
+    if (next === this.bottomInset) return;
+    this.bottomInset = next;
+    this.applyViewOffset();
+    this.fitToArena();
+  }
+
+  private applyViewOffset(): void {
+    const width = this.canvas.clientWidth || 1;
+    const height = this.canvas.clientHeight || 1;
+    const inset = Math.min(this.bottomInset, Math.max(0, height - 80));
+
+    if (inset <= 0) {
+      this.camera.clearViewOffset();
+      return;
+    }
+
+    // Frame as though the canvas were taller by the hidden strip, then show
+    // the lower window of it: the board's centre lands in the middle of the
+    // band above the HUD rather than behind it.
+    this.camera.setViewOffset(width, height + inset, 0, inset, width, height);
+  }
+
   private fitToArena(): void {
     const arena = this.arena;
     if (!arena) return;
@@ -387,8 +436,14 @@ export class DungeonRenderer {
     const forHeight = span / Math.tan(halfFov);
     const forWidth = span / (Math.tan(halfFov) * aspect);
 
+    // The view offset spreads the vertical field over the canvas *plus* the
+    // strip hidden by the HUD, so only part of it is on screen. Back off by
+    // that ratio or the board is framed to a height the player cannot see.
+    const height = this.canvas.clientHeight || 1;
+    const visibleShare = this.bottomInset > 0 ? (height + this.bottomInset) / height : 1;
+
     this.distance = THREE.MathUtils.clamp(
-      Math.max(forHeight, forWidth) * 0.72,
+      Math.max(forHeight, forWidth) * 0.72 * visibleShare,
       MIN_DISTANCE,
       MAX_DISTANCE,
     );
@@ -846,6 +901,9 @@ export class DungeonRenderer {
    * wall, is a bug, not decoration.
    */
   private buildDecor(floors: Array<{ x: number; y: number }>): void {
+    // Counted here rather than off torchLights.length: that array also holds
+    // the entrance and core glows, which must not use up the torch budget.
+    let litTorches = 0;
     const arena = this.arena;
     if (!arena) return;
 
@@ -888,7 +946,8 @@ export class DungeonRenderer {
          * so only the first few get a flame and the rest stay props — the eye
          * reads pooled warm light on the floor long before it counts sources.
          */
-        if (this.torchLights.length < MAX_TORCH_LIGHTS) {
+        if (litTorches < MAX_TORCH_LIGHTS) {
+          litTorches += 1;
           const flame = new THREE.PointLight(0xffa542, 4.2, 9, 1.5);
           flame.position.set(torch.position.x, FLOOR_HEIGHT + 1.1, torch.position.z);
           this.scene.add(flame);
@@ -943,6 +1002,25 @@ export class DungeonRenderer {
       object.position.set(spot.x, FLOOR_HEIGHT + object.position.y, spot.y);
       this.scene.add(object);
       this.landmarks.push(object);
+
+      /*
+       * Give each end its own colour of light.
+       *
+       * A player needs to know which end the raiders walk in from before they
+       * decide where to put a wall, and a stain on the floor was not enough:
+       * the sandstone is bright and washed it out. Two lights say it at a
+       * glance in the language the rest of the room already uses — the
+       * entrance burns red, the core burns gold.
+       */
+      const glow = new THREE.PointLight(
+        spot.key === "entrance" ? 0xff5a3c : 0xffc23c,
+        3.4,
+        6.5,
+        1.7,
+      );
+      glow.position.set(spot.x, FLOOR_HEIGHT + 0.9, spot.y);
+      this.scene.add(glow);
+      this.torchLights.push(glow);
     }
   }
 
@@ -1101,8 +1179,24 @@ export class DungeonRenderer {
       position.set(item.x, proto ? proto.lift : height / 2, item.y);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(i, matrix);
-      // Models carry their own texture, so tinting is only for placeholders.
-      color.setHex(proto ? 0xffffff : COLORS[item.tile]);
+      /*
+       * The two tiles the whole game is measured between have to be findable.
+       *
+       * With the KayKit floor in place every tile was tinted plain white, so
+       * the entrance and the core looked exactly like the other 142 — the
+       * player had no way to see which end the raiders walk in from. The floor
+       * itself is stained instead of relying on the small stairs and chest
+       * models: red where they come from, gold at what they are coming for.
+       */
+      const tint =
+        item.tile === TILE.ENTRANCE
+          ? ENTRANCE_TINT
+          : item.tile === TILE.CORE
+            ? CORE_TINT
+            : proto
+              ? 0xffffff
+              : COLORS[item.tile];
+      color.setHex(tint);
       mesh.setColorAt(i, color);
     });
 
@@ -1206,6 +1300,21 @@ export class DungeonRenderer {
       this.target.z + Math.cos(y) * horizontal + this.shakeOffset.z,
     );
     this.camera.lookAt(this.target);
+
+    /*
+     * Fog follows the camera rather than sitting at fixed depths.
+     *
+     * It was pinned at 30-60 world units, which suited the original small
+     * landscape board. Framing a taller room — or backing off to clear the
+     * HUD — pushed the whole dungeon past the far plane and it faded into the
+     * background colour entirely. Tying it to the viewing distance keeps the
+     * same amount of haze whatever the camera is doing.
+     */
+    const fog = this.scene.fog as THREE.Fog | null;
+    if (fog) {
+      fog.near = this.distance * 0.95;
+      fog.far = this.distance * 2.4;
+    }
   }
 
   /** Advances the shake impulse and recomputes this frame's offset. */
@@ -1236,6 +1345,9 @@ export class DungeonRenderer {
     if (width === 0 || height === 0) return;
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
+    // The offset is expressed in pixels, so it has to be restated whenever the
+    // canvas changes size.
+    this.applyViewOffset();
     this.camera.updateProjectionMatrix();
     if (!this.userAdjustedZoom) this.fitToArena();
   }
@@ -1270,7 +1382,71 @@ export class DungeonRenderer {
     } else {
       this.highlight.visible = false;
     }
+    this.positionGhost();
     this.callbacks.onHoverChange(tile);
+  }
+
+  /**
+   * What the next tap will put down, shown where it will land.
+   *
+   * The hovered tile used to be a plain amber box: it said "here" but never
+   * what, and never whether the game would accept it. The player found out by
+   * tapping and hearing the refusal sound. Now the thing itself stands on the
+   * tile, see-through and washed green or red, so the answer arrives before
+   * the tap rather than after it.
+   */
+  setGhost(modelKey: string | null, legal: boolean): void {
+    if (modelKey !== this.ghostKey) {
+      this.ghostKey = modelKey;
+      if (this.ghost) {
+        this.disposeObject(this.scene, this.ghost);
+        this.ghost = null;
+      }
+      if (modelKey) {
+        const object = this.spawnModel(modelKey, 0.9);
+        if (object) {
+          object.traverse((child) => {
+            const mesh = child as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            for (const material of materials) {
+              material.transparent = true;
+              material.opacity = 0.55;
+              material.depthWrite = false;
+            }
+          });
+          this.ghostLift = object.position.y;
+          this.ghost = object;
+          this.scene.add(object);
+        }
+      }
+    }
+
+    this.ghostLegal = legal;
+    this.tintGhost();
+    this.positionGhost();
+  }
+
+  private tintGhost(): void {
+    if (!this.ghost) return;
+    const hex = this.ghostLegal ? GHOST_OK : GHOST_NO;
+    this.ghost.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        const lit = material as THREE.MeshLambertMaterial;
+        if (lit.color) lit.color.setHex(hex);
+        if ("emissive" in lit && lit.emissive) lit.emissive.setHex(hex).multiplyScalar(0.25);
+      }
+    });
+  }
+
+  private positionGhost(): void {
+    if (!this.ghost) return;
+    const tile = this.hovered;
+    this.ghost.visible = tile !== null;
+    if (tile) this.ghost.position.set(tile.x, FLOOR_HEIGHT + this.ghostLift, tile.y);
   }
 
   private attachPointerEvents(): void {
