@@ -17,8 +17,7 @@ export const LOCALE_LABEL: Record<Locale, string> = {
 const ko = {
   // Shell
   title_kicker: "모험가가 아니라, 던전이 되어라",
-  title_line:
-    "장애물로 길을 접고 함정을 놓고 부하를 세워, 몇 번이고 다시 찾아오는 모험가를 막아내세요. 쓰러뜨린 자는 장비를 남기고, 사로잡은 자는 당신의 편이 됩니다.",
+  title_line: "길을 접고 함정을 놓아 기다리세요.",
   title_start: "던전 짓기 시작",
   title_continue: "이어하기",
   title_loading: "던전을 불러오는 중…",
@@ -33,16 +32,10 @@ const ko = {
 
   // Intro
   intro_title: "당신은 던전의 관리자입니다",
-  intro_1_b: "모험가가 쳐들어옵니다.",
-  intro_1:
-    "닿을 수 있는 길이 있다면, 아무리 멀어도 그 길로 옵니다. 길이 아예 없을 때만 벽을 부수고 들어옵니다. 코어에 닿으면 금고를 털립니다.",
-  intro_2_b: "길은 당신이 접습니다.",
-  intro_2: "장애물로 길을 길게 돌리면 함정과 부하가 일할 시간이 늘어납니다. 장애물에도 값이 듭니다.",
-  intro_3_b: "쓰러뜨린 자는 돌아옵니다.",
-  intro_3:
-    "레벨을 올려서. 죽이면 장비를 남기고, 감옥에 가두면 시간이 지나 당신의 부하가 됩니다.",
-  intro_note:
-    "게임 오버는 없습니다. 돌파당해도 잃는 것은 골드와 시간뿐이고, 던전과 부하는 그대로 남습니다.",
+  intro_1_b: "모험가가 쳐들어옵니다",
+  intro_1: "코어에 닿으면 골드를 털립니다",
+  intro_2_b: "실패해도 끝나지 않습니다",
+  intro_2: "던전과 부하는 그대로 남습니다",
   intro_go: "던전을 지으러 갑니다",
 
   // Settings
@@ -52,8 +45,7 @@ const ko = {
   settings_quality: "그래픽 품질",
   settings_quality_high: "높음",
   settings_quality_low: "낮음 (성능 우선)",
-  settings_quality_note:
-    "낮음은 렌더 해상도를 1배로 고정합니다. 모바일에서 프레임이 떨어질 때 쓰세요.",
+  settings_quality_note: "모바일 프레임이 낮을 때 쓰세요.",
   settings_language: "언어",
   settings_tutorial: "튜토리얼",
   settings_replay: "다시 보기",
@@ -88,7 +80,7 @@ const ko = {
   count_rooms: "방",
   count_jail: "감옥",
   count_obstacles: "장애물",
-  obstacle_note: "완전히 막아도 됩니다. 길이 없으면 용사가 벽을 부수고 들어옵니다.",
+  obstacle_note: "막아도 됩니다. 길이 없으면 벽을 부숩니다.",
   free: "무료",
   locked_hint: "연구로 해금해야 합니다",
 
@@ -111,8 +103,7 @@ const ko = {
   result_breached: "코어 돌파당함",
   result_repelled_note: "모험가들이 물러났습니다. 다음에는 더 강해져서 돌아옵니다.",
   result_breached_note: "코어가 털렸습니다. 던전 구조와 부하는 그대로 남아 있습니다.",
-  result_local:
-    "로컬 전용 모드라 보상과 기록이 반영되지 않습니다. 배포 후에는 골드·위협도·누적 전적이 서버에 저장됩니다.",
+  result_local: "로컬 모드라 기록되지 않습니다.",
   result_captured: "생포",
   result_captured_note: "감옥에서 전향을 기다립니다.",
   result_loot: "노획",
@@ -146,8 +137,7 @@ const ko = {
 
   // Leaderboard
   board_title: "순위표",
-  board_note:
-    "한 판 기록이 아니라 누적 격퇴 횟수 순위입니다. 등록은 선택이며, 등록하지 않아도 게임 진행에는 영향이 없습니다.",
+  board_note: "누적 격퇴 순위입니다. 등록은 선택입니다.",
   board_name: "표시할 이름",
   board_submit: "등록",
   board_update: "갱신",
@@ -184,20 +174,15 @@ const ko = {
 
   // Tutorial
   tut_obstacle_title: "길을 접으세요",
-  tut_obstacle_body:
-    "장애물을 놓아 용사가 돌아가게 만드세요. 길이 길수록 함정과 부하가 일할 시간이 늘어납니다. 완전히 막아도 됩니다 — 그때는 벽을 부수고 들어옵니다.",
+  tut_obstacle_body: "장애물을 놓아 길을 늘리세요.",
   tut_minion_title: "부하를 세우세요",
-  tut_minion_body:
-    "스켈레톤 워리어를 통로에 배치하면 모험가를 붙잡아 둡니다. 함정은 붙잡아 둘 상대가 있어야 값어치를 합니다.",
+  tut_minion_body: "통로에 부하를 세워 적을 묶어두세요.",
   tut_trap_title: "함정을 놓으세요",
-  tut_trap_body:
-    "가시 함정을 부하 근처 통로에 설치하세요. 부하가 시간을 벌고 함정이 피해를 쌓는 조합이 기본입니다.",
+  tut_trap_body: "부하 근처에 함정을 설치하세요.",
   tut_save_title: "저장하세요",
-  tut_save_body:
-    "변경 사항은 저장해야 서버에 반영됩니다. 침입은 저장된 던전으로만 시작할 수 있습니다.",
+  tut_save_body: "저장해야 침입이 시작됩니다.",
   tut_raid_title: "침입을 시작하세요",
-  tut_raid_body:
-    "모험가가 입구에서 코어로 향합니다. 전투는 자동이며, 워든 스킬 3개와 배속으로 개입합니다.",
+  tut_raid_body: "전투는 자동입니다. 스킬로 개입하세요.",
 
   // Research nodes
   res_mage: "강령술",
@@ -273,16 +258,14 @@ const ko = {
   adv_rogue: "로그",
   adv_mage: "메이지",
   adv_ranger: "레인저",
-  banner_offline:
-    "아직 배포되지 않아 VITE_AGENT8_VERSE가 없습니다. 로컬 전용 모드로 실행 중이며 진행이 저장되지 않습니다. npx -y @agent8/deploy 로 배포한 뒤 다시 열면 세이브가 붙습니다.",
+  banner_offline: "VITE_AGENT8_VERSE 없음 — 로컬 모드, 미저장.",
 };
 
 export type StringKey = keyof typeof ko;
 
 const en: Record<StringKey, string> = {
   title_kicker: "Be the dungeon, not the hero",
-  title_line:
-    "Fold the route with obstacles, set the traps, post your minions, and turn back adventurers who keep coming back for more. The fallen leave their gear; the captured become yours.",
+  title_line: "Fold the path, set the trap, and wait.",
   title_start: "Start building",
   title_continue: "Continue",
   title_loading: "Loading your dungeon…",
@@ -297,16 +280,9 @@ const en: Record<StringKey, string> = {
 
   intro_title: "You are the dungeon keeper",
   intro_1_b: "Adventurers come for you.",
-  intro_1:
-    "If a path to your core exists, they take it — however long. Only when there is no path at all do they break through. Reach the core, and they rob you.",
-  intro_2_b: "You fold the path.",
-  intro_2:
-    "Obstacles that fold the route give your traps and minions more time to work — and obstacles cost gold too.",
-  intro_3_b: "Whoever falls comes back.",
-  intro_3:
-    "Stronger. Kill them and they drop their gear; jail them and they eventually fight for you.",
-  intro_note:
-    "There is no game over. A breach costs gold and time — your dungeon and your minions stay.",
+  intro_1: "Reach your core, and they rob you.",
+  intro_2_b: "Failure isn't the end.",
+  intro_2: "Your dungeon and minions remain.",
   intro_go: "Start building",
 
   settings_sound: "Sound",
@@ -315,8 +291,7 @@ const en: Record<StringKey, string> = {
   settings_quality: "Graphics",
   settings_quality_high: "High",
   settings_quality_low: "Low (performance)",
-  settings_quality_note:
-    "Low pins render resolution to 1x. Use it if the frame rate drops on mobile.",
+  settings_quality_note: "Use this if mobile frame rate drops.",
   settings_language: "Language",
   settings_tutorial: "Tutorial",
   settings_replay: "Replay",
@@ -350,7 +325,7 @@ const en: Record<StringKey, string> = {
   count_rooms: "Rooms",
   count_jail: "Jail",
   count_obstacles: "Obstacles",
-  obstacle_note: "Sealing the room is allowed. With no way through, they break the wall down.",
+  obstacle_note: "Sealing is allowed. With no path, they break through.",
   free: "Free",
   locked_hint: "Unlock this with research",
 
@@ -371,8 +346,7 @@ const en: Record<StringKey, string> = {
   result_breached: "Core breached",
   result_repelled_note: "They pulled back. They will return stronger.",
   result_breached_note: "Your core was robbed. The dungeon and your minions remain.",
-  result_local:
-    "Running locally, so rewards and records are not applied. Once deployed, gold, threat and totals are saved on the server.",
+  result_local: "Local mode — nothing is recorded.",
   result_captured: "Captured",
   result_captured_note: "Awaiting conversion in the jail.",
   result_loot: "Loot",
@@ -403,8 +377,7 @@ const en: Record<StringKey, string> = {
   err_done: "Already researched.",
 
   board_title: "Rankings",
-  board_note:
-    "Ranked by total raids repelled, not a single run. Entering is optional and does not affect play.",
+  board_note: "Ranked by total repels. Entering is optional.",
   board_name: "Display name",
   board_submit: "Enter",
   board_update: "Update",
@@ -438,20 +411,15 @@ const en: Record<StringKey, string> = {
   err_no_adventurers: "No adventurers are available right now. Try again shortly.",
 
   tut_obstacle_title: "Fold the route",
-  tut_obstacle_body:
-    "Place obstacles so the raiders walk the long way round. The longer the route, the more time your traps and minions get. Sealing the room is allowed too — then they break the wall down instead.",
+  tut_obstacle_body: "Place obstacles to lengthen the route.",
   tut_minion_title: "Post a minion",
-  tut_minion_body:
-    "A skeleton warrior in the corridor holds adventurers in place. Traps are only worth their cost when something is holding the target still.",
+  tut_minion_body: "A minion in the corridor holds enemies there.",
   tut_trap_title: "Set a trap",
-  tut_trap_body:
-    "Put a spike trap near your minion. One buys time while the other stacks damage — that pairing is the core of every defence.",
+  tut_trap_body: "Set a trap near your minion.",
   tut_save_title: "Save",
-  tut_save_body:
-    "Changes reach the server only when saved, and a raid runs against the saved dungeon.",
+  tut_save_body: "Save to start a raid.",
   tut_raid_title: "Start the raid",
-  tut_raid_body:
-    "They walk from the entrance toward your core. Combat resolves itself; you intervene with three warden skills and the speed control.",
+  tut_raid_body: "Combat is automatic. Step in with skills.",
 
   res_mage: "Necromancy",
   res_mage_n: "Unlocks the skeleton mage",
@@ -525,8 +493,7 @@ const en: Record<StringKey, string> = {
   adv_rogue: "Rogue",
   adv_mage: "Mage",
   adv_ranger: "Ranger",
-  banner_offline:
-    "Not deployed yet, so VITE_AGENT8_VERSE is missing. Running in local-only mode — progress is not saved. Deploy with npx -y @agent8/deploy and reopen to attach a save.",
+  banner_offline: "Missing VITE_AGENT8_VERSE — local mode, unsaved.",
 };
 
 const TABLES: Record<Locale, Record<StringKey, string>> = { ko, en };
