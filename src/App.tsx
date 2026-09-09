@@ -473,7 +473,7 @@ export default function App() {
       </div>
 
       <header className="topbar">
-        <div className="brand">DUNGEON WARDEN <span>M6</span></div>
+        <div className="brand">DUNGEON WARDEN</div>
         <div className="stats">
           <span className="gold">🪙 {gold}</span>
           {meta && <span className="pending">{t("stat_threat")} {meta.threat}</span>}
@@ -765,7 +765,7 @@ export default function App() {
                   <h3 className="section">{t("manage_nemesis")} {adventurers.filter((a) => a.state !== "converted").length}</h3>
                   {adventurers.map((a) => (
                     <p key={a.id} className="hint small">
-                      {a.name} Lv{a.level} · {t("times", { n: a.raids })} ·{" "}
+                      {a.name} Lv{a.level} · {t(a.raids === 1 ? "times_one" : "times", { n: a.raids })} ·{" "}
                       {a.state === "captured"
                         ? t("state_jailed")
                         : a.state === "converted"

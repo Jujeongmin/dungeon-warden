@@ -134,6 +134,7 @@ const ko = {
   soon: "곧",
   minutes: "{n}분",
   times: "{n}회",
+  times_one: "{n}회",
 
   // Research
   research_owned: "보유",
@@ -163,6 +164,7 @@ const ko = {
   shop_title: "상점",
   shop_owned: "보유 중",
   shop_offline: "아직 배포되지 않아 상점을 불러올 수 없습니다.",
+  shop_no_host: "Verse8에서 실행할 때만 상점을 열 수 있습니다.",
   shop_empty: "등록된 상품이 없습니다.",
   shop_loading: "상품 불러오는 중…",
   shop_ads_removed: "광고 제거가 적용되어 있습니다.",
@@ -381,12 +383,13 @@ const en: Record<StringKey, string> = {
   manage_nemesis: "Nemeses",
   state_jailed: "Jailed",
   state_converted: "Converted",
-  state_waiting: "Ready",
+  state_waiting: "Ready to raid",
   returns_in: "returns in {t}",
   converts_in: "converts in {t}",
   soon: "soon",
   minutes: "{n}m",
   times: "{n} raids",
+  times_one: "{n} raid",
 
   research_owned: "Owned",
   research_requires: "Requires",
@@ -413,6 +416,7 @@ const en: Record<StringKey, string> = {
   shop_title: "Shop",
   shop_owned: "Owned",
   shop_offline: "Not deployed yet, so the shop cannot load.",
+  shop_no_host: "The shop is only available when the game runs on Verse8.",
   shop_empty: "No products registered.",
   shop_loading: "Loading products…",
   shop_ads_removed: "Ad removal is active.",

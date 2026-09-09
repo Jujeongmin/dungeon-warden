@@ -42,7 +42,17 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
         {!VERSE_ID && <p className="modal-note">{t("shop_offline")}</p>}
 
         {VERSE_ID && isLoading && <p className="modal-note">{t("shop_loading")}</p>}
-        {VERSE_ID && error && <p className="modal-note error">{error}</p>}
+        {/* The SDK reports a missing account as a developer message aimed at
+            whoever wired the shop up ("Please provide verseId ... and account
+            (via query parameter)"). The account comes from the Verse8 host
+            page, so a player can neither cause nor fix that — outside the
+            platform it simply means the shop is unavailable. Anything else is
+            a real failure and is worth showing. */}
+        {VERSE_ID && error && (
+          <p className="modal-note error">
+            {/vxshop parameters|query parameter/i.test(error) ? t("shop_no_host") : error}
+          </p>
+        )}
         {VERSE_ID && !isLoading && !error && items.length === 0 && (
           <p className="modal-note">
             {t("shop_empty")} <code>{PRODUCT_ID.removeAds}</code>
