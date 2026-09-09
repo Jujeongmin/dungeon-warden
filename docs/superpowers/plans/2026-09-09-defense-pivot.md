@@ -37,6 +37,7 @@
 | `src/game/useDungeonSave.ts` | Obstacle placement and removal; digging gone. |
 | `src/game/DungeonRenderer.ts` | Draws floor over the whole room, walls on the room border, obstacles as damageable models. |
 | `src/App.tsx` | Obstacle tools; the path warning gone. |
+| `src/game/tutorial.ts` | Its first step taught digging and its completion test was "a route exists". Both are gone, so the step is rewritten around placing an obstacle. |
 | `server.js` | Save v2, obstacle pricing and cap, migration; digging gone. |
 | `src/i18n/strings.ts` | Obstacle names and hints; renamed expansion research labels. |
 | `tests/` | **New.** Vitest suites for pathfinding, the simulation, and placement pricing. |
@@ -1260,11 +1261,41 @@ git commit -m "feat: draw the room and its obstacles"
 
 **Files:**
 - Modify: `src/App.tsx`
+- Modify: `src/game/tutorial.ts`
 - Modify: `src/game/devtools.ts`
 
 **Interfaces:**
 - Consumes: everything from Tasks 2 to 7.
 - Produces: the build toolbar's first two entries are the two obstacles; `window.__dw.placeObstacle` exists.
+
+- [ ] **Step 0: Rewrite the tutorial's first step**
+
+`src/game/tutorial.ts` opens by teaching the player to dig, and marks that
+step done with `hasPathToCore(grid, entrance, core)` — a function Task 2
+deleted, because a route is no longer something the player has to produce. Its
+`TutorialContext` also takes a `Grid`.
+
+Replace the `grid: Grid | null` field with `obstacles: PlacedObstacle[]`, drop
+the `hasPathToCore` import, and rewrite the first step to teach the mechanic
+that actually exists: place an obstacle, and the step is done once
+`obstacles.length > 0`. Its title and body keys change to `tut_obstacle_title`
+and `tut_obstacle_body`; add both to the `ko` and `en` tables:
+
+```ts
+  tut_obstacle_title: "길을 접으세요",
+  tut_obstacle_body:
+    "장애물을 놓아 용사가 돌아가게 만드세요. 길이 길수록 함정과 부하가 일할 시간이 늘어납니다. 완전히 막아도 됩니다 — 그때는 벽을 부수고 들어옵니다.",
+```
+
+```ts
+  tut_obstacle_title: "Fold the route",
+  tut_obstacle_body:
+    "Place obstacles so the raiders walk the long way round. The longer the route, the more time your traps and minions get. Sealing the room is allowed too — then they break the wall down instead.",
+```
+
+Delete the now-unused `tut_dig_title` and `tut_dig_body` keys from both tables.
+Update the call site in `App.tsx` that builds the tutorial context so it passes
+`obstacles` instead of `grid`.
 
 - [ ] **Step 1: Replace the dig and remove tools**
 
