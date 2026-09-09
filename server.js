@@ -93,7 +93,8 @@ const START_GOLD = 200;
 
 // Mirrored in src/game/types.ts and src/game/sim/units.ts.
 const BASE_MAX_MINIONS = 8;
-const MINION_COST = { warrior: 50, mage: 70 };
+const MINION_COST = { warrior: 50, mage: 70, convert: 0 };
+// ^ Converts are earned by capturing, never bought.
 
 const MAX_TRAPS = 10;
 const TRAP_COST = { spike: 30, arrow: 35, rockfall: 45, flame: 55 };
