@@ -154,6 +154,15 @@ const CLUTTER_CHANCE = 0.14;
 const TORCH_CHANCE = 0.22;
 
 /**
+ * How many of those torches actually burn.
+ *
+ * Point lights are the expensive kind and this runs on phones, so the rest
+ * stay props. The eye reads pooled warm light on the floor long before it
+ * counts sources.
+ */
+const MAX_TORCH_LIGHTS = 6;
+
+/**
  * A stable pseudo-random number for a tile.
  *
  * Decoration is recomputed on every arena change, so it has to come out the
@@ -244,6 +253,8 @@ export class DungeonRenderer {
 
   private landmarks: THREE.Object3D[] = [];
   private decor: THREE.Object3D[] = [];
+  /** Lights belonging to the torch props; cleared with them. */
+  private torchLights: THREE.PointLight[] = [];
   private pathMarkers: THREE.Object3D[] = [];
   private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
 
@@ -273,10 +284,20 @@ export class DungeonRenderer {
 
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
 
-    const ambient = new THREE.AmbientLight(0xffe9c4, 0.55);
-    const key = new THREE.DirectionalLight(0xfff2d0, 1.15);
-    key.position.set(6, 12, 4);
-    const rim = new THREE.DirectionalLight(0x6fa8ff, 0.35);
+    /*
+     * A dungeon lit by its own torches.
+     *
+     * The scene used to be an even wash from a warm key with a cold blue rim,
+     * and on a dark stone floor the only thing that read was the blue — the
+     * room came out slate and lifeless, which is not what a room full of
+     * burning torches should look like. The rim is now a dim, barely-tinted
+     * bounce, the ambient carries the warmth, and the actual light comes from
+     * the torch props on the walls (see buildDecor).
+     */
+    const ambient = new THREE.AmbientLight(0xffdcae, 0.42);
+    const key = new THREE.DirectionalLight(0xfff0cc, 0.85);
+    key.position.set(6, 14, 4);
+    const rim = new THREE.DirectionalLight(0x9fb4d8, 0.18);
     rim.position.set(-8, 6, -6);
     this.scene.add(ambient, key, rim);
 
@@ -844,6 +865,21 @@ export class DungeonRenderer {
         torch.rotation.y = Math.atan2(-dx, -dy);
         this.scene.add(torch);
         this.decor.push(torch);
+
+        /*
+         * Light the torch.
+         *
+         * A wall of torch models that emit nothing is the difference between a
+         * dungeon and a diorama of one. Point lights are the expensive kind,
+         * so only the first few get a flame and the rest stay props — the eye
+         * reads pooled warm light on the floor long before it counts sources.
+         */
+        if (this.torchLights.length < MAX_TORCH_LIGHTS) {
+          const flame = new THREE.PointLight(0xffa542, 4.2, 9, 1.5);
+          flame.position.set(torch.position.x, FLOOR_HEIGHT + 1.1, torch.position.z);
+          this.scene.add(flame);
+          this.torchLights.push(flame);
+        }
         break;
       }
 
@@ -880,6 +916,8 @@ export class DungeonRenderer {
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);
     this.decor = [];
+    for (const light of this.torchLights) this.scene.remove(light);
+    this.torchLights = [];
 
     const spots: Array<{ key: string; x: number; y: number }> = [];
     if (this.entrance) spots.push({ key: "entrance", x: this.entrance.x, y: this.entrance.y });
@@ -1415,6 +1453,8 @@ export class DungeonRenderer {
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);
     this.decor = [];
+    for (const light of this.torchLights) this.scene.remove(light);
+    this.torchLights = [];
 
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();

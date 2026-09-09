@@ -6,6 +6,28 @@
   --accent: #e8a44c;
   --danger: #d76a5a;
   --ok: #7fc98a;
+
+  /* Carved stone.
+   *
+   * The dungeon in the 3D scene is cut blocks lit by torches bracketed to the
+   * walls, so the interface is cut from the same material: every surface is a
+   * slab with a lit top edge, a shadowed bottom edge, and darkness under it.
+   * That is also what tells the player which things are objects they can press
+   * and which are holes they can drop something into — a raised slab lifts
+   * towards the light, a well sinks away from it. */
+  --stone-face: #241f1a;
+  --stone-raised: #2f2822;
+  --stone-deep: #17130f;
+  --edge-lit: rgba(228, 210, 180, 0.16);
+  --edge-dark: rgba(0, 0, 0, 0.58);
+  --cast: rgba(0, 0, 0, 0.5);
+
+  /* Torchlight. The one warm source in the room, and the only thing allowed to
+   * glow: it marks what the player has chosen. */
+  --torch: #e8a44c;
+  --torch-lit: rgba(255, 214, 150, 0.26);
+  --torch-glow: rgba(232, 164, 76, 0.22);
+  --torch-edge: rgba(232, 164, 76, 0.55);
 }
 
 * { box-sizing: border-box; }
@@ -351,10 +373,15 @@ h3.section {
   display: flex;
   flex-direction: column;
   padding: 12px 14px 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  backdrop-filter: blur(8px);
+  border: 1px solid var(--edge-dark);
+  border-radius: 6px;
+  /* Opaque, not glass. A translucent panel with the dungeon showing through
+   * reads as a debug overlay laid on top of the game; a solid slab with a lit
+   * top edge and darkness under it reads as part of the room. */
+  background: linear-gradient(180deg, var(--stone-raised) 0, var(--stone-face) 18%, var(--stone-face) 100%);
+  box-shadow:
+    inset 0 1px 0 var(--edge-lit),
+    0 -10px 28px var(--cast);
 }
 
 .hud-body {
@@ -380,10 +407,21 @@ h3.section {
   border-radius: 7px;
 }
 
-.hud-tabs button.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(232, 164, 76, 0.14);
+/* Chosen. The torch is on it.
+ *
+ * One light source means one meaning: whatever is glowing is what the next tap
+ * will use. The selected tool, the armed skill and the open tab are the same
+ * state, so they get the same treatment rather than three near-misses. */
+.hud-tabs button.active,
+.tool.active,
+.skill.armed {
+  border-color: var(--torch-edge);
+  color: var(--torch);
+  background: linear-gradient(180deg, #3b2f20, #2a2118);
+  box-shadow:
+    inset 0 1px 0 var(--torch-lit),
+    inset 0 0 12px var(--torch-glow),
+    0 2px 0 var(--edge-dark);
 }
 
 .hud-tabs .hud-toggle {
@@ -521,16 +559,35 @@ h3.section:first-child { margin-top: 2px; }
   margin: 12px 0 8px;
 }
 
+/* A button is a slab of stone sitting proud of the panel: lit along its top
+ * edge, dark along its bottom, with a hard shadow beneath it. Pressing one
+ * pushes it down into the panel — that travel is the whole feedback, and it is
+ * why the shadow under it has to be a solid offset rather than a blur. */
 button {
   flex: 1;
   padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  border: 1px solid var(--edge-dark);
+  background: linear-gradient(180deg, var(--stone-raised), var(--stone-face));
+  box-shadow:
+    inset 0 1px 0 var(--edge-lit),
+    0 2px 0 var(--edge-dark);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
+  transition: transform 60ms ease-out, box-shadow 60ms ease-out, background 120ms ease-out;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55);
+}
+
+/* The keyboard's version of the same idea: the torch picks it out. */
+button:focus-visible {
+  outline: 2px solid var(--torch-edge);
+  outline-offset: 2px;
 }
 
 /* Form elements must remain selectable for input and editing. */
@@ -541,7 +598,7 @@ textarea {
   user-select: text;
 }
 
-button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+button:hover:not(:disabled) { background: linear-gradient(180deg, #3a3129, var(--stone-raised)); }
 button:disabled { opacity: 0.4; cursor: default; }
 button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
 
@@ -570,16 +627,10 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
   align-items: flex-start;
   gap: 2px;
   padding: 8px 10px;
-  background: var(--panel);
 }
 
 .skill b { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
 .skill i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); }
-
-.skill.armed {
-  border-color: var(--accent);
-  background: rgba(232, 164, 76, 0.18);
-}
 
 /* The one ad in the raid, marked apart from the free warden skills. */
 .skill.ad {
@@ -599,11 +650,6 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
 
 .tool b { font-size: var(--fs-xs); font-weight: var(--fw-bold); }
 .tool i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); }
-
-.tool.active {
-  border-color: var(--accent);
-  background: rgba(232, 164, 76, 0.14);
-}
 
 button.primary {
   border-color: rgba(232, 164, 76, 0.6);
@@ -762,9 +808,12 @@ button.primary {
   max-height: min(620px, 100%);
   overflow-y: auto;
   padding: 18px 20px 20px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #1b1815;
+  border: 1px solid var(--edge-dark);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--stone-raised) 0, var(--stone-face) 12%, var(--stone-face) 100%);
+  box-shadow:
+    inset 0 1px 0 var(--edge-lit),
+    0 18px 48px rgba(0, 0, 0, 0.6);
 }
 
 .modal-head {
@@ -942,4 +991,25 @@ button.primary {
    off the right edge. */
 @media (max-width: 460px) {
   .brand { display: none; }
+}
+
+/* The toolbar is a well cut into the panel, not more panel: the tools sit
+   inside it, which is why the shadow runs inwards here and outwards on the
+   slabs above. */
+.toolbar {
+  padding: 6px;
+  border-radius: 5px;
+  background: var(--stone-deep);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+/* Some players get sick from motion, and a button that lurches under the
+   thumb is exactly the kind that does it. Keep the state change, drop the
+   travel. */
+@media (prefers-reduced-motion: reduce) {
+  button,
+  button:active:not(:disabled) {
+    transition: none;
+    transform: none;
+  }
 }
