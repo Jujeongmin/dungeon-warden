@@ -175,6 +175,14 @@ export class RaidSim {
   private arena: Arena;
   private core: Point;
   private lures: Point[];
+  /**
+   * Every mutation of this array's `alive`/`hp` must be followed by a call to
+   * `routeAll()` in the same operation — a route computed against a stale
+   * obstacle set can strand an adventurer mid-`breaking` while a walkable
+   * path already exists elsewhere. Kill an obstacle through `killObstacle()`
+   * below rather than flipping `alive` inline, so there is exactly one place
+   * that has to get this right.
+   */
   private obstacles: SimObstacle[];
   private destroyed: string[] = [];
   private minions: SimMinion[];
@@ -299,8 +307,20 @@ export class RaidSim {
       adventurer.path = open;
       adventurer.breaking = false;
     } else {
-      adventurer.path =
-        buildRaidPath(this.arena, from, this.core, this.lures, new Set()) ?? [from];
+      // No walkable route exists right now, so fall back to the route the
+      // party would take if no obstacle stood in the way at all — that is
+      // what breaking through means. If even THAT is unreachable, `from` or
+      // `this.core` sits outside the arena, which is a bug, not a game state:
+      // resolveStatus() treats "already at path end" as a breach, so silently
+      // falling back to a length-1 path here would hand the attacker a free,
+      // unreported win instead of surfacing the broken input.
+      const fallback = buildRaidPath(this.arena, from, this.core, this.lures, new Set());
+      if (!fallback) {
+        throw new Error(
+          `RaidSim: no route from (${from.x}, ${from.y}) to the core (${this.core.x}, ${this.core.y}) exists even with no obstacles — start or core must be outside the arena.`,
+        );
+      }
+      adventurer.path = fallback;
       adventurer.breaking = true;
     }
     adventurer.pathIndex = 0;
@@ -327,8 +347,33 @@ export class RaidSim {
     return this.obstacleAt(next.x, next.y);
   }
 
+  /**
+   * Kills one obstacle: zeroes it out, reports `obstacleDown`, and re-routes
+   * every adventurer.
+   *
+   * This is the only place allowed to set an obstacle's `alive` to false —
+   * see the comment on the `obstacles` field. Routing every kill through here
+   * means a second kill site added later (a warden skill that collapses a
+   * wall, say) gets the mandatory re-route for free instead of relying on
+   * whoever writes it to remember the rule.
+   */
+  private killObstacle(obstacle: SimObstacle): void {
+    obstacle.hp = 0;
+    obstacle.alive = false;
+    this.destroyed.push(obstacle.id);
+    this.events.push({
+      kind: "obstacleDown",
+      targetId: obstacle.id,
+      x: obstacle.x,
+      y: obstacle.y,
+    });
+    // One hole changes the map for everyone, so everyone re-routes.
+    this.routeAll();
+  }
+
+  /** A copy, not a live reference — callers must not be able to mutate sim state. */
   get destroyedObstacleIds(): string[] {
-    return this.destroyed;
+    return [...this.destroyed];
   }
 
   get state(): RaidState {
@@ -643,19 +688,7 @@ export class RaidSim {
             x: barrier.x,
             y: barrier.y,
           });
-          if (barrier.hp <= 0) {
-            barrier.hp = 0;
-            barrier.alive = false;
-            this.destroyed.push(barrier.id);
-            this.events.push({
-              kind: "obstacleDown",
-              targetId: barrier.id,
-              x: barrier.x,
-              y: barrier.y,
-            });
-            // One hole changes the map for everyone, so everyone re-routes.
-            this.routeAll();
-          }
+          if (barrier.hp <= 0) this.killObstacle(barrier);
         }
         continue;
       }

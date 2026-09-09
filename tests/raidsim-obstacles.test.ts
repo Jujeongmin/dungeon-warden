@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RaidSim, SIM_DT } from "../src/game/sim/RaidSim";
+import { RaidSim, SIM_DT, type SimEvent } from "../src/game/sim/RaidSim";
 import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
 import type { PartyMember, PlacedObstacle } from "../src/game/types";
 
@@ -80,12 +80,40 @@ describe("adventurers and obstacles", () => {
     expect(kinds.has("obstacleDown")).toBe(true);
   });
 
-  it("is deterministic", () => {
+  it("is deterministic: identical inputs produce an identical event stream, not just a matching final state", () => {
+    // Final state matching alone would miss two runs that got to the same
+    // place by a different sequence of events — the property the server
+    // actually needs, to re-run a suspicious raid and compare what happened
+    // step by step.
     const obstacles = wallAt(5, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     const a = makeSim(obstacles);
     const b = makeSim(obstacles);
-    run(a, 45);
-    run(b, 45);
+
+    const steps = Math.round(45 / SIM_DT);
+    const eventsA: SimEvent[] = [];
+    const eventsB: SimEvent[] = [];
+    for (let i = 0; i < steps; i++) {
+      if (a.state.status === "running") a.step();
+      if (b.state.status === "running") b.step();
+      eventsA.push(...a.drainEvents());
+      eventsB.push(...b.drainEvents());
+    }
+
+    // Guard against a vacuous pass: this wall does produce hits and a kill.
+    expect(eventsA.length).toBeGreaterThan(0);
+    expect(eventsA).toEqual(eventsB);
     expect(JSON.stringify(a.state)).toBe(JSON.stringify(b.state));
+  });
+
+  it("destroyedObstacleIds returns a copy, not the simulation's own array", () => {
+    const sim = makeSim(wallAt(5, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]));
+    run(sim, 60);
+
+    const first = sim.destroyedObstacleIds;
+    expect(first.length).toBeGreaterThan(0);
+    first.push("intruder");
+
+    expect(sim.destroyedObstacleIds).not.toContain("intruder");
+    expect(sim.destroyedObstacleIds).not.toBe(sim.destroyedObstacleIds);
   });
 });
