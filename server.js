@@ -3,17 +3,29 @@
 // Only $sender, $global, $room, $asset are available.
 // Do NOT export this class.
 
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 const GRID_W = 12;
 const GRID_H = 12;
 
-const TILE_ROCK = 0;
-const TILE_FLOOR = 1;
-const TILE_ENTRANCE = 2;
-const TILE_CORE = 3;
+const OBSTACLE_COST = { barricade: 12, wall: 35 };
+const BASE_MAX_OBSTACLES = 20;
 
-const DIG_COST = 10;
+/** Room width and obstacle budget both come from the expansion research. */
+function arenaFor(research) {
+  let w = GRID_W;
+  if (research.includes("expand1")) w = 16;
+  if (research.includes("expand2")) w = 20;
+  return { w, h: GRID_H };
+}
+
+function maxObstaclesFor(research) {
+  let cap = BASE_MAX_OBSTACLES;
+  if (research.includes("expand1")) cap = 28;
+  if (research.includes("expand2")) cap = 36;
+  return cap;
+}
+
 const START_GOLD = 200;
 
 // Mirrored in src/game/types.ts and src/game/sim/units.ts.
@@ -85,8 +97,8 @@ const RESEARCH = {
   trap_power1: { cost: 200, requires: ["trap_arrow"], trapDamage: 0.2 },
   trap_power2: { cost: 400, requires: ["trap_power1"], trapDamage: 0.4 },
 
-  expand1: { cost: 420, expandTo: 16 },
-  expand2: { cost: 700, requires: ["expand1"], expandTo: 20 },
+  expand1: { cost: 420 },
+  expand2: { cost: 700, requires: ["expand1"] },
 };
 
 const BASE_MINIONS = ["warrior", "convert"];
@@ -97,7 +109,6 @@ const BASE_ROOMS = ["treasury"];
 const THREAT_DECAY_MS = 20 * 60 * 1000;
 /** Each point of threat raises payouts, making a loud dungeon worth running. */
 const THREAT_REWARD_STEP = 0.08;
-const MAX_GRID_WIDTH = 20;
 
 /** Global collection backing the leaderboard. */
 const LEADERBOARD = "dungeon_leaderboard";
@@ -156,38 +167,6 @@ function decayThreat(dungeon, now) {
   return dungeon.threat || 0;
 }
 
-/**
- * Widens the dungeon and moves the core to the new far wall.
- *
- * The old core tile becomes ordinary corridor and the fresh columns are solid
- * rock, so the player has to dig their way deeper — the expansion is a new
- * problem, not free space.
- */
-function expandGrid(dungeon, newWidth) {
-  const w = dungeon.grid.w;
-  const h = dungeon.grid.h;
-  if (newWidth <= w) return false;
-  if (newWidth > MAX_GRID_WIDTH) return false;
-
-  const cells = decodeRLE(dungeon.grid.cells, w * h);
-  if (!cells) throw new Error("BAD_GRID");
-
-  const next = new Array(newWidth * h).fill(TILE_ROCK);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) next[y * newWidth + x] = cells[y * w + x];
-  }
-
-  const coreY = dungeon.core.y;
-  next[coreY * newWidth + dungeon.core.x] = TILE_FLOOR;
-  const newCoreX = newWidth - 1;
-  next[coreY * newWidth + newCoreX] = TILE_CORE;
-
-  dungeon.grid = { w: newWidth, h, cells: encodeRLE(next) };
-  dungeon.core = { x: newCoreX, y: coreY };
-  return true;
-}
-
-
 // Raid payouts. Kept on the server so a client cannot invent its own reward.
 // Tuned against the research tree: a repelled raid should buy a meaningful
 // fraction of the next unlock, not a rounding error. At the old 20/15 a first
@@ -206,10 +185,6 @@ const ADVENTURER_NAMES = [
   "Aldric", "Brenna", "Cedric", "Dahlia", "Edmund",
   "Fiora", "Gareth", "Halina", "Ivor", "Junia",
 ];
-
-// A single save call may not contain more digs than this. Guards against a
-// client replaying a huge grid diff in one request.
-const MAX_DIGS_PER_SAVE = 64;
 
 // ---------------------------------------------------------------------------
 // VXShop
@@ -295,80 +270,6 @@ async function grantProduct(account, productId, purchaseId, quantity) {
   });
 }
 
-/** cells:number[] -> "count*tile,count*tile" */
-function encodeRLE(cells) {
-  const parts = [];
-  let run = 1;
-  for (let i = 1; i <= cells.length; i++) {
-    if (i < cells.length && cells[i] === cells[i - 1]) {
-      run++;
-    } else {
-      parts.push(run + "*" + cells[i - 1]);
-      run = 1;
-    }
-  }
-  return parts.join(",");
-}
-
-/** "count*tile,..." -> number[] of exactly `length`, or null when malformed */
-function decodeRLE(str, length) {
-  if (typeof str !== "string" || str.length === 0) return null;
-  const cells = [];
-  const parts = str.split(",");
-  for (let i = 0; i < parts.length; i++) {
-    const seg = parts[i].split("*");
-    if (seg.length !== 2) return null;
-    const run = Number(seg[0]);
-    const tile = Number(seg[1]);
-    if (!Number.isInteger(run) || run <= 0) return null;
-    if (!Number.isInteger(tile) || tile < 0 || tile > 3) return null;
-    if (cells.length + run > length) return null;
-    for (let k = 0; k < run; k++) cells.push(tile);
-  }
-  return cells.length === length ? cells : null;
-}
-
-/**
- * Breadth-first reachability over non-rock tiles.
- * Only existence matters here, so BFS is enough — the client runs the full A*
- * to get the actual route.
- */
-function hasPath(cells, w, h, start, goal) {
-  const startIndex = start.y * w + start.x;
-  const goalIndex = goal.y * w + goal.x;
-  if (cells[startIndex] === TILE_ROCK || cells[goalIndex] === TILE_ROCK) return false;
-
-  const seen = new Uint8Array(w * h);
-  const queue = [startIndex];
-  seen[startIndex] = 1;
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === goalIndex) return true;
-
-    const cx = current % w;
-    const cy = Math.floor(current / w);
-    const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-
-    for (let i = 0; i < steps.length; i++) {
-      const nx = cx + steps[i][0];
-      const ny = cy + steps[i][1];
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-
-      const next = ny * w + nx;
-      if (seen[next] || cells[next] === TILE_ROCK) continue;
-      seen[next] = 1;
-      queue.push(next);
-    }
-  }
-  return false;
-}
-
-/**
- * Validates a minion roster against the grid and charges for what is new.
- * Removals are free but refund nothing, and changing an existing id's type is
- * charged in full so a client cannot swap a cheap unit for an expensive one.
- */
 /** Tiles a 2x2 room anchored at (x, y) covers. */
 function roomTiles(room) {
   const tiles = [];
@@ -485,10 +386,13 @@ function pickParty(dungeon, threat, now) {
 /**
  * Validates rooms and charges for new ones.
  *
- * Rooms claim four corridor tiles each, and nothing else may sit on them, so
- * this returns the claimed tiles for the minion and trap checks to respect.
+ * Rooms claim four tiles each, and nothing else may sit on them. `claimed` is
+ * a shared Set the caller seeds with the entrance and core keys before this
+ * runs, and it is shared onward with the trap, minion and obstacle checks so
+ * one occupant ever holds a tile — there is no more floor/rock distinction to
+ * lean on for that.
  */
-function priceRooms(nextRooms, prevRooms, cells, w, h) {
+function priceRooms(nextRooms, prevRooms, arena, claimed) {
   if (!Array.isArray(nextRooms)) throw new Error("BAD_ROOMS");
   if (nextRooms.length > MAX_ROOMS) throw new Error("TOO_MANY_ROOMS");
 
@@ -496,7 +400,6 @@ function priceRooms(nextRooms, prevRooms, cells, w, h) {
   for (const room of prevRooms || []) prevById[room.id] = room;
 
   const seenIds = {};
-  const claimed = {};
   let cost = 0;
 
   for (const room of nextRooms) {
@@ -508,25 +411,24 @@ function priceRooms(nextRooms, prevRooms, cells, w, h) {
     if (!price) throw new Error("UNKNOWN_ROOM_TYPE");
 
     for (const tile of roomTiles(room)) {
-      if (tile.x < 0 || tile.y < 0 || tile.x >= w || tile.y >= h) {
+      if (tile.x < 0 || tile.y < 0 || tile.x >= arena.w || tile.y >= arena.h) {
         throw new Error("ROOM_OUT_OF_BOUNDS");
       }
-      if (cells[tile.y * w + tile.x] !== TILE_FLOOR) throw new Error("ROOM_NOT_ON_FLOOR");
 
-      const key = tile.x + ":" + tile.y;
-      if (claimed[key]) throw new Error("ROOM_OVERLAP");
-      claimed[key] = true;
+      const key = `${tile.x},${tile.y}`;
+      if (claimed.has(key)) throw new Error("ROOM_OVERLAP");
+      claimed.add(key);
     }
 
     const previous = prevById[room.id];
     if (!previous || previous.type !== room.type) cost += price;
   }
 
-  return { cost, claimed };
+  return cost;
 }
 
 /** Validates traps and charges for new ones. */
-function priceTraps(nextTraps, prevTraps, cells, w, h, claimed) {
+function priceTraps(nextTraps, prevTraps, arena, claimed) {
   if (!Array.isArray(nextTraps)) throw new Error("BAD_TRAPS");
   if (nextTraps.length > MAX_TRAPS) throw new Error("TOO_MANY_TRAPS");
 
@@ -547,14 +449,13 @@ function priceTraps(nextTraps, prevTraps, cells, w, h, claimed) {
     if (!Number.isInteger(trap.x) || !Number.isInteger(trap.y)) {
       throw new Error("BAD_TRAP_POSITION");
     }
-    if (trap.x < 0 || trap.y < 0 || trap.x >= w || trap.y >= h) {
+    if (trap.x < 0 || trap.y < 0 || trap.x >= arena.w || trap.y >= arena.h) {
       throw new Error("BAD_TRAP_POSITION");
     }
-    if (cells[trap.y * w + trap.x] !== TILE_FLOOR) throw new Error("TRAP_NOT_ON_FLOOR");
 
-    const key = trap.x + ":" + trap.y;
-    if (claimed[key]) throw new Error("TILE_OCCUPIED");
-    claimed[key] = true;
+    const key = `${trap.x},${trap.y}`;
+    if (claimed.has(key)) throw new Error("TILE_OCCUPIED");
+    claimed.add(key);
 
     const previous = prevById[trap.id];
     if (!previous || previous.type !== trap.type) cost += price;
@@ -563,7 +464,12 @@ function priceTraps(nextTraps, prevTraps, cells, w, h, claimed) {
   return cost;
 }
 
-function priceMinions(nextMinions, prevMinions, cells, w, h, claimed, minionCap) {
+/**
+ * Validates a minion roster against the arena and charges for what is new.
+ * Removals are free but refund nothing, and changing an existing id's type is
+ * charged in full so a client cannot swap a cheap unit for an expensive one.
+ */
+function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
   if (!Array.isArray(nextMinions)) throw new Error("BAD_MINIONS");
   if (nextMinions.length > minionCap) throw new Error("TOO_MANY_MINIONS");
 
@@ -590,21 +496,49 @@ function priceMinions(nextMinions, prevMinions, cells, w, h, claimed, minionCap)
     if (!Number.isInteger(minion.x) || !Number.isInteger(minion.y)) {
       throw new Error("BAD_MINION_POSITION");
     }
-    if (minion.x < 0 || minion.y < 0 || minion.x >= w || minion.y >= h) {
+    if (minion.x < 0 || minion.y < 0 || minion.x >= arena.w || minion.y >= arena.h) {
       throw new Error("BAD_MINION_POSITION");
     }
 
-    // Minions stand in corridors only — never in rock, the entrance or the core.
-    if (cells[minion.y * w + minion.x] !== TILE_FLOOR) {
-      throw new Error("MINION_NOT_ON_FLOOR");
-    }
-
-    const cellKey = minion.x + ":" + minion.y;
-    if (claimed[cellKey]) throw new Error("TILE_OCCUPIED");
-    claimed[cellKey] = true;
+    const cellKey = `${minion.x},${minion.y}`;
+    if (claimed.has(cellKey)) throw new Error("TILE_OCCUPIED");
+    claimed.add(cellKey);
 
     const previous = prevById[minion.id];
     if (!previous || previous.type !== minion.type) cost += price;
+  }
+
+  return cost;
+}
+
+/**
+ * Charges for obstacles that are new or changed type, and refuses a dungeon
+ * that breaks the rules. Removing an obstacle refunds nothing, which is what
+ * makes a wall a purchase rather than a fixture.
+ */
+function priceObstacles(next, saved, arena, research, occupied) {
+  if (!Array.isArray(next)) throw new Error("BAD_OBSTACLES");
+  const cap = maxObstaclesFor(research);
+  if (next.length > cap) throw new Error("TOO_MANY_OBSTACLES");
+
+  const savedById = new Map((saved || []).map((o) => [o.id, o]));
+  let cost = 0;
+
+  for (const o of next) {
+    if (!o || typeof o.id !== "string") throw new Error("BAD_OBSTACLE_ID");
+    if (!OBSTACLE_COST[o.type]) throw new Error("UNKNOWN_OBSTACLE");
+    if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) {
+      throw new Error("OUT_OF_BOUNDS");
+    }
+    if (o.x < 0 || o.y < 0 || o.x >= arena.w || o.y >= arena.h) {
+      throw new Error("OUT_OF_BOUNDS");
+    }
+    const key = `${o.x},${o.y}`;
+    if (occupied.has(key)) throw new Error("TILE_OCCUPIED");
+    occupied.add(key);
+
+    const previous = savedById.get(o.id);
+    if (!previous || previous.type !== o.type) cost += OBSTACLE_COST[o.type];
   }
 
   return cost;
@@ -651,25 +585,27 @@ function sanitizeMinions(nextMinions, prevMinions, loot) {
  * The server does the placing because a convert is the only minion a client is
  * never allowed to create — see the ILLEGAL_CONVERT check in priceMinions.
  */
-function resolveConversions(dungeon, cells, w, h, now) {
+function resolveConversions(dungeon, arena, now) {
   const prisoners = Array.isArray(dungeon.prisoners) ? dungeon.prisoners : [];
   if (prisoners.length === 0) return { converted: [], prisoners };
 
   const occupied = {};
   for (const minion of dungeon.minions || []) occupied[minion.x + ":" + minion.y] = true;
   for (const trap of dungeon.traps || []) occupied[trap.x + ":" + trap.y] = true;
+  for (const obstacle of dungeon.obstacles || []) occupied[obstacle.x + ":" + obstacle.y] = true;
+  occupied[dungeon.entrance.x + ":" + dungeon.entrance.y] = true;
+  occupied[dungeon.core.x + ":" + dungeon.core.y] = true;
 
-  // Converts appear in a jail if there is room, otherwise on any free corridor.
+  // Converts appear in a jail if there is room, otherwise on any free tile —
+  // the whole arena is floor now, so every tile is a candidate.
   const preferred = [];
   for (const room of dungeon.rooms || []) {
     if (room.type !== "jail") continue;
     for (const tile of roomTiles(room)) preferred.push(tile);
   }
   const fallback = [];
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (cells[y * w + x] === TILE_FLOOR) fallback.push({ x, y });
-    }
+  for (let y = 0; y < arena.h; y++) {
+    for (let x = 0; x < arena.w; x++) fallback.push({ x, y });
   }
 
   function freeTile() {
@@ -717,23 +653,30 @@ function resolveConversions(dungeon, cells, w, h, now) {
   return { converted, prisoners: remaining };
 }
 
+/**
+ * Version 1 carved corridors out of rock. Version 2 has no terrain, so the
+ * grid is simply dropped — every placement sat on carved floor, and the
+ * whole room is floor now, so all coordinates stay valid. Nobody loses a
+ * dungeon, gold, or a research node.
+ *
+ * Anything that isn't version 1 or the current version is unreadable and
+ * comes back as null, so loadGame replaces it with a fresh dungeon instead
+ * of half-reading it.
+ */
+function migrate(dungeon) {
+  if (dungeon.version === SAVE_VERSION) return dungeon;
+  if (dungeon.version !== 1) return null;
+  const { grid, ...rest } = dungeon;
+  return { ...rest, version: SAVE_VERSION, obstacles: [] };
+}
+
 function createDefaultDungeon() {
-  const cells = new Array(GRID_W * GRID_H).fill(TILE_ROCK);
   const midY = Math.floor(GRID_H / 2);
-
-  const entranceIndex = midY * GRID_W + 0;
-  const coreIndex = midY * GRID_W + (GRID_W - 1);
-  cells[entranceIndex] = TILE_ENTRANCE;
-  cells[coreIndex] = TILE_CORE;
-
-  // Carve one tile in front of each fixed tile so the player has a seed to work from.
-  cells[midY * GRID_W + 1] = TILE_FLOOR;
-  cells[midY * GRID_W + (GRID_W - 2)] = TILE_FLOOR;
-
   const now = Date.now();
+
   return {
     version: SAVE_VERSION,
-    grid: { w: GRID_W, h: GRID_H, cells: encodeRLE(cells) },
+    obstacles: [],
     minions: [],
     traps: [],
     rooms: [],
@@ -764,8 +707,14 @@ class Server {
     // entitlements are read independently of the dungeon.
     const entitlements = (state && state.entitlements) || emptyEntitlements();
 
-    if (state && state.dungeon && state.dungeon.version === SAVE_VERSION) {
-      const dungeon = state.dungeon;
+    // migrate() returns the save as-is when it is already current, upgrades a
+    // version 1 save, or returns null when it is neither — an unreadable save
+    // falls through to the fresh-dungeon path below rather than being
+    // half-read.
+    const dungeon = state && state.dungeon ? migrate(state.dungeon) : null;
+
+    if (dungeon) {
+      if (!Array.isArray(dungeon.obstacles)) dungeon.obstacles = [];
       if (!Array.isArray(dungeon.minions)) dungeon.minions = [];
       if (!Array.isArray(dungeon.traps)) dungeon.traps = [];
       if (!Array.isArray(dungeon.rooms)) dungeon.rooms = [];
@@ -777,17 +726,8 @@ class Server {
       // Sentences are served between sessions, so conversions are settled on
       // load rather than by a timer the sandbox does not allow.
       const now = Date.now();
-      const cells = decodeRLE(dungeon.grid.cells, dungeon.grid.w * dungeon.grid.h);
-      let converted = [];
-      if (cells) {
-        converted = resolveConversions(
-          dungeon,
-          cells,
-          dungeon.grid.w,
-          dungeon.grid.h,
-          now,
-        ).converted;
-      }
+      const arena = arenaFor(dungeon.research);
+      const converted = resolveConversions(dungeon, arena, now).converted;
 
       decayThreat(dungeon, now);
       dungeon.lastSeenAt = now;
@@ -803,16 +743,16 @@ class Server {
       };
     }
 
-    const dungeon = createDefaultDungeon();
-    await $global.updateMyState({ dungeon });
+    const fresh = createDefaultDungeon();
+    await $global.updateMyState({ dungeon: fresh });
     await $asset.mint("gold", START_GOLD);
 
     return {
-      dungeon,
+      dungeon: fresh,
       entitlements,
       gold: await $asset.get("gold"),
       created: true,
-      research: researchEffects(dungeon.research),
+      research: researchEffects(fresh.research),
       account: $sender.account,
     };
   }
@@ -843,7 +783,6 @@ class Server {
       await $asset.burn("gold", node.cost);
 
       dungeon.research = owned.concat([id]);
-      if (node.expandTo) expandGrid(dungeon, node.expandTo);
       dungeon.updatedAt = Date.now();
 
       await $global.updateMyState({ dungeon });
@@ -867,55 +806,31 @@ class Server {
   }
 
   /**
-   * Persists the dungeon grid. The client batches digs in memory and calls this
-   * at checkpoints only (remoteFunction is rate limited to ~10 calls/sec).
+   * Persists the dungeon layout. The client batches placements in memory and
+   * calls this at checkpoints only (remoteFunction is rate limited to ~10
+   * calls/sec).
    *
    * The server recomputes the cost from the diff instead of trusting a client
-   * total, and only ROCK -> FLOOR transitions are accepted.
+   * total. There is no terrain any more, so nothing here validates a route —
+   * a sealed room is a legal, if expensive, thing to build.
    */
   async saveDungeon(payload) {
-    if (!payload || !payload.grid || typeof payload.grid.cells !== "string") {
-      throw new Error("BAD_PAYLOAD");
-    }
+    if (!payload || typeof payload !== "object") throw new Error("BAD_PAYLOAD");
 
     const state = await $global.getMyState();
     if (!state || !state.dungeon) throw new Error("NO_SAVE");
 
     const prev = state.dungeon;
-    const w = prev.grid.w;
-    const h = prev.grid.h;
+    const research = prev.research || [];
+    const arena = arenaFor(research);
 
-    if (payload.grid.w !== w || payload.grid.h !== h) {
-      throw new Error("GRID_SIZE_MISMATCH");
-    }
-
-    const prevCells = decodeRLE(prev.grid.cells, w * h);
-    const nextCells = decodeRLE(payload.grid.cells, w * h);
-    if (!prevCells || !nextCells) throw new Error("BAD_GRID");
-
-    let digs = 0;
-    for (let i = 0; i < prevCells.length; i++) {
-      if (prevCells[i] === nextCells[i]) continue;
-      if (prevCells[i] === TILE_ROCK && nextCells[i] === TILE_FLOOR) {
-        digs++;
-      } else {
-        // Filling floor back in, moving the entrance, relocating the core:
-        // none of these are legal client moves.
-        throw new Error("ILLEGAL_TILE_CHANGE");
-      }
-    }
-
-    if (digs > MAX_DIGS_PER_SAVE) throw new Error("TOO_MANY_DIGS");
-
-    // Everything is priced against the new grid, so a minion, trap or room may
-    // sit on a tile dug in this very save. Rooms claim their tiles first, then
-    // traps, then minions — one occupant per tile.
     const nextRooms = payload.rooms || prev.rooms || [];
     const nextTraps = payload.traps || prev.traps || [];
     const nextMinions = payload.minions || prev.minions || [];
+    const nextObstacles = payload.obstacles || prev.obstacles || [];
 
     // Locked content cannot be placed, whatever the client sends.
-    const unlocked = researchEffects(prev.research || []);
+    const unlocked = researchEffects(research);
     for (const room of nextRooms) {
       if (unlocked.unlockedRooms.indexOf(room.type) === -1) throw new Error("ROOM_LOCKED");
     }
@@ -928,27 +843,33 @@ class Server {
       }
     }
 
-    const roomPricing = priceRooms(nextRooms, prev.rooms || [], nextCells, w, h);
-    const trapCost = priceTraps(
-      nextTraps,
-      prev.traps || [],
-      nextCells,
-      w,
-      h,
-      roomPricing.claimed,
-    );
+    // Everything is priced against the same arena, and one occupant ever
+    // holds a tile. The entrance and core are claimed before anything else,
+    // so a room, trap, minion or obstacle can never land on either. Rooms
+    // claim their tiles first, then traps, then minions, then obstacles.
+    const claimed = new Set();
+    claimed.add(`${prev.entrance.x},${prev.entrance.y}`);
+    claimed.add(`${prev.core.x},${prev.core.y}`);
+
+    const roomCost = priceRooms(nextRooms, prev.rooms || [], arena, claimed);
+    const trapCost = priceTraps(nextTraps, prev.traps || [], arena, claimed);
     const effects = roomEffects(nextRooms);
     const minionCost = priceMinions(
       nextMinions,
       prev.minions || [],
-      nextCells,
-      w,
-      h,
-      roomPricing.claimed,
+      arena,
+      claimed,
       effects.minionCap,
     );
+    const obstacleCost = priceObstacles(
+      nextObstacles,
+      prev.obstacles || [],
+      arena,
+      research,
+      claimed,
+    );
 
-    const cost = digs * DIG_COST + roomPricing.cost + trapCost + minionCost;
+    const cost = roomCost + trapCost + minionCost + obstacleCost;
     if (cost > 0) {
       const affordable = await $asset.has("gold", cost);
       if (!affordable) throw new Error("INSUFFICIENT_GOLD");
@@ -958,7 +879,7 @@ class Server {
     const now = Date.now();
     const dungeon = {
       version: SAVE_VERSION,
-      grid: { w, h, cells: payload.grid.cells },
+      obstacles: nextObstacles,
       minions: sanitizeMinions(nextMinions, prev.minions || [], prev.loot || []),
       traps: nextTraps,
       rooms: nextRooms,
@@ -980,10 +901,10 @@ class Server {
 
     return {
       ok: true,
-      digs,
+      obstacleCost,
       minionCost,
       trapCost,
-      roomCost: roomPricing.cost,
+      roomCost,
       cost,
       effects,
       gold: await $asset.get("gold"),
@@ -997,23 +918,15 @@ class Server {
 
   /**
    * Opens a raid. The party is built here, not on the client, so a player
-   * cannot pick an easy wave. A dungeon with no route from entrance to core is
-   * refused outright — sealing the core would otherwise be a free win.
+   * cannot pick an easy wave. A sealed room — no route from entrance to core —
+   * is a legal, and expensive, way to buy time: the party simply breaks
+   * through the nearest obstacle once the raid runs.
    */
   async startRaid() {
     const state = await $global.getMyState();
     if (!state || !state.dungeon) throw new Error("NO_SAVE");
 
     const dungeon = state.dungeon;
-    const w = dungeon.grid.w;
-    const h = dungeon.grid.h;
-    const cells = decodeRLE(dungeon.grid.cells, w * h);
-    if (!cells) throw new Error("BAD_GRID");
-
-    if (!hasPath(cells, w, h, dungeon.entrance, dungeon.core)) {
-      throw new Error("NO_PATH");
-    }
-
     const now = Date.now();
 
     // A raid left unresolved is settled as a loss before a new one opens.
@@ -1062,7 +975,14 @@ class Server {
    * comes from the table above and is clamped to the party the server issued,
    * so an inflated report cannot pay more than a perfect raid would have.
    */
-  async finishRaid({ raidId, outcome, killedIds, capturedIds, lostMinionIds }) {
+  async finishRaid({
+    raidId,
+    outcome,
+    killedIds,
+    capturedIds,
+    lostMinionIds,
+    destroyedObstacleIds,
+  }) {
     const state = await $global.getMyState();
     if (!state || !state.dungeon) throw new Error("NO_SAVE");
 
@@ -1165,6 +1085,14 @@ class Server {
         : { ...minion, revivesAt: now + downTime },
     );
 
+    // Walls the party broke through to reach the core are gone for good —
+    // removing an obstacle refunds nothing, so a client that lies here only
+    // destroys its own walls and pays to rebuild them.
+    const destroyed = new Set(
+      Array.isArray(destroyedObstacleIds) ? destroyedObstacleIds : [],
+    );
+    dungeon.obstacles = (dungeon.obstacles || []).filter((o) => !destroyed.has(o.id));
+
     const threatDelta =
       (outcome === "repelled" ? 1 : -1) +
       (outcome === "repelled" ? effects.treasuryCount * TREASURY_THREAT : 0);
@@ -1187,6 +1115,7 @@ class Server {
       wavesRepelled: dungeon.wavesRepelled,
       coreBreaches: dungeon.coreBreaches,
       minions: dungeon.minions,
+      obstacles: dungeon.obstacles,
       loot: dungeon.loot,
       lootGained,
       prisoners: dungeon.prisoners || [],
