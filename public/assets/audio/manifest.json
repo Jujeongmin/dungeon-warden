@@ -1,3 +1,64 @@
 {
-  "sounds": []
+  "sounds": [
+    {
+      "url": "/assets/audio/click_001.wav",
+      "name": "click_001",
+      "group": "",
+      "bytes": 10190
+    },
+    {
+      "url": "/assets/audio/confirmation_002.wav",
+      "name": "confirmation_002",
+      "group": "",
+      "bytes": 49614
+    },
+    {
+      "url": "/assets/audio/drop_002.wav",
+      "name": "drop_002",
+      "group": "",
+      "bytes": 35662
+    },
+    {
+      "url": "/assets/audio/error_004.wav",
+      "name": "error_004",
+      "group": "",
+      "bytes": 18510
+    },
+    {
+      "url": "/assets/audio/footstep_concrete_000.ogg",
+      "name": "footstep_concrete_000",
+      "group": "",
+      "bytes": 5808
+    },
+    {
+      "url": "/assets/audio/impactGeneric_light_000.ogg",
+      "name": "impactgeneric_light_000",
+      "group": "",
+      "bytes": 5827
+    },
+    {
+      "url": "/assets/audio/impactPlate_medium_000.ogg",
+      "name": "impactplate_medium_000",
+      "group": "",
+      "bytes": 10921
+    },
+    {
+      "url": "/assets/audio/jingles_STEEL00.ogg",
+      "name": "jingles_steel00",
+      "group": "",
+      "bytes": 15691
+    },
+    {
+      "url": "/assets/audio/lose_jingle.ogg",
+      "name": "lose_jingle",
+      "group": "",
+      "bytes": 10872
+    },
+    {
+      "url": "/assets/audio/win_jingle.ogg",
+      "name": "win_jingle",
+      "group": "",
+      "bytes": 22460
+    }
+  ]
 }

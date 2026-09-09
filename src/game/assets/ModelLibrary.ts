@@ -76,6 +76,27 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   altar: [/^altar/, /^candle/, /^pillar/],
   workshop: [/^table_medium$/, /^table_small$/, /^table/, /anvil/],
   jail: [/^wall_gated/, /gated/, /^cage/, /^chain/],
+
+  // Dressing.
+  //
+  // The pack ships 211 dungeon props and the game was using eleven of them, so
+  // a finished dungeon read as corridors of bare stone with two landmarks in
+  // it. These fill the walls and the empty floor, and give each room type a
+  // few different things to put on its four tiles instead of the same model
+  // four times over.
+  prop_torch: [/^torch$/, /^torch_/, /^candle_triple$/],
+  prop_barrel: [/^barrel_large$/, /^barrel_small$/, /^barrel/],
+  prop_box: [/^box_stacked$/, /^box_small$/, /^box_large$/],
+  prop_bottle: [/^bottle_a_green$/, /^bottle_b_brown$/, /^bottle/],
+  prop_rubble: [/^rubble_half$/, /^rubble/, /^rocks/],
+  prop_pillar: [/^pillar_decorated$/, /^pillar$/, /^column$/],
+  prop_coin_large: [/^coin_stack_large$/, /^coin_stack/],
+  prop_coin_small: [/^coin_stack_small$/, /^coin$/],
+  prop_bed: [/^bed_frame$/, /^bed_decorated$/, /^bed/],
+  prop_shelf: [/^shelf_large$/, /^shelf_small$/, /^shelf/],
+  prop_candle: [/^candle_lit$/, /^candle_thin_lit$/, /^candle/],
+  prop_table: [/^table_long$/, /^table_medium$/, /^table/],
+  prop_banner: [/^banner_shield_red$/, /^banner_triple_red$/, /^banner_red$/],
 };
 
 /**

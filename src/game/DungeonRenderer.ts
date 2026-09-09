@@ -89,6 +89,49 @@ const UNIT_HEIGHT = 0.7;
 const MARKER_HEIGHT = 0.16;
 
 /**
+ * What each room type puts on its tiles.
+ *
+ * A room is 2x2, and drawing its one model on all four tiles read as a
+ * warehouse of identical chests. Each tile picks from this list instead, so a
+ * treasury is a chest with coin piles around it and a barracks is beds and
+ * footlockers. The room's own key stays first: it is the one that has to be
+ * recognisable, and it is what a one-tile fallback shows.
+ */
+const ROOM_PROPS: Record<string, string[]> = {
+  treasury: ["treasury", "prop_coin_large", "prop_coin_small", "treasury"],
+  vault: ["vault", "prop_box", "prop_barrel", "prop_bottle"],
+  barracks: ["barracks", "prop_bed", "prop_box", "prop_banner"],
+  altar: ["altar", "prop_candle", "prop_pillar", "prop_candle"],
+  workshop: ["workshop", "prop_table", "prop_shelf", "prop_barrel"],
+  jail: ["jail", "prop_rubble", "prop_box", "jail"],
+};
+
+/** Props scattered on empty corridor floor, and how often a tile gets one. */
+const CLUTTER = ["prop_barrel", "prop_box", "prop_rubble", "prop_bottle", "prop_pillar"];
+const CLUTTER_CHANCE = 0.14;
+
+/** How many of a corridor's wall panels carry a torch. */
+const TORCH_CHANCE = 0.22;
+
+/**
+ * A stable pseudo-random number for a tile.
+ *
+ * Decoration is recomputed on every grid change, so it has to come out the
+ * same each time — otherwise the barrels dance around the room whenever the
+ * player digs somewhere else. FNV-1a over the coordinates, folded to [0, 1).
+ */
+function tileNoise(x: number, y: number, salt: number): number {
+  let hash = 0x811c9dc5;
+  for (const value of [x + 1, y + 1, salt + 1]) {
+    hash ^= value & 0xff;
+    hash = Math.imul(hash, 0x01000193);
+    hash ^= (value >> 8) & 0xff;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return ((hash >>> 0) % 100000) / 100000;
+}
+
+/**
  * Owns the three.js scene. Tiles are drawn with two InstancedMeshes (rock and
  * floor) so a 24x24 grid still costs a handful of draw calls once the KayKit
  * models replace these placeholder boxes — they share one 1024px atlas.
@@ -142,6 +185,7 @@ export class DungeonRenderer {
   private ringGeometry = new THREE.RingGeometry(0.2, 0.34, 20);
 
   private landmarks: THREE.Object3D[] = [];
+  private decor: THREE.Object3D[] = [];
   private pathMarkers: THREE.Object3D[] = [];
   private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
 
@@ -485,11 +529,15 @@ export class DungeonRenderer {
     for (const marker of markers) {
       seen.add(marker.id);
       let object = this.markerMeshes.get(marker.id);
-      const usesModel = this.loaded.get(marker.kind) != null;
+      // A room tile may show one of its type's props rather than the room
+      // model itself; a trap is always its own model.
+      const modelKey =
+        marker.shape === "room" ? this.roomPropFor(marker) : marker.kind;
+      const usesModel = this.loaded.get(modelKey) != null;
 
       if (!object) {
         object =
-          this.spawnModel(marker.kind, marker.shape === "trap" ? 0.7 : 0.85) ??
+          this.spawnModel(modelKey, marker.shape === "trap" ? 0.7 : 0.85) ??
           new THREE.Mesh(
             marker.shape === "trap" ? this.trapGeometry : this.roomGeometry,
             new THREE.MeshLambertMaterial({
@@ -510,6 +558,19 @@ export class DungeonRenderer {
       this.disposeObject(this.markerGroup, object);
       this.markerMeshes.delete(id);
     }
+  }
+
+  /**
+   * Which prop this tile of a room shows.
+   *
+   * Falls back to the room's own model when the prop did not load, so a
+   * missing file costs one prop rather than an invisible room.
+   */
+  private roomPropFor(marker: MarkerView): string {
+    const props = ROOM_PROPS[marker.kind];
+    if (!props) return marker.kind;
+    const pick = props[Math.floor(tileNoise(marker.x, marker.y, 7) * props.length)];
+    return this.loaded.get(pick) ? pick : marker.kind;
   }
 
   private rebuildInstances(): void {
@@ -534,6 +595,73 @@ export class DungeonRenderer {
 
     this.buildWalls(floorPositions);
     this.buildLandmarks();
+    this.buildDecor(floorPositions);
+  }
+
+  /**
+   * Torches on the walls, clutter on the floor.
+   *
+   * Without this a dug-out dungeon is bare stone corridors: correct, readable,
+   * and completely lifeless. Placement is driven by tileNoise so it survives a
+   * rebuild unchanged, and it deliberately skips the tiles that mean something
+   * — the entrance, the core, and anywhere a trap, room or minion can stand —
+   * because a barrel that hides a spike plate is a bug, not decoration.
+   */
+  private buildDecor(floors: Array<{ x: number; y: number }>): void {
+    const grid = this.grid;
+    if (!grid) return;
+
+    const occupied = new Set<string>();
+    for (const marker of this.lastMarkers) occupied.add(`${marker.x},${marker.y}`);
+    for (const unit of this.lastUnits) {
+      occupied.add(`${Math.round(unit.x)},${Math.round(unit.y)}`);
+    }
+
+    const steps: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+    for (const floor of floors) {
+      const tile = grid.get(floor.x, floor.y);
+      if (tile !== TILE.FLOOR) continue;
+
+      // Torches ride the wall panels, so they only exist where one does.
+      for (const [dx, dy] of steps) {
+        const nx = floor.x + dx;
+        const ny = floor.y + dy;
+        const solid = !grid.inBounds(nx, ny) || grid.get(nx, ny) === TILE.ROCK;
+        if (!solid) continue;
+        if (tileNoise(nx * 2 + dx, ny * 2 + dy, 3) > TORCH_CHANCE) continue;
+
+        const torch = this.spawnModel("prop_torch", 0.5);
+        if (!torch) break;
+        // Just inside the panel, or it floats in the rock.
+        torch.position.set(
+          floor.x + dx * 0.38,
+          FLOOR_HEIGHT + torch.position.y,
+          floor.y + dy * 0.38,
+        );
+        torch.rotation.y = Math.atan2(-dx, -dy);
+        this.scene.add(torch);
+        this.decor.push(torch);
+        break;
+      }
+
+      if (occupied.has(`${floor.x},${floor.y}`)) continue;
+      const roll = tileNoise(floor.x, floor.y, 11);
+      if (roll > CLUTTER_CHANCE) continue;
+
+      const key = CLUTTER[Math.floor(tileNoise(floor.x, floor.y, 13) * CLUTTER.length)];
+      const prop = this.spawnModel(key, 0.55);
+      if (!prop) continue;
+      // Off-centre and turned, so a corridor of barrels does not look stamped.
+      prop.position.set(
+        floor.x + (tileNoise(floor.x, floor.y, 17) - 0.5) * 0.4,
+        FLOOR_HEIGHT + prop.position.y,
+        floor.y + (tileNoise(floor.x, floor.y, 19) - 0.5) * 0.4,
+      );
+      prop.rotation.y = tileNoise(floor.x, floor.y, 23) * Math.PI * 2;
+      this.scene.add(prop);
+      this.decor.push(prop);
+    }
   }
 
   /**
@@ -549,6 +677,8 @@ export class DungeonRenderer {
 
     for (const object of this.landmarks) this.disposeObject(this.scene, object);
     this.landmarks = [];
+    for (const object of this.decor) this.disposeObject(this.scene, object);
+    this.decor = [];
 
     const spots: Array<{ key: string; x: number; y: number }> = [];
     grid.forEach((x, y, tile) => {
@@ -753,6 +883,7 @@ export class DungeonRenderer {
       floorInstances: this.floorMesh?.count ?? 0,
       wallInstances: this.wallMesh?.count ?? 0,
       landmarks: this.landmarks.length,
+      decor: this.decor.length,
       pathMarkers: this.pathMarkers.length,
       units: this.unitMeshes.size,
       markers: this.markerMeshes.size,
@@ -1010,6 +1141,8 @@ export class DungeonRenderer {
     this.pathGeometry.dispose();
     for (const object of this.landmarks) this.disposeObject(this.scene, object);
     this.landmarks = [];
+    for (const object of this.decor) this.disposeObject(this.scene, object);
+    this.decor = [];
 
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();
