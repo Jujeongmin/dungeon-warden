@@ -6,6 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#14120f" />
     <title>Dungeon Warden</title>
+    <!-- Preloaded so the boot text below (painted before src/index.css's
+         @font-face is discovered) has a chance to land in Pretendard
+         instead of the fallback — this is the very first thing a player
+         sees. Bold isn't preloaded: it's not needed until the app mounts. -->
+    <link
+      rel="preload"
+      href="/src/assets/fonts/Pretendard-Regular.subset.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <style>
       html,
       body {
@@ -17,7 +28,10 @@
       }
 
       /* Shown until React mounts. The 3D scene and its models take a moment,
-         and a black rectangle reads as a broken embed. */
+         and a black rectangle reads as a broken embed. Sized to match the
+         scale in src/index.css (--fs-md / --fw-bold / --ls-wider,
+         --fs-sm) rather than the CSS variables themselves — this markup has
+         to render correctly before that stylesheet has loaded. */
       .boot {
         position: fixed;
         inset: 0;
@@ -30,13 +44,13 @@
       }
 
       .boot-title {
-        font-size: 1.1rem;
-        font-weight: 800;
+        font-size: 16px;
+        font-weight: 700;
         letter-spacing: 0.12em;
       }
 
       .boot-sub {
-        font-size: 0.8rem;
+        font-size: 13px;
         color: #a4998a;
       }
     </style>

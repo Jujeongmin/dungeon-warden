@@ -48,7 +48,10 @@ html, body, #root {
 body {
   background: #14120f;
   color: var(--ink);
-  font: 14px/1.5 "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
   overscroll-behavior: none;
 }
 
@@ -100,16 +103,16 @@ h3.section {
 }
 
 .brand {
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  font-size: 15px;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide);
+  font-size: var(--fs-md);
   white-space: nowrap;
 }
 
 .brand span {
   color: var(--muted);
-  font-weight: 600;
-  font-size: 11px;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-2xs);
   margin-left: 6px;
 }
 
@@ -118,11 +121,11 @@ h3.section {
   align-items: center;
   flex-wrap: nowrap;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
-.gold { font-weight: 700; color: var(--accent); }
+.gold { font-weight: var(--fw-bold); color: var(--accent); }
 .pending { color: var(--muted); }
 
 .status {
@@ -130,7 +133,7 @@ h3.section {
   border-radius: 99px;
   border: 1px solid var(--line);
   background: var(--panel);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .status-ready { color: var(--ok); }
@@ -156,23 +159,23 @@ h3.section {
 
 .title-kicker {
   margin: 0 0 6px;
-  font-size: 12.5px;
-  letter-spacing: 0.18em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-widest);
   color: var(--accent);
 }
 
 .title-name {
   margin: 0 0 14px;
-  font-size: clamp(30px, 8vw, 52px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide);
   line-height: 1.05;
 }
 
 .title-line {
   margin: 0 auto 22px;
   max-width: 420px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   line-height: 1.75;
   color: var(--muted);
 }
@@ -186,7 +189,7 @@ h3.section {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -194,8 +197,8 @@ h3.section {
   width: 100%;
   max-width: 320px;
   padding: 13px 16px;
-  font-size: 14.5px;
-  font-weight: 800;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
   border-radius: 10px;
   border-color: rgba(232, 164, 76, 0.6);
   color: var(--accent);
@@ -210,11 +213,11 @@ h3.section {
   max-width: 320px;
 }
 
-.title-menu button { flex: 1; font-size: 12.5px; }
+.title-menu button { flex: 1; font-size: var(--fs-sm); }
 
 .title-note {
   margin: 16px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--accent);
 }
 
@@ -225,7 +228,7 @@ h3.section {
   gap: 12px;
   padding: 11px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .setting-row button,
@@ -242,7 +245,7 @@ h3.section {
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .setting-row.danger-row { border-bottom: none; }
@@ -250,7 +253,7 @@ h3.section {
 .intro-list {
   margin: 10px 0 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.8;
   color: var(--muted);
 }
@@ -268,17 +271,17 @@ h3.section {
 .floater {
   position: absolute;
   transform: translate(-50%, -50%);
-  font-weight: 800;
-  font-size: 15px;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
   animation: floatUp 1s ease-out forwards;
   white-space: nowrap;
 }
 
 .floater.melee { color: #ffd9b0; }
-.floater.trap { color: #ff9a5c; font-size: 17px; }
+.floater.trap { color: #ff9a5c; font-size: var(--fs-lg); }
 .floater.killed { color: #ff8f7a; }
-.floater.captured { color: #8fe6a0; font-size: 16px; }
+.floater.captured { color: #8fe6a0; font-size: var(--fs-lg); }
 
 /* Starts fully visible: a damage number that fades in is a damage number the
    player misses. */
@@ -309,7 +312,7 @@ h3.section {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
 }
 
@@ -333,7 +336,7 @@ h3.section {
   flex: none;
   padding: 0;
   line-height: 1;
-  font-size: 16px;
+  font-size: var(--fs-md);
   border: none;
   background: none;
   color: var(--muted);
@@ -373,7 +376,7 @@ h3.section {
 .hud-tabs button {
   flex: 1;
   padding: 6px 4px;
-  font-size: 11.5px;
+  font-size: var(--fs-2xs);
   border-radius: 7px;
 }
 
@@ -390,8 +393,8 @@ h3.section {
 
 h3.section {
   margin: 14px 0 4px;
-  font-size: 12px;
-  letter-spacing: 0.03em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-tight);
   color: var(--muted);
 }
 
@@ -402,7 +405,7 @@ h3.section:first-child { margin-top: 2px; }
   pointer-events: auto;
   width: 30px;
   padding: 3px 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   border-radius: 99px;
 }
 
@@ -426,8 +429,8 @@ h3.section:first-child { margin-top: 2px; }
   gap: 8px;
 }
 
-.tutorial-head b { color: var(--accent); font-size: 12.5px; }
-.tutorial p { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.tutorial-head b { color: var(--accent); font-size: var(--fs-sm); }
+.tutorial p { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
 
 .rank-submit {
   display: flex;
@@ -443,7 +446,7 @@ h3.section:first-child { margin-top: 2px; }
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .rank-submit button { flex: none; width: auto; min-width: 64px; }
@@ -451,7 +454,7 @@ h3.section:first-child { margin-top: 2px; }
 .rank-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   margin-top: 8px;
 }
 
@@ -462,22 +465,23 @@ h3.section:first-child { margin-top: 2px; }
   border-bottom: 1px solid var(--line);
 }
 
-.rank-table th { color: var(--muted); font-weight: 600; font-size: 11px; }
-.rank-table tr.me td { color: var(--accent); font-weight: 700; }
+.rank-table th { color: var(--muted); font-weight: var(--fw-bold); font-size: var(--fs-2xs); }
+.rank-table tr.me td { color: var(--accent); font-weight: var(--fw-bold); }
 
 .hud h2 {
   margin: 0 0 6px;
-  font-size: 14px;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-normal);
 }
 
 .hint {
   margin: 6px 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
 }
 
-.hint.small { font-size: 11.5px; }
+.hint.small { font-size: var(--fs-2xs); }
 .hint .warn { color: var(--danger); }
 .account {
   overflow: hidden;
@@ -492,7 +496,7 @@ h3.section:first-child { margin-top: 2px; }
   list-style: none;
   margin: 10px 0;
   padding: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
@@ -525,7 +529,7 @@ button {
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
@@ -569,8 +573,8 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
   background: var(--panel);
 }
 
-.skill b { font-size: 12.5px; }
-.skill i { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.skill b { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+.skill i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); }
 
 .skill.armed {
   border-color: var(--accent);
@@ -593,8 +597,8 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
   text-align: left;
 }
 
-.tool b { font-size: 12px; font-weight: 700; }
-.tool i { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.tool b { font-size: var(--fs-xs); font-weight: var(--fw-bold); }
+.tool i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); }
 
 .tool.active {
   border-color: var(--accent);
@@ -604,7 +608,7 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
 button.primary {
   border-color: rgba(232, 164, 76, 0.6);
   color: var(--accent);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 }
 
 .raid-bar {
@@ -617,11 +621,11 @@ button.primary {
   border: 1px solid var(--line);
   border-radius: 99px;
   background: var(--panel);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
-.raid-bar b { color: var(--accent); }
+.raid-bar b { color: var(--accent); font-weight: var(--fw-bold); }
 .raid-bar span { color: var(--muted); }
 
 .speeds { display: flex; gap: 4px; }
@@ -630,7 +634,7 @@ button.primary {
   flex: none;
   width: 34px;
   padding: 3px 0;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   border-radius: 6px;
 }
 
@@ -645,7 +649,7 @@ button.primary {
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .result-list li {
@@ -664,15 +668,15 @@ button.primary {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   max-height: 160px;
   overflow-y: auto;
 }
 
 .panel summary {
   cursor: pointer;
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
@@ -693,15 +697,15 @@ button.primary {
   gap: 8px;
 }
 
-.research-head b { font-size: 12px; }
-.research-head .ok { color: var(--ok); font-size: 11px; }
+.research-head b { font-size: var(--fs-xs); font-weight: var(--fw-bold); }
+.research-head .ok { color: var(--ok); font-size: var(--fs-2xs); }
 
 .research-head button {
   flex: none;
   width: auto;
   min-width: 54px;
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
 }
 
 .equip-row {
@@ -709,7 +713,7 @@ button.primary {
   align-items: center;
   gap: 8px;
   margin: 6px 0;
-  font-size: 11.5px;
+  font-size: var(--fs-2xs);
   color: var(--muted);
 }
 
@@ -729,14 +733,14 @@ button.primary {
   background: var(--panel);
   color: var(--ink);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
 }
 
 .shop-btn {
   flex: none;
   pointer-events: auto;
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   border-radius: 99px;
   border-color: rgba(232, 164, 76, 0.5);
   color: var(--accent);
@@ -772,8 +776,9 @@ button.primary {
 
 .modal-head h2 {
   margin: 0;
-  font-size: 16px;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-normal);
 }
 
 .icon-btn {
@@ -781,7 +786,7 @@ button.primary {
   width: 28px;
   height: 28px;
   padding: 0;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   line-height: 1;
   border: none;
   background: none;
@@ -791,7 +796,7 @@ button.primary {
 .modal-note {
   margin: 8px 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
 }
 
@@ -828,11 +833,11 @@ button.primary {
 }
 
 .shop-item-body { flex: 1; min-width: 0; }
-.shop-item-body b { font-size: 13.5px; }
+.shop-item-body b { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
 .shop-item-body p {
   margin: 3px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .shop-block { color: #ffb4a8 !important; }
@@ -877,8 +882,8 @@ button.primary {
     padding: 6px 6px;
   }
 
-  .tool b { font-size: 11px; }
-  .tool i { font-size: 10px; }
+  .tool b { font-size: var(--fs-2xs); }
+  .tool i { font-size: var(--fs-2xs); }
 
   .legend { display: none; }
 
@@ -899,7 +904,7 @@ button.primary {
     display: none;
   }
 
-  .brand { font-size: 12px; letter-spacing: 0.04em; }
+  .brand { font-size: var(--fs-xs); letter-spacing: var(--ls-normal); }
   .brand span { display: none; }
 
   .skillbar {
@@ -916,7 +921,7 @@ button.primary {
        pushes this bar down. What doesn't fit scrolls (already overflow-x). */
     max-width: calc(100% - 124px);
     gap: 8px;
-    font-size: 11.5px;
+    font-size: var(--fs-2xs);
     justify-content: space-between;
     overflow-x: auto;
   }
@@ -927,8 +932,8 @@ button.primary {
      happen to be long enough to push them off. */
   .raid-bar .speeds { order: -1; }
 
-  .stats { gap: 6px; font-size: 12px; }
-  .banner { font-size: 12px; }
+  .stats { gap: 6px; font-size: var(--fs-xs); }
+  .banner { font-size: var(--fs-xs); }
   .modal { max-height: 80%; }
 }
 
