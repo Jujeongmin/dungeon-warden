@@ -50,6 +50,10 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   entrance: [/^stairs_/, /^stairs$/, /^door_/, /^doorway/],
   core: [/^chest_gold$/, /^chest$/, /^banner_red$/],
 
+  // Obstacles — walls the player places to block a raiding party's route.
+  obstacle_barricade: [/^barrier_half$/, /^barrier$/, /^fence/],
+  obstacle_wall: [/^wall$/, /^wall_arched$/, /^pillar$/],
+
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
   // minion and a mage adventurer are different models.

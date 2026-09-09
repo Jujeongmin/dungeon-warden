@@ -1,10 +1,11 @@
 import * as THREE from "three";
-import { TILE, type TileId } from "./types";
+import { TILE, type TileId, type ObstacleType } from "./types";
 import { ModelLibrary, MODEL_PATTERNS, fitToTile, type LoadedModel } from "./assets/ModelLibrary";
-import type { Grid } from "./grid";
+import { inArena, type Arena } from "./arena";
+import type { Point } from "./sim/pathfinding";
 
 const TILE_SIZE = 1;
-const ROCK_HEIGHT = 0.9;
+const WALL_HEIGHT = 0.9;
 const FLOOR_HEIGHT = 0.12;
 
 const PITCH = THREE.MathUtils.degToRad(52);
@@ -16,7 +17,6 @@ const FOV = 45;
 const TAP_SLOP = 6;
 
 const COLORS: Record<TileId, number> = {
-  [TILE.ROCK]: 0x4a423a,
   [TILE.FLOOR]: 0x8a7f6d,
   [TILE.ENTRANCE]: 0x4c7d4a,
   [TILE.CORE]: 0xb4712c,
@@ -60,6 +60,23 @@ export interface MarkerView {
   y: number;
   kind: string;
   shape: "trap" | "room";
+}
+
+/**
+ * Walls the player put down.
+ *
+ * Height tracks remaining HP: a barricade being chopped through visibly
+ * sinks, which is the only feedback the player gets that hitting it is
+ * working. Everything else about the model stays put so it does not read as
+ * a different object.
+ */
+export interface ObstacleView {
+  id: string;
+  type: ObstacleType;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
 }
 
 /** Placeholder colors, keyed the same way as MODEL_PATTERNS. */
@@ -106,19 +123,20 @@ const ROOM_PROPS: Record<string, string[]> = {
   jail: ["jail", "prop_rubble", "prop_box", "jail"],
 };
 
-/** Props scattered on empty corridor floor, and how often a tile gets one. */
+/** Props scattered on empty room floor, and how often a tile gets one. */
 const CLUTTER = ["prop_barrel", "prop_box", "prop_rubble", "prop_bottle", "prop_pillar"];
 const CLUTTER_CHANCE = 0.14;
 
-/** How many of a corridor's wall panels carry a torch. */
+/** How many of the room's wall panels carry a torch. */
 const TORCH_CHANCE = 0.22;
 
 /**
  * A stable pseudo-random number for a tile.
  *
- * Decoration is recomputed on every grid change, so it has to come out the
+ * Decoration is recomputed on every arena change, so it has to come out the
  * same each time — otherwise the barrels dance around the room whenever the
- * player digs somewhere else. FNV-1a over the coordinates, folded to [0, 1).
+ * player places or removes an obstacle. FNV-1a over the coordinates, folded
+ * to [0, 1).
  */
 function tileNoise(x: number, y: number, salt: number): number {
   let hash = 0x811c9dc5;
@@ -132,9 +150,9 @@ function tileNoise(x: number, y: number, salt: number): number {
 }
 
 /**
- * Owns the three.js scene. Tiles are drawn with two InstancedMeshes (rock and
- * floor) so a 24x24 grid still costs a handful of draw calls once the KayKit
- * models replace these placeholder boxes — they share one 1024px atlas.
+ * Owns the three.js scene. The room's floor is one InstancedMesh, so a wide
+ * arena still costs a handful of draw calls once the KayKit models replace
+ * these placeholder boxes — they share one 1024px atlas.
  */
 export class DungeonRenderer {
   private renderer: THREE.WebGLRenderer;
@@ -143,7 +161,6 @@ export class DungeonRenderer {
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-  private rockMesh: THREE.InstancedMesh | null = null;
   private floorMesh: THREE.InstancedMesh | null = null;
   private wallMesh: THREE.InstancedMesh | null = null;
   private highlight: THREE.Mesh;
@@ -157,7 +174,14 @@ export class DungeonRenderer {
   private trapGeometry = new THREE.BoxGeometry(0.72, MARKER_HEIGHT, 0.72);
   private roomGeometry = new THREE.BoxGeometry(0.94, MARKER_HEIGHT * 0.6, 0.94);
 
-  private grid: Grid | null = null;
+  private obstacleGroup = new THREE.Group();
+  private obstacleMeshes = new Map<string, THREE.Object3D>();
+  private obstacleGeometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+  private lastObstacles: ObstacleView[] = [];
+
+  private arena: Arena | null = null;
+  private entrance: Point | null = null;
+  private core: Point | null = null;
   private callbacks: RendererCallbacks;
 
   private target = new THREE.Vector3(0, 0, 0);
@@ -224,7 +248,7 @@ export class DungeonRenderer {
 
     const highlightGeo = new THREE.BoxGeometry(
       TILE_SIZE * 0.98,
-      ROCK_HEIGHT * 1.04,
+      WALL_HEIGHT * 1.04,
       TILE_SIZE * 0.98,
     );
     this.highlight = new THREE.Mesh(
@@ -240,6 +264,7 @@ export class DungeonRenderer {
     this.scene.add(this.highlight);
     this.scene.add(this.unitGroup);
     this.scene.add(this.markerGroup);
+    this.scene.add(this.obstacleGroup);
 
     this.attachPointerEvents();
     window.addEventListener("keydown", this.onKeyDown);
@@ -265,27 +290,29 @@ export class DungeonRenderer {
     this.loop();
   }
 
-  setGrid(grid: Grid): void {
-    this.grid = grid;
-    this.target.set((grid.w - 1) / 2, 0, (grid.h - 1) / 2);
+  setArena(arena: Arena, entrance: Point, core: Point): void {
+    this.arena = arena;
+    this.entrance = entrance;
+    this.core = core;
+    this.target.set((arena.w - 1) / 2, 0, (arena.h - 1) / 2);
     this.userAdjustedZoom = false;
-    this.fitToGrid();
+    this.fitToArena();
     this.rebuildInstances();
   }
 
   /**
-   * Pulls the camera back until the whole dungeon fits. Needed because a phone
+   * Pulls the camera back until the whole room fits. Needed because a phone
    * in portrait is far narrower than the desktop pane, and a fixed distance
-   * leaves the grid running off both edges there.
+   * leaves the arena running off both edges there.
    */
-  private fitToGrid(): void {
-    const grid = this.grid;
-    if (!grid) return;
+  private fitToArena(): void {
+    const arena = this.arena;
+    if (!arena) return;
 
     const aspect = this.camera.aspect || 1;
-    // The grid is viewed at 45 degrees of yaw, so its screen footprint is the
+    // The room is viewed at 45 degrees of yaw, so its screen footprint is the
     // diagonal rather than the side length.
-    const span = Math.max(grid.w, grid.h) * Math.SQRT2 * 0.62;
+    const span = Math.max(arena.w, arena.h) * Math.SQRT2 * 0.62;
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
 
     const forHeight = span / Math.tan(halfFov);
@@ -298,7 +325,7 @@ export class DungeonRenderer {
     );
   }
 
-  /** Cheap path used after a dig: geometry counts change, so instances rebuild. */
+  /** Cheap path used after a wall is placed or broken: instances rebuild. */
   refresh(): void {
     this.rebuildInstances();
   }
@@ -386,12 +413,14 @@ export class DungeonRenderer {
     // next sync recreate every object with its model.
     this.clearUnits();
     this.clearMarkers();
+    this.clearObstacles();
     this.setUnits(this.lastUnits);
     this.setMarkers(this.lastMarkers);
+    this.setObstacles(this.lastObstacles);
   }
 
   /**
-   * A fresh instance of a model, scaled to the tile grid.
+   * A fresh instance of a model, scaled to the tile size.
    *
    * Materials are cloned so one wounded minion does not darken every other
    * unit sharing the same source material.
@@ -548,7 +577,7 @@ export class DungeonRenderer {
         this.markerGroup.add(object);
       }
 
-      // Sits just above the corridor floor so it reads as part of the tile.
+      // Sits just above the room floor so it reads as part of the tile.
       const lift = usesModel ? object.position.y : MARKER_HEIGHT / 2;
       object.position.set(marker.x, FLOOR_HEIGHT + lift, marker.y);
     }
@@ -558,6 +587,50 @@ export class DungeonRenderer {
       this.disposeObject(this.markerGroup, object);
       this.markerMeshes.delete(id);
     }
+  }
+
+  /**
+   * Walls the player put down.
+   *
+   * Height tracks remaining HP: a barricade being chopped through visibly
+   * sinks, which is the only feedback the player gets that hitting it is
+   * working. Everything else about the model stays put so it does not read as
+   * a different object.
+   */
+  setObstacles(obstacles: ObstacleView[]): void {
+    this.lastObstacles = obstacles;
+    const seen = new Set<string>();
+
+    for (const obstacle of obstacles) {
+      seen.add(obstacle.id);
+      let object = this.obstacleMeshes.get(obstacle.id);
+
+      if (!object) {
+        object =
+          this.spawnModel(`obstacle_${obstacle.type}`, 0.9) ??
+          new THREE.Mesh(
+            this.obstacleGeometry,
+            new THREE.MeshLambertMaterial({ color: 0x6b5f4e }),
+          );
+        this.obstacleMeshes.set(obstacle.id, object);
+        this.obstacleGroup.add(object);
+      }
+
+      const health = obstacle.maxHp > 0 ? obstacle.hp / obstacle.maxHp : 1;
+      object.scale.y = 0.25 + 0.75 * health;
+      object.position.set(obstacle.x, FLOOR_HEIGHT, obstacle.y);
+    }
+
+    for (const [id, object] of this.obstacleMeshes) {
+      if (seen.has(id)) continue;
+      this.disposeObject(this.obstacleGroup, object);
+      this.obstacleMeshes.delete(id);
+    }
+  }
+
+  private clearObstacles(): void {
+    for (const [, object] of this.obstacleMeshes) this.disposeObject(this.obstacleGroup, object);
+    this.obstacleMeshes.clear();
   }
 
   /**
@@ -573,24 +646,27 @@ export class DungeonRenderer {
     return this.loaded.get(pick) ? pick : marker.kind;
   }
 
+  /**
+   * Every tile in the arena rectangle is floor — there is no terrain to dig
+   * through any more, so the whole room is built in one pass.
+   */
   private rebuildInstances(): void {
-    const grid = this.grid;
-    if (!grid) return;
+    const arena = this.arena;
+    if (!arena) return;
 
     this.disposeInstanced();
 
-    const rockPositions: Array<{ x: number; y: number; tile: TileId }> = [];
     const floorPositions: Array<{ x: number; y: number; tile: TileId }> = [];
-    grid.forEach((x, y, tile) => {
-      if (tile === TILE.ROCK) rockPositions.push({ x, y, tile });
-      else floorPositions.push({ x, y, tile });
-    });
+    for (let y = 0; y < arena.h; y++) {
+      for (let x = 0; x < arena.w; x++) {
+        let tile: TileId = TILE.FLOOR;
+        if (this.entrance && x === this.entrance.x && y === this.entrance.y) tile = TILE.ENTRANCE;
+        else if (this.core && x === this.core.x && y === this.core.y) tile = TILE.CORE;
+        floorPositions.push({ x, y, tile });
+      }
+    }
 
-    // Rock stays a solid block: a dungeon kit has no 1x1 stone cube, because
-    // its walls are panels meant to stand on the edge of a carved tile.
-    this.rockMesh = this.buildInstanced(rockPositions, ROCK_HEIGHT, null);
     this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, "floor");
-    if (this.rockMesh) this.scene.add(this.rockMesh);
     if (this.floorMesh) this.scene.add(this.floorMesh);
 
     this.buildWalls(floorPositions);
@@ -601,39 +677,39 @@ export class DungeonRenderer {
   /**
    * Torches on the walls, clutter on the floor.
    *
-   * Without this a dug-out dungeon is bare stone corridors: correct, readable,
-   * and completely lifeless. Placement is driven by tileNoise so it survives a
+   * Without this an open room is bare flagstones: correct, readable, and
+   * completely lifeless. Placement is driven by tileNoise so it survives a
    * rebuild unchanged, and it deliberately skips the tiles that mean something
-   * — the entrance, the core, and anywhere a trap, room or minion can stand —
-   * because a barrel that hides a spike plate is a bug, not decoration.
+   * — the entrance, the core, and anywhere an obstacle, trap, room or minion
+   * can stand — because a barrel that hides a spike plate, or sits inside a
+   * wall, is a bug, not decoration.
    */
   private buildDecor(floors: Array<{ x: number; y: number }>): void {
-    const grid = this.grid;
-    if (!grid) return;
+    const arena = this.arena;
+    if (!arena) return;
 
     const occupied = new Set<string>();
     for (const marker of this.lastMarkers) occupied.add(`${marker.x},${marker.y}`);
     for (const unit of this.lastUnits) {
       occupied.add(`${Math.round(unit.x)},${Math.round(unit.y)}`);
     }
+    for (const obstacle of this.lastObstacles) {
+      occupied.add(`${Math.round(obstacle.x)},${Math.round(obstacle.y)}`);
+    }
 
     const steps: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
     for (const floor of floors) {
-      const tile = grid.get(floor.x, floor.y);
-      if (tile !== TILE.FLOOR) continue;
-
       // Torches ride the wall panels, so they only exist where one does.
       for (const [dx, dy] of steps) {
         const nx = floor.x + dx;
         const ny = floor.y + dy;
-        const solid = !grid.inBounds(nx, ny) || grid.get(nx, ny) === TILE.ROCK;
-        if (!solid) continue;
+        if (inArena(arena, nx, ny)) continue;
         if (tileNoise(nx * 2 + dx, ny * 2 + dy, 3) > TORCH_CHANCE) continue;
 
         const torch = this.spawnModel("prop_torch", 0.5);
         if (!torch) break;
-        // Just inside the panel, or it floats in the rock.
+        // Just inside the panel, or it floats outside the room.
         torch.position.set(
           floor.x + dx * 0.38,
           FLOOR_HEIGHT + torch.position.y,
@@ -652,7 +728,7 @@ export class DungeonRenderer {
       const key = CLUTTER[Math.floor(tileNoise(floor.x, floor.y, 13) * CLUTTER.length)];
       const prop = this.spawnModel(key, 0.55);
       if (!prop) continue;
-      // Off-centre and turned, so a corridor of barrels does not look stamped.
+      // Off-centre and turned, so a room of barrels does not look stamped.
       prop.position.set(
         floor.x + (tileNoise(floor.x, floor.y, 17) - 0.5) * 0.4,
         FLOOR_HEIGHT + prop.position.y,
@@ -672,8 +748,7 @@ export class DungeonRenderer {
    * they are without a legend.
    */
   private buildLandmarks(): void {
-    const grid = this.grid;
-    if (!grid) return;
+    if (!this.arena) return;
 
     for (const object of this.landmarks) this.disposeObject(this.scene, object);
     this.landmarks = [];
@@ -681,10 +756,8 @@ export class DungeonRenderer {
     this.decor = [];
 
     const spots: Array<{ key: string; x: number; y: number }> = [];
-    grid.forEach((x, y, tile) => {
-      if (tile === TILE.ENTRANCE) spots.push({ key: "entrance", x, y });
-      else if (tile === TILE.CORE) spots.push({ key: "core", x, y });
-    });
+    if (this.entrance) spots.push({ key: "entrance", x: this.entrance.x, y: this.entrance.y });
+    if (this.core) spots.push({ key: "core", x: this.core.x, y: this.core.y });
 
     for (const spot of spots) {
       const object = this.spawnModel(spot.key, 0.9);
@@ -727,16 +800,19 @@ export class DungeonRenderer {
   }
 
   /**
-   * Stands a wall panel on every corridor edge that touches rock.
+   * Stands a wall panel on every edge of the room where the floor meets
+   * open air.
    *
-   * This is how the kit is meant to be used, and it is what makes a dug
-   * passage read as carved out of stone rather than as a stripe painted on a
+   * There is no rock any more, so "solid" now means "outside the arena" —
+   * panels land only on the room's outer border, which is exactly the wall
+   * of a room. This is how the kit is meant to be used, and it is what makes
+   * the room read as built from stone rather than as a stripe painted on a
    * field of cubes.
    */
   private buildWalls(floors: Array<{ x: number; y: number }>): void {
-    const grid = this.grid;
-    const proto = this.tileProto("wall", ROCK_HEIGHT);
-    if (!grid || !proto) return;
+    const arena = this.arena;
+    const proto = this.tileProto("wall", WALL_HEIGHT);
+    if (!arena || !proto) return;
 
     const steps: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     const transforms: Array<{ x: number; z: number; rot: number }> = [];
@@ -745,8 +821,7 @@ export class DungeonRenderer {
       for (const [dx, dy] of steps) {
         const nx = floor.x + dx;
         const ny = floor.y + dy;
-        const solid = !grid.inBounds(nx, ny) || grid.get(nx, ny) === TILE.ROCK;
-        if (!solid) continue;
+        if (inArena(arena, nx, ny)) continue;
 
         transforms.push({
           x: floor.x + dx * 0.5,
@@ -859,7 +934,7 @@ export class DungeonRenderer {
   }
 
   private disposeInstanced(): void {
-    for (const mesh of [this.rockMesh, this.floorMesh, this.wallMesh]) {
+    for (const mesh of [this.floorMesh, this.wallMesh]) {
       if (!mesh) continue;
       this.scene.remove(mesh);
       // Model geometry belongs to the cached glTF and is reused by the next
@@ -868,7 +943,6 @@ export class DungeonRenderer {
       (mesh.material as THREE.Material).dispose();
       mesh.dispose();
     }
-    this.rockMesh = null;
     this.floorMesh = null;
     this.wallMesh = null;
   }
@@ -879,7 +953,6 @@ export class DungeonRenderer {
       modelsAvailable: this.models.available,
       modelsLoaded: [...this.loaded.entries()].filter(([, m]) => m).map(([k]) => k),
       sharedClips: this.sharedClips.length,
-      rockInstances: this.rockMesh?.count ?? 0,
       floorInstances: this.floorMesh?.count ?? 0,
       wallInstances: this.wallMesh?.count ?? 0,
       landmarks: this.landmarks.length,
@@ -887,6 +960,7 @@ export class DungeonRenderer {
       pathMarkers: this.pathMarkers.length,
       units: this.unitMeshes.size,
       markers: this.markerMeshes.size,
+      obstacles: this.obstacleMeshes.size,
       mixers: this.mixers.size,
     };
   }
@@ -929,7 +1003,7 @@ export class DungeonRenderer {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    if (!this.userAdjustedZoom) this.fitToGrid();
+    if (!this.userAdjustedZoom) this.fitToArena();
   }
 
   private pointerToTile(clientX: number, clientY: number): { x: number; y: number } | null {
@@ -945,7 +1019,7 @@ export class DungeonRenderer {
 
     const x = Math.round(hit.x);
     const y = Math.round(hit.z);
-    if (!this.grid?.inBounds(x, y)) return null;
+    if (!this.arena || !inArena(this.arena, x, y)) return null;
     return { x, y };
   }
 
@@ -957,7 +1031,7 @@ export class DungeonRenderer {
 
     this.hovered = tile;
     if (tile) {
-      this.highlight.position.set(tile.x, ROCK_HEIGHT / 2, tile.y);
+      this.highlight.position.set(tile.x, WALL_HEIGHT / 2, tile.y);
       this.highlight.visible = true;
     } else {
       this.highlight.visible = false;
@@ -1129,6 +1203,7 @@ export class DungeonRenderer {
     this.disposeInstanced();
     this.clearUnits();
     this.clearMarkers();
+    this.clearObstacles();
 
     for (const ring of this.rings) {
       this.scene.remove(ring.mesh);
@@ -1147,6 +1222,7 @@ export class DungeonRenderer {
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();
     this.roomGeometry.dispose();
+    this.obstacleGeometry.dispose();
     this.highlight.geometry.dispose();
     (this.highlight.material as THREE.Material).dispose();
     this.renderer.dispose();
