@@ -18,8 +18,8 @@ const ko = {
   // Shell
   title_kicker: "모험가가 아니라, 던전이 되어라",
   title_line:
-    "방을 파고 함정을 놓고 부하를 세워, 몇 번이고 다시 찾아오는 모험가를 막아내세요. 쓰러뜨린 자는 장비를 남기고, 사로잡은 자는 당신의 편이 됩니다.",
-  title_start: "던전 파기 시작",
+    "장애물로 길을 접고 함정을 놓고 부하를 세워, 몇 번이고 다시 찾아오는 모험가를 막아내세요. 쓰러뜨린 자는 장비를 남기고, 사로잡은 자는 당신의 편이 됩니다.",
+  title_start: "던전 짓기 시작",
   title_continue: "이어하기",
   title_loading: "던전을 불러오는 중…",
   title_offline: "로컬 전용 모드입니다. 진행이 저장되지 않습니다.",
@@ -34,15 +34,16 @@ const ko = {
   // Intro
   intro_title: "당신은 던전의 관리자입니다",
   intro_1_b: "모험가가 쳐들어옵니다.",
-  intro_1: "입구에서 코어까지 최단 경로로 걸어옵니다. 코어에 닿으면 금고를 털립니다.",
-  intro_2_b: "길은 당신이 팝니다.",
-  intro_2: "통로를 길게 돌리면 함정과 부하가 붙을 시간이 늘어납니다. 대신 굴착 비용이 듭니다.",
+  intro_1:
+    "닿을 수 있는 길이 있다면, 아무리 멀어도 그 길로 옵니다. 길이 아예 없을 때만 벽을 부수고 들어옵니다. 코어에 닿으면 금고를 털립니다.",
+  intro_2_b: "길은 당신이 접습니다.",
+  intro_2: "장애물로 길을 길게 돌리면 함정과 부하가 일할 시간이 늘어납니다. 장애물에도 값이 듭니다.",
   intro_3_b: "쓰러뜨린 자는 돌아옵니다.",
   intro_3:
     "레벨을 올려서. 죽이면 장비를 남기고, 감옥에 가두면 시간이 지나 당신의 부하가 됩니다.",
   intro_note:
     "게임 오버는 없습니다. 돌파당해도 잃는 것은 골드와 시간뿐이고, 던전과 부하는 그대로 남습니다.",
-  intro_go: "던전을 파러 갑니다",
+  intro_go: "던전을 지으러 갑니다",
 
   // Settings
   settings_sound: "소리",
@@ -77,7 +78,7 @@ const ko = {
   controls: "드래그 팬 · 휠/핀치 줌 · Q/E 90° 회전",
 
   hint_dig: "암반 타일을 클릭하면 통로가 됩니다.",
-  hint_remove: "타일 위의 부하 · 함정 · 방을 회수합니다. 환불은 없습니다.",
+  hint_remove: "타일 위의 장애물 · 부하 · 함정 · 방을 회수합니다. 환불은 없습니다.",
   hint_minion: "통로 타일에 배치합니다.",
   hint_trap: "통로 타일에 설치합니다.",
   hint_room: "2×2 통로가 필요합니다.",
@@ -284,8 +285,8 @@ export type StringKey = keyof typeof ko;
 const en: Record<StringKey, string> = {
   title_kicker: "Be the dungeon, not the hero",
   title_line:
-    "Dig the corridors, set the traps, post your minions, and turn back adventurers who keep coming back for more. The fallen leave their gear; the captured become yours.",
-  title_start: "Start digging",
+    "Fold the route with obstacles, set the traps, post your minions, and turn back adventurers who keep coming back for more. The fallen leave their gear; the captured become yours.",
+  title_start: "Start building",
   title_continue: "Continue",
   title_loading: "Loading your dungeon…",
   title_offline: "Running locally. Progress is not saved.",
@@ -299,16 +300,17 @@ const en: Record<StringKey, string> = {
 
   intro_title: "You are the dungeon keeper",
   intro_1_b: "Adventurers come for you.",
-  intro_1: "They walk the shortest path from the entrance to your core. Reach it, and they rob you.",
-  intro_2_b: "You dig the path.",
+  intro_1:
+    "If a path to your core exists, they take it — however long. Only when there is no path at all do they break through. Reach the core, and they rob you.",
+  intro_2_b: "You fold the path.",
   intro_2:
-    "A longer corridor gives your traps and minions more time to work — and costs more to excavate.",
+    "Obstacles that fold the route give your traps and minions more time to work — and obstacles cost gold too.",
   intro_3_b: "Whoever falls comes back.",
   intro_3:
     "Stronger. Kill them and they drop their gear; jail them and they eventually fight for you.",
   intro_note:
     "There is no game over. A breach costs gold and time — your dungeon and your minions stay.",
-  intro_go: "Start digging",
+  intro_go: "Start building",
 
   settings_sound: "Sound",
   settings_on: "On",
@@ -341,7 +343,7 @@ const en: Record<StringKey, string> = {
   controls: "Drag to pan · wheel/pinch to zoom · Q/E to rotate",
 
   hint_dig: "Click solid rock to carve a corridor.",
-  hint_remove: "Removes the minion, trap or room on a tile. No refund.",
+  hint_remove: "Removes the obstacle, minion, trap or room on a tile. No refund.",
   hint_minion: "Place on a corridor tile.",
   hint_trap: "Set on a corridor tile.",
   hint_room: "Needs a clear 2×2 of corridor.",
@@ -501,7 +503,7 @@ const en: Record<StringKey, string> = {
   obstacle_barricade: "Wooden barricade",
   obstacle_wall: "Stone wall",
   obstacle_barricade_desc: "Cheap and weak. For folding the route.",
-  obstacle_wall_desc: "Costly and tough. Holds a sealed line.",
+  obstacle_wall_desc: "Costly and tough. Holds a sealed line for a long time.",
   room_treasury: "Treasury",
   room_vault: "Vault",
   room_barracks: "Barracks",
