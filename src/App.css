@@ -863,13 +863,30 @@ button.primary {
 
   .raid-bar {
     align-self: stretch;
+    /* Kept narrower than the stack so it can never grow under the skillbar,
+       which sits at a fixed spot to its right — however tall a banner above
+       pushes this bar down. What doesn't fit scrolls (already overflow-x). */
+    max-width: calc(100% - 124px);
     gap: 8px;
     font-size: 11.5px;
     justify-content: space-between;
     overflow-x: auto;
   }
 
+  /* The speed toggles are controls; the counters beside them are read-only.
+     Lead with the controls so they land in the always-visible left edge of
+     the (possibly scrollable) bar instead of behind whichever counters
+     happen to be long enough to push them off. */
+  .raid-bar .speeds { order: -1; }
+
   .stats { gap: 6px; font-size: 12px; }
   .banner { font-size: 12px; }
   .modal { max-height: 80%; }
+}
+
+/* Below this the brand no longer fits alongside the functional buttons —
+   decoration yields to function, so it drops rather than push controls
+   off the right edge. */
+@media (max-width: 460px) {
+  .brand { display: none; }
 }
