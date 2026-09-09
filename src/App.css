@@ -851,16 +851,34 @@ button.primary {
     right: 8px;
     bottom: 8px;
     width: auto;
-    max-height: 52%;
+    /* Capped well under half the screen so the board — the whole reason the
+       board went portrait — always keeps the other half. Whatever tab
+       content doesn't fit at this height scrolls inside .hud-body instead
+       of pushing the sheet taller. */
+    max-height: 44%;
     padding: 10px 12px 8px;
   }
 
   .hud.collapsed { max-height: none; }
 
   .toolbar {
-    grid-template-columns: 1fr 1fr;
-    max-height: 150px;
+    /* A third column trades row count for width: 15 build tools land in 5
+       dense rows instead of 8, so most of them are visible without the
+       player ever needing to scroll .hud-body. */
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    /* No scroll box of its own — .hud-body is the single scrollable region
+       for every tab, so build/manage/research all behave the same way. */
+    max-height: none;
+    overflow-y: visible;
   }
+
+  .tool {
+    padding: 6px 6px;
+  }
+
+  .tool b { font-size: 11px; }
+  .tool i { font-size: 10px; }
 
   .legend { display: none; }
 
