@@ -31,13 +31,13 @@ function run(sim: RaidSim, seconds: number) {
   }
 }
 
-function wallAt(x: number, ys: number[], type: "barricade" | "wall" = "barricade"): PlacedObstacle[] {
-  return ys.map((y) => ({ id: `o-${x}-${y}`, type, x, y }));
+function wallAt(y: number, xs: number[], type: "barricade" | "wall" = "barricade"): PlacedObstacle[] {
+  return xs.map((x) => ({ id: `o-${y}-${x}`, type, x, y }));
 }
 
 describe("adventurers and obstacles", () => {
   it("walks a long detour without touching a single obstacle", () => {
-    // Wall across x=5 with a gap at y=0, forcing a long way round.
+    // Wall across y=5 with a gap at x=0, forcing a long way round.
     const obstacles = wallAt(5, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     const sim = makeSim(obstacles);
     run(sim, 60);
@@ -59,14 +59,14 @@ describe("adventurers and obstacles", () => {
   });
 
   it("attacks the obstacle on its own line, not the nearest one", () => {
-    // Sealed. The entrance is at y=6, so the obstacle in the way is (5,6).
+    // Sealed. The entrance is at x=6, so the obstacle in the way is (6,5).
     const obstacles = wallAt(5, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     const sim = makeSim(obstacles);
     run(sim, 12);
 
     const hurt = sim.state.obstacles.filter((o) => o.hp < o.maxHp);
     expect(hurt).toHaveLength(1);
-    expect(hurt[0]).toMatchObject({ x: 5, y: 6 });
+    expect(hurt[0]).toMatchObject({ x: 6, y: 5 });
   });
 
   it("emits obstacleHit and obstacleDown", () => {

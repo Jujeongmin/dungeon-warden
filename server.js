@@ -42,13 +42,13 @@ function priceOf(table, type) {
   return price;
 }
 
-/** Room width and obstacle budget both come from the expansion research. */
+/** Room height and obstacle budget both come from the expansion research. */
 function arenaFor(research) {
   const owned = Array.isArray(research) ? research : [];
-  let w = GRID_W;
-  if (owned.includes("expand1")) w = 16;
-  if (owned.includes("expand2")) w = 20;
-  return { w, h: GRID_H };
+  let h = GRID_H;
+  if (owned.includes("expand1")) h = 16;
+  if (owned.includes("expand2")) h = 20;
+  return { w: GRID_W, h };
 }
 
 /**
@@ -62,11 +62,11 @@ function arenaFor(research) {
  * time it is read.
  */
 function entranceOf(arena) {
-  return { x: 0, y: Math.floor(arena.h / 2) };
+  return { x: Math.floor(arena.w / 2), y: 0 };
 }
 
 function coreOf(arena) {
-  return { x: arena.w - 1, y: Math.floor(arena.h / 2) };
+  return { x: Math.floor(arena.w / 2), y: arena.h - 1 };
 }
 
 /**

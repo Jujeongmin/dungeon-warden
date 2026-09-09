@@ -16,25 +16,25 @@ export interface Arena {
 export const BASE_ARENA: Arena = { w: 12, h: 12 };
 
 /** Mirrors the expand1/expand2 entries of RESEARCH in server.js. */
-const EXPANSIONS: Array<{ id: string; w: number }> = [
-  { id: "expand1", w: 16 },
-  { id: "expand2", w: 20 },
+const EXPANSIONS: Array<{ id: string; h: number }> = [
+  { id: "expand1", h: 16 },
+  { id: "expand2", h: 20 },
 ];
 
 export function arenaFor(research: string[]): Arena {
-  let w = BASE_ARENA.w;
+  let h = BASE_ARENA.h;
   for (const step of EXPANSIONS) {
-    if (research.includes(step.id)) w = Math.max(w, step.w);
+    if (research.includes(step.id)) h = Math.max(h, step.h);
   }
-  return { w, h: BASE_ARENA.h };
+  return { w: BASE_ARENA.w, h };
 }
 
 export function entranceOf(arena: Arena): Point {
-  return { x: 0, y: Math.floor(arena.h / 2) };
+  return { x: Math.floor(arena.w / 2), y: 0 };
 }
 
 export function coreOf(arena: Arena): Point {
-  return { x: arena.w - 1, y: Math.floor(arena.h / 2) };
+  return { x: Math.floor(arena.w / 2), y: arena.h - 1 };
 }
 
 export function blockedKey(x: number, y: number, w: number): number {

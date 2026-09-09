@@ -8,7 +8,7 @@ const arena = arenaFor([]);
 
 function secondsToBreak(type: "barricade" | "wall", party: PartyMember[]): number {
   const obstacles: PlacedObstacle[] = [];
-  for (let y = 0; y < 12; y++) obstacles.push({ id: `o${y}`, type, x: 5, y });
+  for (let x = 0; x < 12; x++) obstacles.push({ id: `o${x}`, type, x, y: 5 });
   const sim = new RaidSim({
     minions: [], traps: [], obstacles, party, arena,
     entrance: entranceOf(arena), core: coreOf(arena), lures: [], seed: 1,
