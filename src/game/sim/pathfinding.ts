@@ -15,8 +15,9 @@ function walkable(arena: Arena, x: number, y: number, blocked: Set<number>): boo
  * 4-directional A* over walkable tiles.
  *
  * Returns the tile sequence from `start` to `goal` inclusive, or null when the
- * player has walled the core off. The caller treats null as "raid cannot
- * start", which is what stops a sealed dungeon from being a free win.
+ * player has walled the core off completely. A null path does not stop a
+ * raid: the caller has adventurers break through the nearest obstacle
+ * instead, which is what stops a sealed dungeon from being a free win.
  */
 export function findPath(arena: Arena, start: Point, goal: Point, blocked: Set<number>): Point[] | null {
   if (!walkable(arena, start.x, start.y, blocked) || !walkable(arena, goal.x, goal.y, blocked)) {

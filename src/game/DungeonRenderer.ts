@@ -325,11 +325,6 @@ export class DungeonRenderer {
     );
   }
 
-  /** Cheap path used after a wall is placed or broken: instances rebuild. */
-  refresh(): void {
-    this.rebuildInstances();
-  }
-
   /**
    * Syncs the unit meshes with the given roster. Meshes are reused by id and
    * only created or disposed when the roster actually changes, so a 20 Hz

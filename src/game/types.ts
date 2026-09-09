@@ -223,7 +223,6 @@ export const PRODUCT_ID = {
 
 export interface SaveResult {
   ok: true;
-  digs: number;
   cost: number;
   gold: number;
   savedAt: number;

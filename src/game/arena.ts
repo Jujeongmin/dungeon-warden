@@ -15,7 +15,7 @@ export interface Arena {
 
 export const BASE_ARENA: Arena = { w: 12, h: 12 };
 
-/** Mirrors RESEARCH[...].expandTo in server.js. */
+/** Mirrors the expand1/expand2 entries of RESEARCH in server.js. */
 const EXPANSIONS: Array<{ id: string; w: number }> = [
   { id: "expand1", w: 16 },
   { id: "expand2", w: 20 },
