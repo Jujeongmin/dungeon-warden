@@ -11,18 +11,81 @@ const GRID_H = 12;
 const OBSTACLE_COST = { barricade: 12, wall: 35 };
 const BASE_MAX_OBSTACLES = 20;
 
+/**
+ * Reads a key that a client chose out of a plain-object table.
+ *
+ * `TABLE[key]` alone is not a membership test: every object inherits
+ * `toString`, `constructor`, `valueOf` and friends from Object.prototype, so
+ * `OBSTACLE_COST["toString"]` returns a *function* — truthy enough to walk
+ * straight past a `if (!TABLE[key])` guard. Every lookup on a client-supplied
+ * key goes through here so only an own key can ever answer.
+ */
+function ownEntry(table, key) {
+  if (typeof key !== "string") return null;
+  if (!Object.prototype.hasOwnProperty.call(table, key)) return null;
+  const value = table[key];
+  return value === undefined ? null : value;
+}
+
+/**
+ * The price of a thing, or null if it has none.
+ *
+ * The number check is the second half of the defence: even if a table one day
+ * held something that is not a price, a non-number can never reach the `cost +=`
+ * arithmetic. That matters more than it looks — `cost += someFunction` turns the
+ * running total into a *string*, and `"0function ..." > 0` is false, so
+ * saveDungeon would skip the burn entirely and hand the whole layout out free.
+ */
+function priceOf(table, type) {
+  const price = ownEntry(table, type);
+  if (typeof price !== "number" || !Number.isFinite(price) || price < 0) return null;
+  return price;
+}
+
 /** Room width and obstacle budget both come from the expansion research. */
 function arenaFor(research) {
+  const owned = Array.isArray(research) ? research : [];
   let w = GRID_W;
-  if (research.includes("expand1")) w = 16;
-  if (research.includes("expand2")) w = 20;
+  if (owned.includes("expand1")) w = 16;
+  if (owned.includes("expand2")) w = 20;
   return { w, h: GRID_H };
 }
 
+/**
+ * The two fixed tiles are derived, never stored-and-trusted.
+ *
+ * These mirror `entranceOf`/`coreOf` in src/game/arena.ts exactly. They used to
+ * be written into the save and moved by hand when an expansion widened the
+ * room; a save that missed that rewrite disagreed with the client about where
+ * its own core was. Computing both from the research list means the two sides
+ * agree by construction, and a save that was already wrong is repaired the next
+ * time it is read.
+ */
+function entranceOf(arena) {
+  return { x: 0, y: Math.floor(arena.h / 2) };
+}
+
+function coreOf(arena) {
+  return { x: arena.w - 1, y: Math.floor(arena.h / 2) };
+}
+
+/**
+ * Stamps the derived entrance and core onto a dungeon and returns its arena.
+ * Called on every path that reads or hands back a save, so no reader anywhere
+ * sees a stale pair.
+ */
+function applyArena(dungeon) {
+  const arena = arenaFor(dungeon.research);
+  dungeon.entrance = entranceOf(arena);
+  dungeon.core = coreOf(arena);
+  return arena;
+}
+
 function maxObstaclesFor(research) {
+  const owned = Array.isArray(research) ? research : [];
   let cap = BASE_MAX_OBSTACLES;
-  if (research.includes("expand1")) cap = 28;
-  if (research.includes("expand2")) cap = 36;
+  if (owned.includes("expand1")) cap = 28;
+  if (owned.includes("expand2")) cap = 36;
   return cap;
 }
 
@@ -123,7 +186,7 @@ function researchEffects(owned) {
   const rooms = BASE_ROOMS.slice();
 
   for (const id of owned || []) {
-    const node = RESEARCH[id];
+    const node = ownEntry(RESEARCH, id);
     if (!node) continue;
 
     // Tiers replace rather than stack, so owning I and II gives II.
@@ -391,24 +454,28 @@ function pickParty(dungeon, threat, now) {
  * runs, and it is shared onward with the trap, minion and obstacle checks so
  * one occupant ever holds a tile — there is no more floor/rock distinction to
  * lean on for that.
+ *
+ * Ids the client chose index a Map and a Set, never a plain object, and the
+ * type indexes ROOM_COST through priceOf — an id or type of "toString" is then
+ * just a string that is not there, rather than a hit on Object.prototype.
  */
 function priceRooms(nextRooms, prevRooms, arena, claimed) {
   if (!Array.isArray(nextRooms)) throw new Error("BAD_ROOMS");
   if (nextRooms.length > MAX_ROOMS) throw new Error("TOO_MANY_ROOMS");
 
-  const prevById = {};
-  for (const room of prevRooms || []) prevById[room.id] = room;
+  const prevById = new Map();
+  for (const room of prevRooms || []) prevById.set(room.id, room);
 
-  const seenIds = {};
+  const seenIds = new Set();
   let cost = 0;
 
   for (const room of nextRooms) {
     if (!room || typeof room.id !== "string") throw new Error("BAD_ROOM_ID");
-    if (seenIds[room.id]) throw new Error("DUPLICATE_ROOM_ID");
-    seenIds[room.id] = true;
+    if (seenIds.has(room.id)) throw new Error("DUPLICATE_ROOM_ID");
+    seenIds.add(room.id);
 
-    const price = ROOM_COST[room.type];
-    if (!price) throw new Error("UNKNOWN_ROOM_TYPE");
+    const price = priceOf(ROOM_COST, room.type);
+    if (price === null) throw new Error("UNKNOWN_ROOM_TYPE");
 
     for (const tile of roomTiles(room)) {
       if (tile.x < 0 || tile.y < 0 || tile.x >= arena.w || tile.y >= arena.h) {
@@ -420,7 +487,7 @@ function priceRooms(nextRooms, prevRooms, arena, claimed) {
       claimed.add(key);
     }
 
-    const previous = prevById[room.id];
+    const previous = prevById.get(room.id);
     if (!previous || previous.type !== room.type) cost += price;
   }
 
@@ -432,19 +499,19 @@ function priceTraps(nextTraps, prevTraps, arena, claimed) {
   if (!Array.isArray(nextTraps)) throw new Error("BAD_TRAPS");
   if (nextTraps.length > MAX_TRAPS) throw new Error("TOO_MANY_TRAPS");
 
-  const prevById = {};
-  for (const trap of prevTraps || []) prevById[trap.id] = trap;
+  const prevById = new Map();
+  for (const trap of prevTraps || []) prevById.set(trap.id, trap);
 
-  const seenIds = {};
+  const seenIds = new Set();
   let cost = 0;
 
   for (const trap of nextTraps) {
     if (!trap || typeof trap.id !== "string") throw new Error("BAD_TRAP_ID");
-    if (seenIds[trap.id]) throw new Error("DUPLICATE_TRAP_ID");
-    seenIds[trap.id] = true;
+    if (seenIds.has(trap.id)) throw new Error("DUPLICATE_TRAP_ID");
+    seenIds.add(trap.id);
 
-    const price = TRAP_COST[trap.type];
-    if (!price) throw new Error("UNKNOWN_TRAP_TYPE");
+    const price = priceOf(TRAP_COST, trap.type);
+    if (price === null) throw new Error("UNKNOWN_TRAP_TYPE");
 
     if (!Number.isInteger(trap.x) || !Number.isInteger(trap.y)) {
       throw new Error("BAD_TRAP_POSITION");
@@ -457,7 +524,7 @@ function priceTraps(nextTraps, prevTraps, arena, claimed) {
     if (claimed.has(key)) throw new Error("TILE_OCCUPIED");
     claimed.add(key);
 
-    const previous = prevById[trap.id];
+    const previous = prevById.get(trap.id);
     if (!previous || previous.type !== trap.type) cost += price;
   }
 
@@ -473,23 +540,25 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
   if (!Array.isArray(nextMinions)) throw new Error("BAD_MINIONS");
   if (nextMinions.length > minionCap) throw new Error("TOO_MANY_MINIONS");
 
-  const prevById = {};
-  for (const minion of prevMinions || []) prevById[minion.id] = minion;
+  const prevById = new Map();
+  for (const minion of prevMinions || []) prevById.set(minion.id, minion);
 
-  const seenIds = {};
+  const seenIds = new Set();
   let cost = 0;
 
   for (const minion of nextMinions) {
     if (!minion || typeof minion.id !== "string") throw new Error("BAD_MINION_ID");
-    if (seenIds[minion.id]) throw new Error("DUPLICATE_MINION_ID");
-    seenIds[minion.id] = true;
+    if (seenIds.has(minion.id)) throw new Error("DUPLICATE_MINION_ID");
+    seenIds.add(minion.id);
 
-    const price = MINION_COST[minion.type];
-    if (price === undefined) throw new Error("UNKNOWN_MINION_TYPE");
+    const price = priceOf(MINION_COST, minion.type);
+    if (price === null) throw new Error("UNKNOWN_MINION_TYPE");
 
     // Converts are earned by capturing and are created by the server alone.
-    // A client that invents one is rejected outright.
-    if (minion.type === "convert" && !prevById[minion.id]) {
+    // A client that invents one is rejected outright. The Map lookup matters
+    // here: with a plain object, `id: "toString"` would have satisfied "this
+    // one already existed" with an inherited method.
+    if (minion.type === "convert" && !prevById.has(minion.id)) {
       throw new Error("ILLEGAL_CONVERT");
     }
 
@@ -504,7 +573,7 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
     if (claimed.has(cellKey)) throw new Error("TILE_OCCUPIED");
     claimed.add(cellKey);
 
-    const previous = prevById[minion.id];
+    const previous = prevById.get(minion.id);
     if (!previous || previous.type !== minion.type) cost += price;
   }
 
@@ -515,6 +584,19 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
  * Charges for obstacles that are new or changed type, and refuses a dungeon
  * that breaks the rules. Removing an obstacle refunds nothing, which is what
  * makes a wall a purchase rather than a fixture.
+ *
+ * Two things here are load-bearing and were missing:
+ *
+ * 1. The price comes from priceOf, not `OBSTACLE_COST[o.type]`. A type of
+ *    "toString" used to resolve to Object.prototype.toString, sail past the
+ *    `!OBSTACLE_COST[o.type]` guard, and then `cost += <function>` made the
+ *    running total a string. saveDungeon's `if (cost > 0)` is false for a
+ *    string, so the entire save — rooms, traps, minions and all — was free.
+ * 2. `seenIds`, which the room, trap and minion pricers already had. Without
+ *    it one saved wall could be listed many times at different coordinates:
+ *    savedById matched every copy, the type never changed, and each clone cost
+ *    nothing while still eating a tile and an obstacle slot. It also confused
+ *    finishRaid, where destroying that one id deleted every clone at once.
  */
 function priceObstacles(next, saved, arena, research, occupied) {
   if (!Array.isArray(next)) throw new Error("BAD_OBSTACLES");
@@ -522,11 +604,17 @@ function priceObstacles(next, saved, arena, research, occupied) {
   if (next.length > cap) throw new Error("TOO_MANY_OBSTACLES");
 
   const savedById = new Map((saved || []).map((o) => [o.id, o]));
+  const seenIds = new Set();
   let cost = 0;
 
   for (const o of next) {
     if (!o || typeof o.id !== "string") throw new Error("BAD_OBSTACLE_ID");
-    if (!OBSTACLE_COST[o.type]) throw new Error("UNKNOWN_OBSTACLE");
+    if (seenIds.has(o.id)) throw new Error("DUPLICATE_OBSTACLE_ID");
+    seenIds.add(o.id);
+
+    const price = priceOf(OBSTACLE_COST, o.type);
+    if (price === null) throw new Error("UNKNOWN_OBSTACLE");
+
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) {
       throw new Error("OUT_OF_BOUNDS");
     }
@@ -538,7 +626,7 @@ function priceObstacles(next, saved, arena, research, occupied) {
     occupied.add(key);
 
     const previous = savedById.get(o.id);
-    if (!previous || previous.type !== o.type) cost += OBSTACLE_COST[o.type];
+    if (!previous || previous.type !== o.type) cost += price;
   }
 
   return cost;
@@ -552,19 +640,22 @@ function priceObstacles(next, saved, arena, research, occupied) {
  * actually be in the loot pile and held by only one minion.
  */
 function sanitizeMinions(nextMinions, prevMinions, loot) {
-  const prevById = {};
-  for (const minion of prevMinions || []) prevById[minion.id] = minion;
+  // Map/Set rather than plain objects: `weaponId: "toString"` would otherwise
+  // read as "yes, that item is in the loot pile" off Object.prototype and let a
+  // minion carry a weapon nobody owns.
+  const prevById = new Map();
+  for (const minion of prevMinions || []) prevById.set(minion.id, minion);
 
-  const lootIds = {};
-  for (const item of loot || []) lootIds[item.id] = true;
+  const lootIds = new Set();
+  for (const item of loot || []) lootIds.add(item.id);
 
-  const usedWeapons = {};
+  const usedWeapons = new Set();
   return nextMinions.map((minion) => {
-    const previous = prevById[minion.id] || {};
+    const previous = prevById.get(minion.id) || {};
 
     let weaponId = minion.weaponId || null;
-    if (weaponId && (!lootIds[weaponId] || usedWeapons[weaponId])) weaponId = null;
-    if (weaponId) usedWeapons[weaponId] = true;
+    if (weaponId && (!lootIds.has(weaponId) || usedWeapons.has(weaponId))) weaponId = null;
+    if (weaponId) usedWeapons.add(weaponId);
 
     return {
       id: minion.id,
@@ -593,8 +684,15 @@ function resolveConversions(dungeon, arena, now) {
   for (const minion of dungeon.minions || []) occupied[minion.x + ":" + minion.y] = true;
   for (const trap of dungeon.traps || []) occupied[trap.x + ":" + trap.y] = true;
   for (const obstacle of dungeon.obstacles || []) occupied[obstacle.x + ":" + obstacle.y] = true;
-  occupied[dungeon.entrance.x + ":" + dungeon.entrance.y] = true;
-  occupied[dungeon.core.x + ":" + dungeon.core.y] = true;
+
+  // Derived from the arena, not read off the save: a dungeon whose stored core
+  // was left behind by an expansion would otherwise reserve the wrong tile and
+  // let a convert spawn on the real one. It also means a save that is missing
+  // the fields entirely no longer throws a TypeError here.
+  const entrance = entranceOf(arena);
+  const core = coreOf(arena);
+  occupied[entrance.x + ":" + entrance.y] = true;
+  occupied[core.x + ":" + core.y] = true;
 
   // Converts appear in a jail if there is room, otherwise on any free tile —
   // the whole arena is floor now, so every tile is a candidate.
@@ -671,7 +769,7 @@ function migrate(dungeon) {
 }
 
 function createDefaultDungeon() {
-  const midY = Math.floor(GRID_H / 2);
+  const arena = arenaFor([]);
   const now = Date.now();
 
   return {
@@ -684,8 +782,8 @@ function createDefaultDungeon() {
     prisoners: [],
     adventurers: [],
     research: [],
-    entrance: { x: 0, y: midY },
-    core: { x: GRID_W - 1, y: midY },
+    entrance: entranceOf(arena),
+    core: coreOf(arena),
     threat: 0,
     wavesRepelled: 0,
     coreBreaches: 0,
@@ -723,10 +821,15 @@ class Server {
       if (!Array.isArray(dungeon.adventurers)) dungeon.adventurers = [];
       if (!Array.isArray(dungeon.research)) dungeon.research = [];
 
+      // The entrance and core are recomputed from the research list before
+      // anything reads them, so the dungeon handed back to the client always
+      // carries the same pair its own arena.ts would compute. A save whose core
+      // was stranded by an expansion is corrected here and written back below.
+      const arena = applyArena(dungeon);
+
       // Sentences are served between sessions, so conversions are settled on
       // load rather than by a timer the sandbox does not allow.
       const now = Date.now();
-      const arena = arenaFor(dungeon.research);
       const converted = resolveConversions(dungeon, arena, now).converted;
 
       decayThreat(dungeon, now);
@@ -764,7 +867,9 @@ class Server {
    * client cannot grant itself a mage or a wider dungeon.
    */
   async researchNode({ id }) {
-    const node = RESEARCH[id];
+    // ownEntry, not RESEARCH[id]: `id: "toString"` would otherwise resolve to a
+    // function, pass the guard, and get pushed onto the research list.
+    const node = ownEntry(RESEARCH, id);
     if (!node) throw new Error("UNKNOWN_RESEARCH");
 
     return await $lock(`research:${$sender.account}`, async () => {
@@ -783,6 +888,10 @@ class Server {
       await $asset.burn("gold", node.cost);
 
       dungeon.research = owned.concat([id]);
+      // An expansion widens the arena, which moves the core. Nothing is
+      // relocated — the pair is simply recomputed from the new research list,
+      // so the dungeon returned below already agrees with the client.
+      applyArena(dungeon);
       dungeon.updatedAt = Date.now();
 
       await $global.updateMyState({ dungeon });
@@ -847,9 +956,16 @@ class Server {
     // holds a tile. The entrance and core are claimed before anything else,
     // so a room, trap, minion or obstacle can never land on either. Rooms
     // claim their tiles first, then traps, then minions, then obstacles.
+    // Both come from the arena, never from the stored fields — a save carrying
+    // a stale core would otherwise reserve a tile the client does not draw a
+    // core on, refusing a legal placement while leaving the real core buildable.
+    // It also means a save missing either field cannot throw a TypeError here.
+    const entrance = entranceOf(arena);
+    const core = coreOf(arena);
+
     const claimed = new Set();
-    claimed.add(`${prev.entrance.x},${prev.entrance.y}`);
-    claimed.add(`${prev.core.x},${prev.core.y}`);
+    claimed.add(`${entrance.x},${entrance.y}`);
+    claimed.add(`${core.x},${core.y}`);
 
     const roomCost = priceRooms(nextRooms, prev.rooms || [], arena, claimed);
     const trapCost = priceTraps(nextTraps, prev.traps || [], arena, claimed);
@@ -888,8 +1004,11 @@ class Server {
       adventurers: prev.adventurers || [],
       research: prev.research || [],
       threatCheckedAt: prev.threatCheckedAt,
-      entrance: prev.entrance,
-      core: prev.core,
+      // Still written, but written derived. Keeping the fields means the save
+      // shape does not change under the client, and every save quietly repairs
+      // a stale pair; deriving them means no reader ever depends on that.
+      entrance,
+      core,
       threat: prev.threat,
       wavesRepelled: prev.wavesRepelled,
       coreBreaches: prev.coreBreaches,
