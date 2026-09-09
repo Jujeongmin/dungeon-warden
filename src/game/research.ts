@@ -12,8 +12,6 @@ export interface ResearchNode {
   minionDamage?: number;
   minionHp?: number;
   trapDamage?: number;
-  /** Widens the dungeon and pushes the core further back. */
-  expandTo?: number;
   note?: string;
 }
 
@@ -41,8 +39,8 @@ export const RESEARCH: ResearchNode[] = [
   { id: "trap_power1", label: "res_tp1", cost: 200, requires: ["trap_arrow"], trapDamage: 0.2, note: "res_tp1_n" },
   { id: "trap_power2", label: "res_tp2", cost: 400, requires: ["trap_power1"], trapDamage: 0.4, note: "res_tp2_n" },
 
-  { id: "expand1", label: "res_expand1", cost: 420, expandTo: 16, note: "res_expand1_n" },
-  { id: "expand2", label: "res_expand2", cost: 700, requires: ["expand1"], expandTo: 20, note: "res_expand2_n" },
+  { id: "expand1", label: "res_expand1", cost: 420, note: "res_expand1_n" },
+  { id: "expand2", label: "res_expand2", cost: 700, requires: ["expand1"], note: "res_expand2_n" },
 ];
 
 export const RESEARCH_BY_ID = new Map(RESEARCH.map((node) => [node.id, node]));
