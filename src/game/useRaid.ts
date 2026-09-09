@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { RaidSim, SIM_DT, type RaidState, type SimEvent } from "./sim/RaidSim";
-import { buildRaidPath, findPath } from "./sim/pathfinding";
 import { lureTiles } from "./rooms";
 import { SKILL_STATS } from "./sim/traps";
+import type { Arena } from "./arena";
 import type { ResearchEffects } from "./research";
 import { maybeShowInterstitial, watchReviveAd } from "./ads";
-import type { Grid } from "./grid";
 import type { DungeonMeta } from "./useDungeonSave";
 import type {
   PlacedMinion,
+  PlacedObstacle,
   PlacedRoom,
   PlacedTrap,
   RaidFinishResult,
@@ -29,17 +29,24 @@ export type RaidSpeed = (typeof RAID_SPEEDS)[number];
 interface Options {
   /** Called with everything the simulation reported this frame. */
   onEvents?: (events: SimEvent[]) => void;
-  grid: Grid | null;
+  arena: Arena;
   meta: DungeonMeta | null;
   minions: PlacedMinion[];
   traps: PlacedTrap[];
   rooms: PlacedRoom[];
+  obstacles: PlacedObstacle[];
   effects: RoomEffects;
   jailFree: number;
   weaponTiers: Record<string, number>;
   research: ResearchEffects;
   adsRemoved: boolean;
   onFinished: (result: RaidFinishResult) => void;
+  /**
+   * Walls the party broke through to reach the core are gone for good. The
+   * server already drops them in `finishRaid`; this keeps local state from
+   * disagreeing with the save until the next reload.
+   */
+  onObstaclesDestroyed: (ids: string[]) => void;
 }
 
 /**
@@ -50,17 +57,19 @@ interface Options {
  * regardless of frame rate or speed setting.
  */
 export function useRaid({
-  grid,
+  arena,
   meta,
   minions,
   traps,
   rooms,
+  obstacles,
   effects,
   jailFree,
   weaponTiers,
   research,
   adsRemoved,
   onFinished,
+  onObstaclesDestroyed,
   onEvents,
 }: Options) {
   const eventsRef = useRef(onEvents);
@@ -85,9 +94,6 @@ export function useRaid({
   speedRef.current = speed;
   const settlingRef = useRef(false);
 
-  const pathExists =
-    grid && meta ? findPath(grid, meta.entrance, meta.core) !== null : false;
-
   /** Skill targeting: rally waits for the next tile tap. */
   const [pendingSkill, setPendingSkill] = useState<WardenSkill | null>(null);
 
@@ -97,8 +103,11 @@ export function useRaid({
       settlingRef.current = true;
 
       const raidId = raidIdRef.current;
+      const destroyedObstacleIds = simRef.current?.destroyedObstacleIds ?? [];
       simRef.current = null;
       raidIdRef.current = null;
+
+      onObstaclesDestroyed(destroyedObstacleIds);
 
       const outcome = finalState.status === "breached" ? "breached" : "repelled";
       const lostMinionIds = finalState.minions.filter((m) => !m.alive).map((m) => m.id);
@@ -131,6 +140,7 @@ export function useRaid({
             killedIds: finalState.killedIds,
             capturedIds: finalState.capturedIds,
             lostMinionIds,
+            destroyedObstacleIds,
           },
         ]);
         setResult(finish);
@@ -144,7 +154,7 @@ export function useRaid({
         void maybeShowInterstitial(adsRemoved);
       }
     },
-    [server, onFinished, adsRemoved],
+    [server, onFinished, onObstaclesDestroyed, adsRemoved],
   );
 
   // Fixed-step loop, keyed on the run id so it starts once per raid instead of
@@ -190,14 +200,7 @@ export function useRaid({
   }, [runId, settle]);
 
   const startRaid = useCallback(async (): Promise<void> => {
-    if (!grid || !meta || starting || simRef.current) return;
-
-    // Treasuries drag the party off the direct route on the way in.
-    const path = buildRaidPath(grid, meta.entrance, meta.core, lureTiles(rooms));
-    if (!path) {
-      setError("NO_PATH");
-      return;
-    }
+    if (!meta || starting || simRef.current) return;
 
     setStarting(true);
     setError(null);
@@ -226,8 +229,12 @@ export function useRaid({
       const sim = new RaidSim({
         minions: minions.filter((m) => available.has(m.id)),
         traps,
+        obstacles,
         party: start.party,
-        path,
+        arena,
+        entrance: meta.entrance,
+        core: meta.core,
+        lures: lureTiles(rooms),
         seed: start.seed,
         trapCooldownScale: effects.trapCooldownScale,
         jailFree: start.jailFree ?? jailFree,
@@ -245,11 +252,12 @@ export function useRaid({
       setStarting(false);
     }
   }, [
-    grid,
+    arena,
     meta,
     minions,
     traps,
     rooms,
+    obstacles,
     effects.trapCooldownScale,
     jailFree,
     weaponTiers,
@@ -343,7 +351,6 @@ export function useRaid({
     setSpeed,
     result,
     error,
-    pathExists,
     pendingSkill,
     startRaid,
     useSkill,
