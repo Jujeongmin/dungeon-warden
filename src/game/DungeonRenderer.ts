@@ -417,6 +417,11 @@ export class DungeonRenderer {
     this.setUnits(this.lastUnits);
     this.setMarkers(this.lastMarkers);
     this.setObstacles(this.lastObstacles);
+
+    // The floor/walls/landmarks/decor were built at mount, before models
+    // existed, so every tileProto/spawnModel lookup came back null and they
+    // never rebuild on their own. Rebuild them now that models are loaded.
+    this.rebuildInstances();
   }
 
   /**
