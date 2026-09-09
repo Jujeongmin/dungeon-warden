@@ -54,13 +54,23 @@ entrance or the core.
 | Wooden barricade | 12 G | 120 | Early mazing. Cheap, and expected to die. |
 | Stone wall | 35 G | 380 | Holds a sealed line long enough to matter. |
 
-**Costs and HP are provisional.** A level-1 knight deals 13 damage every 1.1 s
-(≈ 11.8 DPS), so a barricade is about ten seconds of one adventurer's attention
-and a stone wall about half a minute. Both numbers get verified against real
-parties after implementation, the same way the raid economy was.
+**Costs and HP are measured**, against headless `RaidSim` runs in
+`tests/balance.test.ts` rather than hand arithmetic. A lone level-1 knight
+breaks a barricade in 12.65 s and a stone wall in 34.65 s (2.74x the
+barricade) — inside the design's 5-15 s / 2x+ targets, so no retuning was
+needed. Checked further against the case that actually decides whether the
+design holds up: a level-5 party of three or four, where several attackers
+stand adjacent to the same blocking tile and stack their damage per swing. A
+barricade there falls in 4.6 s and a stone wall in 8.25-8.5 s — still roughly
+double, just no longer the 2x+ margin a lone attacker sees, because more
+hands are landing hits on the one obstacle in reach. A wall still buys the
+defender several real seconds even against a fully leveled party, so sealing
+keeps paying off late game, just proportionally less than it does early.
 
 Digging cost 10 G per tile and was the early gold sink. Obstacles take that
-job.
+job: with `START_GOLD` at 200, a first-time player can afford a 6-barricade
+route (72 G) plus a warrior (50 G) plus a spike trap (30 G) for 152 G, with
+48 G left over.
 
 ## How adventurers treat obstacles
 
