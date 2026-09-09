@@ -196,11 +196,24 @@ export default function App() {
         });
       } else if (event.kind === "trap") {
         renderer.spawnRing(event.x, event.y);
+        renderer.shake(0.14); // a spike plate going off is a tap, not a jolt
         audio.play("trap", 90);
+      } else if (event.kind === "down") {
+        // The blow that actually finishes the adventurer — they stay on the
+        // board a few seconds yet (down, not gone), so this is the moment a
+        // knockback is guaranteed to be seen rather than removed same-frame.
+        renderer.knockbackUnit(`a:${event.targetId}`);
+        renderer.shake(0.22);
       } else if (event.kind === "minionDown") {
         renderer.spawnRing(event.x, event.y, 0x9d8bd8);
+        renderer.knockbackUnit(`m:${event.targetId}`);
+      } else if (event.kind === "obstacleDown") {
+        renderer.shake(0.45); // a wall coming down is the biggest thump here
       } else if (event.kind === "captured" || event.kind === "killed") {
         renderer.spawnRing(event.x, event.y, event.kind === "captured" ? 0x7fc98a : 0xd86a4c);
+        // A fresh jolt right as they actually leave the board, so the
+        // renderer's brief corpse-linger has a live knockback to play out.
+        renderer.knockbackUnit(`a:${event.targetId}`);
         const at = renderer.project(event.x, event.y);
         if (at) {
           floaterSeq.current += 1;
@@ -422,6 +435,8 @@ export default function App() {
       raidState: raid.raidState,
       raidResult: raid.result,
       rendererStats: () => rendererRef.current?.debugStats() ?? null,
+      rendererShakeState: () => rendererRef.current?.debugShakeState() ?? null,
+      renderer: () => rendererRef.current,
     });
   });
 

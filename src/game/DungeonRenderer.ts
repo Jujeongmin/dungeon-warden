@@ -13,6 +13,29 @@ const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
 
+/** Camera shake: trauma decays exponentially and is never integrated, so the
+ *  offset is a pure function of (trauma, time) — it always returns to exactly
+ *  zero rather than drifting. */
+const SHAKE_MAX_OFFSET = 0.55; // world units at trauma = 1
+const SHAKE_DECAY = 3.2; // trauma lost per second
+
+/** Per-unit hit feedback: a scale punch on every hit, a short knockback nudge
+ *  on a killing blow. Both decay to zero the same way the shake does. */
+const PUNCH_SCALE = 0.24; // peak scale bump, applied on top of the unit's own base scale
+const PUNCH_DECAY = 9; // punch strength lost per second
+const KNOCKBACK_DECAY = 6.5; // knockback strength lost per second
+
+/**
+ * A unit that dies leaves the sim's live roster the instant its event fires,
+ * often the same frame the knockback is applied — with no lingering "downed"
+ * state (minions have none, and a captured adventurer can resolve in the
+ * same step as its "down" event). Without this, the knockback would never
+ * actually be seen. So a dying unit keeps its mesh around for this long,
+ * still playing out its knockback decay while shrinking away, before it is
+ * actually disposed.
+ */
+const CORPSE_LINGER = 0.32;
+
 // Pointer travel (px) beyond which a gesture counts as a camera drag, not a tap.
 const TAP_SLOP = 6;
 
@@ -208,6 +231,17 @@ export class DungeonRenderer {
   private rings: Array<{ mesh: THREE.Mesh; life: number }> = [];
   private ringGeometry = new THREE.RingGeometry(0.2, 0.34, 20);
 
+  /** Per-unit scale punch (on every hit) and knockback nudge (on a kill). */
+  private impacts = new Map<string, { punch: number; kx: number; ky: number; kLife: number }>();
+  /** Units mid-death, kept around briefly to finish their knockback — see CORPSE_LINGER. */
+  private corpses = new Map<string, { object: THREE.Object3D; restX: number; restZ: number; life: number }>();
+
+  /** Camera shake: an impulse (trauma) that decays to zero, applied as a
+   *  render-time offset on top of the player's own target/distance/yaw. */
+  private shakeTrauma = 0;
+  private shakeTime = 0;
+  private shakeOffset = new THREE.Vector3();
+
   private landmarks: THREE.Object3D[] = [];
   private decor: THREE.Object3D[] = [];
   private pathMarkers: THREE.Object3D[] = [];
@@ -356,11 +390,27 @@ export class DungeonRenderer {
           const own = this.loaded.get(unit.kind)?.animations ?? [];
           this.setupAnimation(unit.id, object, own.length > 0 ? own : this.sharedClips);
         }
+
+        // fitToTile (or the placeholder capsule) already set the resting
+        // scale; the punch below multiplies on top of it rather than
+        // overwriting it, so it has to be remembered up front.
+        object.userData.baseScale = object.scale.x || 1;
       }
 
+      const impact = this.impacts.get(unit.id);
+      const knock = impact?.kLife ?? 0;
+      const punch = impact?.punch ?? 0;
+
       // A model already sits on the floor thanks to fitToTile; the capsule is
-      // centred on its own middle and needs lifting.
-      object.position.set(unit.x, usesModel ? object.position.y : UNIT_HEIGHT, unit.y);
+      // centred on its own middle and needs lifting. The knockback nudge is a
+      // horizontal-only render offset — the sim's x/y stay authoritative.
+      object.position.set(
+        unit.x + (impact?.kx ?? 0) * knock,
+        usesModel ? object.position.y : UNIT_HEIGHT,
+        unit.y + (impact?.ky ?? 0) * knock,
+      );
+      const baseScale = (object.userData.baseScale as number | undefined) ?? 1;
+      object.scale.setScalar(baseScale * (1 + punch * PUNCH_SCALE));
       if (unit.facing !== undefined) object.rotation.y = unit.facing;
       if (unit.action) this.playClip(unit.id, unit.action);
 
@@ -379,10 +429,52 @@ export class DungeonRenderer {
 
     for (const [id, object] of this.unitMeshes) {
       if (seen.has(id)) continue;
-      this.disposeObject(this.unitGroup, object);
       this.unitMeshes.delete(id);
       this.mixers.delete(id);
       this.flashes.delete(id);
+
+      const impact = this.impacts.get(id);
+      if (impact && (impact.kLife > 0 || impact.punch > 0)) {
+        // Mid-impact — hand it to the corpse list instead of disposing it
+        // outright, so the knockback/punch already in flight gets to finish.
+        const knock = impact.kLife;
+        this.corpses.set(id, {
+          object,
+          restX: object.position.x - impact.kx * knock,
+          restZ: object.position.z - impact.ky * knock,
+          life: CORPSE_LINGER,
+        });
+        continue;
+      }
+
+      this.disposeObject(this.unitGroup, object);
+      this.impacts.delete(id);
+    }
+  }
+
+  /** Advances lingering corpses: continues their knockback decay while
+   *  shrinking them away, then disposes them once CORPSE_LINGER elapses. */
+  private updateCorpses(delta: number): void {
+    for (const [id, corpse] of this.corpses) {
+      corpse.life -= delta;
+
+      const impact = this.impacts.get(id);
+      const knock = impact?.kLife ?? 0;
+      corpse.object.position.set(
+        corpse.restX + (impact?.kx ?? 0) * knock,
+        corpse.object.position.y,
+        corpse.restZ + (impact?.ky ?? 0) * knock,
+      );
+
+      const fade = Math.max(0, corpse.life / CORPSE_LINGER);
+      const baseScale = (corpse.object.userData.baseScale as number | undefined) ?? 1;
+      corpse.object.scale.setScalar(baseScale * fade);
+
+      if (corpse.life <= 0) {
+        this.disposeObject(this.unitGroup, corpse.object);
+        this.corpses.delete(id);
+        this.impacts.delete(id);
+      }
     }
   }
 
@@ -521,9 +613,43 @@ export class DungeonRenderer {
     this.mixers.set(unitId, { mixer, current: null, actions });
   }
 
-  /** Flags a unit to flash on its next frames. */
+  /** Flags a unit to flash and scale-punch on its next frames. */
   flashUnit(unitId: string): void {
     this.flashes.set(unitId, 1);
+    const impact = this.impacts.get(unitId);
+    if (impact) impact.punch = 1;
+    else this.impacts.set(unitId, { punch: 1, kx: 0, ky: 0, kLife: 0 });
+  }
+
+  /**
+   * Shoves a unit back a step on a killing blow.
+   *
+   * Events carry no attacker id, so this reads the unit's own current facing
+   * instead — the sim always turns a unit to face whatever it is fighting
+   * (see RaidSim's `adventurer.facing`/`minion.facing` assignments), so
+   * "away from facing" reads as "away from the thing that just finished it".
+   * The nudge is a pure render-time offset that decays to zero; it never
+   * touches the simulation's authoritative position.
+   */
+  knockbackUnit(unitId: string, strength = 0.18): void {
+    const object = this.unitMeshes.get(unitId);
+    const facing = object?.rotation.y ?? 0;
+    const impact = this.impacts.get(unitId) ?? { punch: 0, kx: 0, ky: 0, kLife: 0 };
+    impact.kx = -Math.sin(facing) * strength;
+    impact.ky = -Math.cos(facing) * strength;
+    impact.kLife = 1;
+    impact.punch = 1; // a kill lands harder than a graze
+    this.impacts.set(unitId, impact);
+  }
+
+  /**
+   * Adds a camera-shake impulse. Scale to the event: a spike trap is a tap
+   * (~0.1), an obstacle collapsing is a thump (~0.5). Impulses accumulate up
+   * to a cap rather than stacking without bound, so a burst of events reads
+   * as one solid hit instead of a jitter spike.
+   */
+  shake(amount: number): void {
+    this.shakeTrauma = Math.min(1, this.shakeTrauma + amount);
   }
 
   /** Expanding ring on a tile, used when a trap fires. */
@@ -962,6 +1088,33 @@ export class DungeonRenderer {
       markers: this.markerMeshes.size,
       obstacles: this.obstacleMeshes.size,
       mixers: this.mixers.size,
+      corpses: this.corpses.size,
+      impacts: this.impacts.size,
+    };
+  }
+
+  /**
+   * Camera-shake state, exposed so a headless/dev-tools caller can drive
+   * `shake()` and confirm the offset decays to exactly zero and that the
+   * unshaken camera position (target/distance/yaw only) is unaffected.
+   */
+  debugShakeState(): {
+    trauma: number;
+    offset: { x: number; y: number; z: number };
+    cameraPosition: { x: number; y: number; z: number };
+    unshakenPosition: { x: number; y: number; z: number };
+  } {
+    const y = this.yaw;
+    const horizontal = Math.cos(PITCH) * this.distance;
+    return {
+      trauma: this.shakeTrauma,
+      offset: { x: this.shakeOffset.x, y: this.shakeOffset.y, z: this.shakeOffset.z },
+      cameraPosition: { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z },
+      unshakenPosition: {
+        x: this.target.x + Math.sin(y) * horizontal,
+        y: this.target.y + Math.sin(PITCH) * this.distance,
+        z: this.target.z + Math.cos(y) * horizontal,
+      },
     };
   }
 
@@ -984,15 +1137,44 @@ export class DungeonRenderer {
     return (this.yawStep * Math.PI) / 2 + Math.PI / 4;
   }
 
+  /**
+   * Shake is applied here as a pure offset on top of the player's own
+   * target/distance/yaw — never by mutating them — so panning, zooming and
+   * rotating during a shake behave exactly as if it were not happening, and
+   * the camera lands back exactly where the player left it once trauma hits
+   * zero (the offset is `f(trauma, time)`, not integrated, so it can't
+   * drift).
+   */
   private updateCamera(): void {
     const y = this.yaw;
     const horizontal = Math.cos(PITCH) * this.distance;
     this.camera.position.set(
-      this.target.x + Math.sin(y) * horizontal,
-      this.target.y + Math.sin(PITCH) * this.distance,
-      this.target.z + Math.cos(y) * horizontal,
+      this.target.x + Math.sin(y) * horizontal + this.shakeOffset.x,
+      this.target.y + Math.sin(PITCH) * this.distance + this.shakeOffset.y,
+      this.target.z + Math.cos(y) * horizontal + this.shakeOffset.z,
     );
     this.camera.lookAt(this.target);
+  }
+
+  /** Advances the shake impulse and recomputes this frame's offset. */
+  private updateShake(delta: number): void {
+    if (this.shakeTrauma <= 0) {
+      if (this.shakeOffset.lengthSq() > 0) this.shakeOffset.set(0, 0, 0);
+      return;
+    }
+
+    this.shakeTime += delta;
+    // Squaring the falloff gives a sharp initial jolt that tails off fast,
+    // rather than a linear wobble that reads as sluggish.
+    const amount = this.shakeTrauma * this.shakeTrauma * SHAKE_MAX_OFFSET;
+    this.shakeOffset.set(
+      Math.sin(this.shakeTime * 53.7) * amount,
+      Math.sin(this.shakeTime * 71.3 + 1.7) * amount * 0.5,
+      Math.sin(this.shakeTime * 61.1 + 3.1) * amount,
+    );
+
+    this.shakeTrauma = Math.max(0, this.shakeTrauma - SHAKE_DECAY * delta);
+    if (this.shakeTrauma === 0) this.shakeOffset.set(0, 0, 0);
   }
 
   private resize(): void {
@@ -1155,18 +1337,30 @@ export class DungeonRenderer {
 
     for (const entry of this.mixers.values()) entry.mixer.update(delta);
     this.updateEffects(delta);
+    this.updateShake(delta);
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
   };
 
-  /** Advances hit flashes and trap rings. */
+  /** Advances hit flashes, punches, knockbacks, corpses and trap rings. */
   private updateEffects(delta: number): void {
     for (const [id, value] of this.flashes) {
       const next = value - delta * 4;
       if (next <= 0) this.flashes.delete(id);
       else this.flashes.set(id, next);
     }
+
+    for (const [id, impact] of this.impacts) {
+      impact.punch = Math.max(0, impact.punch - delta * PUNCH_DECAY);
+      impact.kLife = Math.max(0, impact.kLife - delta * KNOCKBACK_DECAY);
+      // Only drop entries for units that are still live-tracked; a corpse's
+      // impact is cleaned up by updateCorpses once it finishes lingering.
+      if (impact.punch === 0 && impact.kLife === 0 && !this.corpses.has(id)) {
+        this.impacts.delete(id);
+      }
+    }
+    this.updateCorpses(delta);
 
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const ring = this.rings[i];
@@ -1204,6 +1398,9 @@ export class DungeonRenderer {
     this.clearUnits();
     this.clearMarkers();
     this.clearObstacles();
+    for (const [, corpse] of this.corpses) this.disposeObject(this.unitGroup, corpse.object);
+    this.corpses.clear();
+    this.impacts.clear();
 
     for (const ring of this.rings) {
       this.scene.remove(ring.mesh);

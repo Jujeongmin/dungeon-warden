@@ -23,6 +23,24 @@ const HAS_VERSE = Boolean(import.meta.env.VITE_AGENT8_VERSE);
 /** Guards against a tab that was backgrounded dumping a huge catch-up burst. */
 const MAX_STEPS_PER_FRAME = 8;
 
+/**
+ * Hit stop: a brief freeze of wall-clock time whenever the sim reports a
+ * decisive event, so the moment reads instead of sliding past. This only
+ * ever withholds delta from the accumulator below — it never touches
+ * `sim.step()` — so it cannot change how many steps a raid takes or what
+ * events it produces; the determinism test covers exactly that guarantee.
+ * 100ms reads as a solid beat without feeling like input lag.
+ */
+const HIT_STOP_SECONDS = 0.1;
+/** A player who chose fast-forward asked for less drama, not more. */
+const HIT_STOP_SPEED_SCALE: Record<RaidSpeed, number> = { 1: 1, 2: 0.4, 4: 0 };
+const DECISIVE_EVENTS = new Set<SimEvent["kind"]>([
+  "killed",
+  "captured",
+  "minionDown",
+  "obstacleDown",
+]);
+
 export const RAID_SPEEDS = [1, 2, 4] as const;
 export type RaidSpeed = (typeof RAID_SPEEDS)[number];
 
@@ -90,6 +108,8 @@ export function useRaid({
   const frameRef = useRef(0);
   const accumulatorRef = useRef(0);
   const lastFrameRef = useRef(0);
+  /** Seconds of hit-stop still owed to the current freeze, if any. */
+  const hitStopRef = useRef(0);
   const speedRef = useRef<RaidSpeed>(1);
   speedRef.current = speed;
   const settlingRef = useRef(false);
@@ -170,7 +190,16 @@ export function useRaid({
 
       const delta = Math.min((now - lastFrameRef.current) / 1000, 0.25);
       lastFrameRef.current = now;
-      accumulatorRef.current += delta * speedRef.current;
+
+      // Hit stop withholds this frame's delta from the accumulator instead
+      // of feeding it in — the freeze is entirely a wall-clock pacing effect
+      // on top of the fixed-step loop, so it cannot change how many times
+      // sim.step() below ends up running for a given raid.
+      if (hitStopRef.current > 0) {
+        hitStopRef.current = Math.max(0, hitStopRef.current - delta);
+      } else {
+        accumulatorRef.current += delta * speedRef.current;
+      }
 
       let steps = 0;
       while (accumulatorRef.current >= SIM_DT && steps < MAX_STEPS_PER_FRAME) {
@@ -181,7 +210,13 @@ export function useRaid({
       }
 
       const drained = sim.drainEvents();
-      if (drained.length > 0) eventsRef.current?.(drained);
+      if (drained.length > 0) {
+        eventsRef.current?.(drained);
+        if (drained.some((e) => DECISIVE_EVENTS.has(e.kind))) {
+          const duration = HIT_STOP_SECONDS * HIT_STOP_SPEED_SCALE[speedRef.current];
+          hitStopRef.current = Math.max(hitStopRef.current, duration);
+        }
+      }
 
       const next = sim.state;
       setRaidState({ ...next, minions: [...next.minions], adventurers: [...next.adventurers] });
@@ -194,6 +229,7 @@ export function useRaid({
 
     lastFrameRef.current = performance.now();
     accumulatorRef.current = 0;
+    hitStopRef.current = 0;
     frameRef.current = requestAnimationFrame(tick);
 
     return () => cancelAnimationFrame(frameRef.current);
