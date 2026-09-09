@@ -69,7 +69,6 @@ const ko = {
   save_now: "지금 저장",
   start_raid: "침입 시작",
   preparing: "준비 중…",
-  need_path: "입구에서 코어까지 길이 이어져야 합니다.",
   unsaved_changes: "저장하지 않은 변경이 있습니다.",
   hover_hint: "타일 위에 커서를 올려보세요",
   tile: "타일",
@@ -185,9 +184,9 @@ const ko = {
   err_no_adventurers: "지금은 쳐들어올 모험가가 없습니다. 잠시 후 다시 시도하세요.",
 
   // Tutorial
-  tut_dig_title: "길을 파세요",
-  tut_dig_body:
-    "암반 타일을 클릭하면 통로가 됩니다. 입구(초록)에서 코어(주황)까지 길이 이어져야 모험가가 들어옵니다.",
+  tut_obstacle_title: "길을 접으세요",
+  tut_obstacle_body:
+    "장애물을 놓아 용사가 돌아가게 만드세요. 길이 길수록 함정과 부하가 일할 시간이 늘어납니다. 완전히 막아도 됩니다 — 그때는 벽을 부수고 들어옵니다.",
   tut_minion_title: "부하를 세우세요",
   tut_minion_body:
     "스켈레톤 워리어를 통로에 배치하면 모험가를 붙잡아 둡니다. 함정은 붙잡아 둘 상대가 있어야 값어치를 합니다.",
@@ -334,7 +333,6 @@ const en: Record<StringKey, string> = {
   save_now: "Save now",
   start_raid: "Start raid",
   preparing: "Preparing…",
-  need_path: "A path must connect the entrance to the core.",
   unsaved_changes: "You have unsaved changes.",
   hover_hint: "Hover a tile to inspect it",
   tile: "Tile",
@@ -442,9 +440,9 @@ const en: Record<StringKey, string> = {
   err_no_save: "No save found.",
   err_no_adventurers: "No adventurers are available right now. Try again shortly.",
 
-  tut_dig_title: "Dig a path",
-  tut_dig_body:
-    "Click solid rock to carve a corridor. Adventurers only come once the entrance (green) connects to the core (amber).",
+  tut_obstacle_title: "Fold the route",
+  tut_obstacle_body:
+    "Place obstacles so the raiders walk the long way round. The longer the route, the more time your traps and minions get. Sealing the room is allowed too — then they break the wall down instead.",
   tut_minion_title: "Post a minion",
   tut_minion_body:
     "A skeleton warrior in the corridor holds adventurers in place. Traps are only worth their cost when something is holding the target still.",

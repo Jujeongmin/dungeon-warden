@@ -1,9 +1,7 @@
-import type { PlacedMinion, PlacedTrap } from "./types";
-import type { Grid } from "./grid";
-import { hasPathToCore } from "./sim/pathfinding";
+import type { PlacedMinion, PlacedObstacle, PlacedTrap } from "./types";
 
 export interface TutorialContext {
-  grid: Grid | null;
+  obstacles: PlacedObstacle[];
   entrance: { x: number; y: number } | null;
   core: { x: number; y: number } | null;
   minions: PlacedMinion[];
@@ -31,11 +29,10 @@ export interface TutorialStep {
  */
 export const TUTORIAL: TutorialStep[] = [
   {
-    id: "dig",
-    title: "tut_dig_title",
-    body: "tut_dig_body",
-    done: ({ grid, entrance, core }) =>
-      Boolean(grid && entrance && core && hasPathToCore(grid, entrance, core)),
+    id: "obstacle",
+    title: "tut_obstacle_title",
+    body: "tut_obstacle_body",
+    done: ({ obstacles }) => obstacles.length > 0,
   },
   {
     id: "minion",

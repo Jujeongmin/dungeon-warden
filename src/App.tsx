@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DungeonRenderer, type UnitView, type MarkerView } from "./game/DungeonRenderer";
+import { DungeonRenderer, type UnitView, type MarkerView, type ObstacleView } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
 import { SKILL_STATS } from "./game/sim/traps";
+import { OBSTACLE_STATS } from "./game/sim/obstacles";
 import { roomTiles, lureTiles } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
+import { blockedSet, coreOf, entranceOf } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, currentStep } from "./game/tutorial";
 import { audio } from "./game/audio";
@@ -20,18 +22,21 @@ import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game
 import { LocaleProvider, type Translate } from "./i18n";
 import { translate, type StringKey } from "./i18n/strings";
 import {
-  DIG_COST,
   MAX_ROOMS,
   MAX_TRAPS,
   MINION_COST,
   MINION_LABEL,
+  OBSTACLE_COST,
+  OBSTACLE_LABEL,
   ROOM_COST,
   ROOM_DESCRIPTION,
   ROOM_LABEL,
   SKILL_LABEL,
   TRAP_COST,
   TRAP_LABEL,
+  maxObstaclesFor,
   type MinionType,
+  type ObstacleType,
   type RoomType,
   type TrapType,
   type WardenSkill,
@@ -48,7 +53,6 @@ const STATUS_LABEL: Record<string, StringKey> = {
 };
 
 const RAID_ERROR_LABEL: Record<string, StringKey> = {
-  NO_PATH: "need_path",
   NO_SAVE: "err_no_save",
   NO_ADVENTURERS: "err_no_adventurers",
 };
@@ -67,14 +71,15 @@ function remaining(at: number, t: Translate): string {
 }
 
 type Tool =
-  | { kind: "dig" }
+  | { kind: "obstacle"; type: ObstacleType }
   | { kind: "remove" }
   | { kind: "minion"; type: MinionType }
   | { kind: "trap"; type: TrapType }
   | { kind: "room"; type: RoomType };
 
 const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
-  { id: "dig", tool: { kind: "dig" }, label: "tool_dig", cost: DIG_COST },
+  { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
+  { id: "wall", tool: { kind: "obstacle", type: "wall" }, label: OBSTACLE_LABEL.wall, cost: OBSTACLE_COST.wall },
   { id: "remove", tool: { kind: "remove" }, label: "tool_remove", cost: null },
   { id: "warrior", tool: { kind: "minion", type: "warrior" }, label: MINION_LABEL.warrior, cost: MINION_COST.warrior },
   { id: "mage", tool: { kind: "minion", type: "mage" }, label: MINION_LABEL.mage, cost: MINION_COST.mage },
@@ -102,7 +107,7 @@ export default function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
   const [adNotice, setAdNotice] = useState<string | null>(null);
-  const [toolId, setToolId] = useState("dig");
+  const [toolId, setToolId] = useState("barricade");
   const [researchError, setResearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("build");
   const [hudOpen, setHudOpen] = useState(true);
@@ -130,8 +135,8 @@ export default function App() {
 
   const save = useDungeonSave();
   const {
-    grid,
-    gridVersion,
+    arena,
+    obstacles,
     gold,
     entitlements,
     minions,
@@ -146,7 +151,6 @@ export default function App() {
     jailFree,
     weaponTiers,
     meta,
-    pendingDigs,
     pendingCost,
     hasUnsaved,
     status,
@@ -219,20 +223,22 @@ export default function App() {
 
   const raid = useRaid({
     onEvents: onSimEvents,
-    grid,
+    arena,
     meta,
     minions,
     traps,
     rooms,
+    obstacles,
     effects,
     jailFree,
     weaponTiers,
     research: unlocked,
     adsRemoved: entitlements.adsRemoved,
     onFinished: save.applyRaidResult,
+    onObstaclesDestroyed: save.clearDestroyedObstacles,
   });
 
-  const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "dig" as const };
+  const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "remove" as const };
 
   // Browsers only allow an AudioContext to start from a gesture.
   useEffect(() => {
@@ -256,14 +262,14 @@ export default function App() {
     if (raid.raiding) return; // no editing while a raid is running
 
     let ok = false;
-    if (tool.kind === "dig") ok = save.digTile(x, y);
+    if (tool.kind === "obstacle") ok = save.placeObstacle(tool.type, x, y);
     else if (tool.kind === "remove") ok = save.removeAt(x, y);
     else if (tool.kind === "minion") ok = save.placeMinion(tool.type, x, y);
     else if (tool.kind === "trap") ok = save.placeTrap(tool.type, x, y);
     else ok = save.placeRoom(tool.type, x, y);
 
     if (!ok) audio.play("error");
-    else audio.play(tool.kind === "dig" ? "dig" : "place");
+    else audio.play("place");
   };
 
   useEffect(() => {
@@ -280,12 +286,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (grid) rendererRef.current?.setGrid(grid);
-  }, [grid]);
-
-  useEffect(() => {
-    if (gridVersion > 0) rendererRef.current?.refresh();
-  }, [gridVersion]);
+    rendererRef.current?.setArena(arena, entranceOf(arena), coreOf(arena));
+  }, [arena]);
 
   // During a raid the simulation owns the units; otherwise the placed roster is
   // shown so the player can see what they built.
@@ -349,6 +351,20 @@ export default function App() {
     return list;
   }, [traps, rooms]);
 
+  // During a raid the simulation owns obstacle HP as they get chopped down;
+  // otherwise the placed roster is shown whole, mirroring the `units` memo.
+  const obstacleViews: ObstacleView[] = useMemo(() => {
+    if (raid.raidState) {
+      return raid.raidState.obstacles
+        .filter((o) => o.alive)
+        .map((o) => ({ id: o.id, type: o.type, x: o.x, y: o.y, hp: o.hp, maxHp: o.maxHp }));
+    }
+    return obstacles.map((o) => {
+      const stats = OBSTACLE_STATS[o.type];
+      return { id: o.id, type: o.type, x: o.x, y: o.y, hp: stats.hp, maxHp: stats.hp };
+    });
+  }, [raid.raidState, obstacles]);
+
   useEffect(() => {
     rendererRef.current?.setUnits(units);
   }, [units]);
@@ -357,17 +373,21 @@ export default function App() {
     rendererRef.current?.setMarkers(markers);
   }, [markers]);
 
+  useEffect(() => {
+    rendererRef.current?.setObstacles(obstacleViews);
+  }, [obstacleViews]);
+
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
   useEffect(() => {
-    if (!grid || !meta || raid.raiding) {
+    if (!meta || raid.raiding) {
       rendererRef.current?.setPathPreview(null);
       return;
     }
     rendererRef.current?.setPathPreview(
-      buildRaidPath(grid, meta.entrance, meta.core, lureTiles(rooms)),
+      buildRaidPath(arena, meta.entrance, meta.core, lureTiles(rooms), blockedSet(arena, obstacles)),
     );
-  }, [grid, gridVersion, meta, rooms, raid.raiding]);
+  }, [arena, obstacles, meta, rooms, raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
@@ -386,9 +406,9 @@ export default function App() {
 
   useEffect(() => {
     installDevTools({
-      grid, minions, traps, rooms, loot, prisoners, adventurers,
+      arena, obstacles, minions, traps, rooms, loot, prisoners, adventurers,
       research, unlocked, effects, jailFree, meta, gold,
-      digTile: save.digTile,
+      placeObstacle: save.placeObstacle,
       placeMinion: save.placeMinion,
       placeTrap: save.placeTrap,
       placeRoom: save.placeRoom,
@@ -401,7 +421,6 @@ export default function App() {
       stepRaid: raid.stepRaid,
       raidState: raid.raidState,
       raidResult: raid.result,
-      pathExists: raid.pathExists,
       rendererStats: () => rendererRef.current?.debugStats() ?? null,
     });
   });
@@ -437,7 +456,7 @@ export default function App() {
   }, [settings.introSeen, patchSettings]);
 
   const stepIndex = currentStep({
-    grid,
+    obstacles,
     entrance: meta?.entrance ?? null,
     core: meta?.core ?? null,
     minions,
@@ -452,7 +471,7 @@ export default function App() {
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
-    if (tool.kind === "dig") return t("hint_dig");
+    if (tool.kind === "obstacle") return `${t("hint_obstacle")} ${obstacles.length}/${maxObstaclesFor(research)}`;
     if (tool.kind === "remove") return t("hint_remove");
     if (tool.kind === "minion") return `${t("hint_minion")} ${minions.length}/${effects.minionCap}`;
     if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
@@ -683,21 +702,21 @@ export default function App() {
 
               <p className="hint">{toolHint}</p>
               <p className="hint small">
-                {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
+                {t("count_obstacles")} {obstacles.length}/{maxObstaclesFor(research)} · {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
                 {effects.jailCapacity > 0 && ` · ${t("count_jail")} ${prisoners.length}/${effects.jailCapacity}`}
               </p>
+              <p className="hint small">{t("obstacle_note")}</p>
               <p className="hint small">{t("controls")}</p>
 
               <div className="actions">
                 <button
                   className="primary"
                   onClick={() => { audio.play("raidStart"); void raid.startRaid(); }}
-                  disabled={raid.raiding || raid.starting || !raid.pathExists || hasUnsaved}
+                  disabled={raid.raiding || raid.starting || hasUnsaved}
                 >
                   {raid.starting ? t("preparing") : t("start_raid")}
                 </button>
               </div>
-              {!raid.pathExists && <p className="hint small warn">{t("need_path")}</p>}
               {hasUnsaved && <p className="hint small warn">{t("unsaved_changes")}</p>}
 
               <div className="actions">
@@ -710,7 +729,6 @@ export default function App() {
 
               <p className="hint small">
                 {hover ? `${t("tile")} (${hover.x}, ${hover.y})` : t("hover_hint")}
-                {pendingDigs > 0 && ` · ${t("pending_digs")} ${pendingDigs}`}
                 {lastSavedAt && ` · ${t("saved_at")} ${new Date(lastSavedAt).toLocaleTimeString()}`}
               </p>
             </>
