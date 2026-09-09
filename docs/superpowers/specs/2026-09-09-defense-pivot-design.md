@@ -1,7 +1,7 @@
 # Dungeon Warden — defense pivot
 
 **Date:** 2026-09-09
-**Status:** approved, not yet implemented
+**Status:** implemented on `feat/defense-pivot`, not yet merged
 
 ## Why
 
@@ -28,14 +28,16 @@ stronger. A breached core costs gold, never the dungeon.
 
 ## The board
 
-A single open room. All floor. The **entrance** sits at `(0, midY)`, the
-**core** at `(w - 1, midY)` — the same fixed pair the game already uses.
+A single open room, all floor, in **portrait**: the width stays 12 and the room
+grows taller with research, because this game is played on the web and mostly on
+phones. The **entrance** sits at `(midX, 0)` and the **core** at
+`(midX, h - 1)`, so adventurers descend from the top.
 
 | Research | Room | Obstacle budget |
 |---|---|---|
 | — | 12 × 12 | 20 |
-| `expand1` (420 G) | 16 × 12 | 28 |
-| `expand2` (700 G) | 20 × 12 | 36 |
+| `expand1` (420 G) | 12 × 16 | 28 |
+| `expand2` (700 G) | 12 × 20 | 36 |
 
 The two existing expansion nodes carry the obstacle budget with them rather
 than adding new nodes. A bigger room with the same wall budget would make the
