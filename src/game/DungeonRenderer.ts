@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { TILE, type TileId, type ObstacleType } from "./types";
 import { ModelLibrary, MODEL_PATTERNS, fitToTile, type LoadedModel } from "./assets/ModelLibrary";
+import { bakeModelIcons } from "./assets/modelIcons";
 import { inArena, type Arena } from "./arena";
 import type { Point } from "./sim/pathfinding";
 
@@ -343,6 +344,19 @@ export class DungeonRenderer {
     this.resize();
 
     this.loop();
+  }
+
+  /**
+   * Photographs the models behind a set of keys, for use as toolbar icons.
+   *
+   * Lives here because this owns the loaded model library; the baking itself
+   * is in assets/modelIcons.ts. Safe to call before the models have arrived —
+   * it waits, and returns whatever it could load.
+   */
+  async bakeToolIcons(keys: string[]): Promise<Record<string, string>> {
+    await this.models.init();
+    if (this.disposed) return {};
+    return bakeModelIcons(this.models, keys);
   }
 
   setArena(arena: Arena, entrance: Point, core: Point): void {

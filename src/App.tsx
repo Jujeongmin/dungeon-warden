@@ -77,6 +77,33 @@ type Tool =
   | { kind: "trap"; type: TrapType }
   | { kind: "room"; type: RoomType };
 
+/**
+ * Which model stands in for each tool in the toolbar.
+ *
+ * These are the same keys the renderer draws with, so a tool's icon is a
+ * photograph of the thing it puts on the board rather than an approximation of
+ * it. `remove` has no model because it places nothing.
+ */
+const TOOL_MODEL: Record<string, string | null> = {
+  barricade: "obstacle_barricade",
+  wall: "obstacle_wall",
+  remove: null,
+  warrior: "m_warrior",
+  mage: "m_mage",
+  spike: "spike",
+  arrow: "arrow",
+  rockfall: "rockfall",
+  flame: "flame",
+  treasury: "treasury",
+  vault: "vault",
+  barracks: "barracks",
+  altar: "altar",
+  workshop: "workshop",
+  jail: "jail",
+};
+
+const TOOL_MODEL_KEYS = Object.values(TOOL_MODEL).filter((k): k is string => k !== null);
+
 const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
   { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
   { id: "wall", tool: { kind: "obstacle", type: "wall" }, label: OBSTACLE_LABEL.wall, cost: OBSTACLE_COST.wall },
@@ -103,6 +130,8 @@ export default function App() {
   const rendererRef = useRef<DungeonRenderer | null>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  /** Baked from the tool models once the pack loads; empty until then. */
+  const [toolIcons, setToolIcons] = useState<Record<string, string>>({});
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
   const [shopOpen, setShopOpen] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
@@ -292,7 +321,18 @@ export default function App() {
       onHoverChange: setHover,
     });
     rendererRef.current = renderer;
+
+    // Photograph the tool models once the pack has loaded. Icons are a nicety:
+    // if this fails or the device refuses a second GL context, the toolbar
+    // keeps its labels and nothing else changes.
+    let alive = true;
+    void renderer
+      .bakeToolIcons(TOOL_MODEL_KEYS)
+      .then((icons) => { if (alive) setToolIcons(icons); })
+      .catch(() => {});
+
     return () => {
+      alive = false;
       renderer.dispose();
       rendererRef.current = null;
     };
@@ -708,8 +748,15 @@ export default function App() {
                       disabled={raid.raiding || locked}
                       title={locked ? t("locked_hint") : undefined}
                     >
-                      <b>{locked ? `🔒 ${label}` : label}</b>
-                      <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
+                      {(() => {
+                        const modelKey = TOOL_MODEL[entry.id];
+                        const icon = modelKey ? toolIcons[modelKey] : undefined;
+                        return icon ? <img className="tool-icon" src={icon} alt="" /> : null;
+                      })()}
+                      <span className="tool-text">
+                        <b>{locked ? `🔒 ${label}` : label}</b>
+                        <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
+                      </span>
                     </button>
                   );
                 })}

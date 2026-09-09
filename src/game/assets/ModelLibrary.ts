@@ -117,6 +117,7 @@ export class ModelLibrary {
   private pending = new Map<string, Promise<LoadedModel | null>>();
   private sharedClips: THREE.AnimationClip[] | null = null;
   private ready = false;
+  private initTask: Promise<void> | null = null;
 
   get available(): boolean {
     return this.entries.length > 0;
@@ -126,10 +127,26 @@ export class ModelLibrary {
     return this.entries.length;
   }
 
-  /** Reads the manifest. Safe to call when no assets have been added yet. */
-  async init(): Promise<void> {
-    if (this.ready) return;
-    this.ready = true;
+  /**
+   * Reads the manifest. Safe to call when no assets have been added yet, and
+   * safe to call from two places at once.
+   *
+   * The second part is not free: this used to set a `ready` flag before
+   * awaiting the fetch, so a concurrent caller was told the library was ready
+   * while the manifest was still in flight and got an empty entry list. The
+   * in-flight promise is shared instead, so every caller waits for the same
+   * fetch and sees the same result.
+   */
+  init(): Promise<void> {
+    if (this.ready) return Promise.resolve();
+    this.initTask ??= this.readManifest().finally(() => {
+      this.ready = true;
+      this.initTask = null;
+    });
+    return this.initTask;
+  }
+
+  private async readManifest(): Promise<void> {
     try {
       const response = await fetch(MANIFEST_URL);
       if (!response.ok) return;
