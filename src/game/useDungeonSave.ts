@@ -6,6 +6,7 @@ import { addCost, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
 import { installServerProbe } from "./devtools";
+import { maxIdSuffix } from "./idSeq";
 import {
   EMPTY_ENTITLEMENTS,
   MAX_ROOMS,
@@ -184,10 +185,16 @@ export function useDungeonSave() {
     setResearch(result.dungeon.research ?? []);
     setMeta(metaOf(result.dungeon));
 
-    // Keep generated ids from colliding with ids already in the save.
+    // Keep generated ids from colliding with ids already in the save: seed
+    // from the highest numeric suffix actually in use per collection, not
+    // from a count (which falls behind as soon as low-numbered items are
+    // deleted and can then regenerate an id still present in the save).
     seqRef.current = Math.max(
       seqRef.current,
-      loadedObstacles.length + loadedMinions.length + loadedTraps.length + loadedRooms.length,
+      maxIdSuffix(loadedObstacles.map((o) => o.id), "o"),
+      maxIdSuffix(loadedMinions.map((m) => m.id), "m"),
+      maxIdSuffix(loadedTraps.map((t) => t.id), "t"),
+      maxIdSuffix(loadedRooms.map((r) => r.id), "r"),
     );
 
     setGold(result.gold);
