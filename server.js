@@ -302,7 +302,13 @@ function pushCapped(list, value, max) {
  * same code — testing a different path than production would prove nothing.
  */
 async function grantProduct(account, productId, purchaseId, quantity) {
-  const product = PRODUCTS[productId];
+  // ownEntry, not PRODUCTS[productId]: the same unguarded-index bug the cost
+  // tables had. `productId: "toString"` resolved to Object.prototype.toString,
+  // walked past `if (!product)`, granted nothing (no `grants` field matches),
+  // and yet still burned the purchaseId into grantedPurchases and overwrote
+  // lastPurchase — so a later, genuine callback carrying that id would be
+  // answered ALREADY_GRANTED and the player would be charged for nothing.
+  const product = ownEntry(PRODUCTS, productId);
   if (!product) return { success: false, reason: "UNKNOWN_PRODUCT" };
 
   return await $lock(`purchase:${account}`, async () => {
@@ -533,6 +539,33 @@ function priceTraps(nextTraps, prevTraps, arena, claimed) {
 }
 
 /**
+ * Is this minion's "convert or not" identity the one the server already stored?
+ *
+ * A convert is a captured adventurer that changed sides: the server alone
+ * creates one (resolveConversions), it costs nothing because it is earned, and
+ * it carries a `cls` and `level` that make it strictly stronger than a bought
+ * warrior — 130hp/13dmg against 90/9 for a knight convert at level 1.
+ *
+ * The guard used to ask only whether *something* was stored under that id. That
+ * was an existence test standing in for a type test, and it held only as long
+ * as MINION_COST had no `convert` key to price: the missing price threw
+ * UNKNOWN_MINION_TYPE first and hid the hole. Once `convert: 0` was added the
+ * hole opened — a client could take one of its own warriors' ids, resend it as
+ * `type: "convert"`, and the id existed, so nothing objected. The type is in
+ * BASE_MINIONS so MINION_LOCKED passes, the price is 0, and every minion in the
+ * dungeon became a better unit for free.
+ *
+ * So the test is on the *type* of the stored entry, and it runs in both
+ * directions. A stored convert may not be re-typed into anything else either:
+ * that would leave a knight's cls and level attached to a "warrior", and would
+ * launder the convert identity away so the id could be re-converted later.
+ */
+function convertIdentityHolds(minion, previous) {
+  const wasConvert = !!previous && previous.type === "convert";
+  return (minion.type === "convert") === wasConvert;
+}
+
+/**
  * Validates a minion roster against the arena and charges for what is new.
  * Removals are free but refund nothing, and changing an existing id's type is
  * charged in full so a client cannot swap a cheap unit for an expensive one.
@@ -556,12 +589,10 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
     if (price === null) throw new Error("UNKNOWN_MINION_TYPE");
 
     // Converts are earned by capturing and are created by the server alone.
-    // A client that invents one is rejected outright. The Map lookup matters
-    // here: with a plain object, `id: "toString"` would have satisfied "this
-    // one already existed" with an inherited method.
-    if (minion.type === "convert" && !prevById.has(minion.id)) {
-      throw new Error("ILLEGAL_CONVERT");
-    }
+    // The Map lookup matters here: with a plain object, `id: "toString"` would
+    // have satisfied "this one already existed" with an inherited method.
+    const previous = prevById.get(minion.id);
+    if (!convertIdentityHolds(minion, previous)) throw new Error("ILLEGAL_CONVERT");
 
     if (!Number.isInteger(minion.x) || !Number.isInteger(minion.y)) {
       throw new Error("BAD_MINION_POSITION");
@@ -574,7 +605,6 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
     if (claimed.has(cellKey)) throw new Error("TILE_OCCUPIED");
     claimed.add(cellKey);
 
-    const previous = prevById.get(minion.id);
     if (!previous || previous.type !== minion.type) cost += price;
   }
 
@@ -636,9 +666,25 @@ function priceObstacles(next, saved, arena, research, occupied) {
 /**
  * Rebuilds the minion list from trusted fields.
  *
- * The client may move minions and swap which looted weapon each carries, but
- * class, level and revive timers come from the previous save, and a weapon must
- * actually be in the loot pile and held by only one minion.
+ * The client may move minions and swap which looted weapon each carries. Every
+ * other field is the server's: `revivesAt`, `cls` and `level` are copied from
+ * the entry already stored under that id and the payload's own values are never
+ * read, and a weapon must actually be in the loot pile and held by only one
+ * minion.
+ *
+ * `type` is the one field the client legitimately chooses — buying a mage means
+ * sending a mage — so it is copied, but only after two checks that make this
+ * function safe standing alone rather than because priceMinions happened to run
+ * first on the same list:
+ *
+ * - it must be an own key of MINION_COST, so no inherited Object.prototype name
+ *   and nothing the server would refuse to price can be written into the save;
+ * - it must satisfy the same convert identity rule priceMinions enforces, so
+ *   `cls`/`level` written here always belong to a minion whose type matches the
+ *   one the server itself created. Without it, re-typing a warrior to "convert"
+ *   would be copied straight through with `cls`/`level` left undefined and the
+ *   client would stat it as a knight; `cls: "barbarian"` or an inflated `level`
+ *   in the payload is ignored either way, since neither is read from `minion`.
  */
 function sanitizeMinions(nextMinions, prevMinions, loot) {
   // Map/Set rather than plain objects: `weaponId: "toString"` would otherwise
@@ -652,7 +698,12 @@ function sanitizeMinions(nextMinions, prevMinions, loot) {
 
   const usedWeapons = new Set();
   return nextMinions.map((minion) => {
-    const previous = prevById.get(minion.id) || {};
+    const previous = prevById.get(minion.id);
+
+    if (priceOf(MINION_COST, minion.type) === null) throw new Error("UNKNOWN_MINION_TYPE");
+    if (!convertIdentityHolds(minion, previous)) throw new Error("ILLEGAL_CONVERT");
+
+    const stored = previous || {};
 
     let weaponId = minion.weaponId || null;
     if (weaponId && (!lootIds.has(weaponId) || usedWeapons.has(weaponId))) weaponId = null;
@@ -663,9 +714,9 @@ function sanitizeMinions(nextMinions, prevMinions, loot) {
       type: minion.type,
       x: minion.x,
       y: minion.y,
-      revivesAt: previous.revivesAt || null,
-      cls: previous.cls,
-      level: previous.level,
+      revivesAt: stored.revivesAt || null,
+      cls: stored.cls,
+      level: stored.level,
       weaponId,
     };
   });
@@ -753,6 +804,39 @@ function resolveConversions(dungeon, arena, now) {
 }
 
 /**
+ * Drops entries whose id was already seen, keeping the first of each.
+ *
+ * priceObstacles rejects a list containing a repeated id, and it is right to:
+ * one saved wall listed twice used to cost nothing for the second copy while
+ * still eating a tile and a cap slot. But saveDungeon re-prices the *whole*
+ * obstacle list on every save, so a duplicate that is already sitting in
+ * storage makes that dungeon permanently unsaveable — every save after it is
+ * refused, including edits that touch no obstacle at all. Such saves exist:
+ * the client seeds its id counter from the number of items rather than the
+ * highest suffix in use, so deleting obstacles and placing more regenerates an
+ * id, and before the guard those saves were written out silently. The client
+ * deletes obstacles by tile, not by id, so the player cannot see or clear it.
+ *
+ * De-duplicating on load makes those saves repair themselves: loadGame writes
+ * the cleaned dungeon straight back, so the very next save prices a list the
+ * guard accepts. First occurrence wins, for three reasons — it is the older,
+ * already-paid-for wall rather than the one the recycled counter produced; it
+ * leaves the layout the player has been looking at where it was instead of
+ * teleporting a wall to the newer tile; and it is stable, so loading twice
+ * converges on the same dungeon.
+ */
+function dedupeById(list) {
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    if (!item || typeof item.id !== "string" || seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
+/**
  * Version 1 carved corridors out of rock. Version 2 has no terrain, so the
  * grid is simply dropped — every placement sat on carved floor, and the
  * whole room is floor now, so all coordinates stay valid. Nobody loses a
@@ -814,6 +898,10 @@ class Server {
 
     if (dungeon) {
       if (!Array.isArray(dungeon.obstacles)) dungeon.obstacles = [];
+      // Alongside the coercions rather than after them: a stored duplicate
+      // obstacle id is exactly as unsaveable as a missing array, and the
+      // player has no way to clear one from inside the game. See dedupeById.
+      dungeon.obstacles = dedupeById(dungeon.obstacles);
       if (!Array.isArray(dungeon.minions)) dungeon.minions = [];
       if (!Array.isArray(dungeon.traps)) dungeon.traps = [];
       if (!Array.isArray(dungeon.rooms)) dungeon.rooms = [];
