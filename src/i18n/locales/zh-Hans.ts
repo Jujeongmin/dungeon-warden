@@ -241,6 +241,6 @@ export const zhHans: Record<StringKey, string> = {
   adv_ranger: "游侠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本地模式，不会保存。",
   rotate_hint: "请将设备竖起",
-  party_level: "Lv",
   result_champion: "击溃首领",
+  party_summary: "Lv{level} · {count}人",
 };

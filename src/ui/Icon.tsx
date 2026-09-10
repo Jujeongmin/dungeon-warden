@@ -20,6 +20,7 @@ export type IconName =
   | "settings"
   | "home"
   | "lock"
+  | "crown"
   | "chevronDown"
   | "chevronUp";
 
@@ -38,6 +39,9 @@ const PATHS: Record<IconName, string> = {
   home: "M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3z",
   // Shackle over a closed body.
   lock: "M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7z",
+  // Three peaks on a band. The party leader, at a size where a photograph
+  // of the model itself is a smudge: a flat glyph still reads at 12px.
+  crown: "M3 8l4 3 5-6 5 6 4-3-2 11H5L3 8zm2.6 13h12.8v2H5.6v-2z",
   chevronDown: "M6 9l6 6 6-6H6z",
   chevronUp: "M6 15l6-6 6 6H6z",
 };

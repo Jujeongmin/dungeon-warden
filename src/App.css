@@ -1570,6 +1570,30 @@ button.ad-gold {
   color: var(--accent);
 }
 
+.hud-foot .go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The party readout, under the verb. Quieter than the label above it - it
+   is what you are walking into, not the thing you are pressing. */
+.hud-foot .go-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-normal);
+  color: var(--ink);
+  opacity: 0.85;
+}
+
+/* The crown is the one thing in the line that is not a number, so it keeps
+   the torch colour while the numbers stay quiet. */
+.hud-foot .go-sub .icon { color: var(--accent); }
+
 .hud-foot .go:disabled { opacity: 0.45; }
 
 /* Five controls across a phone: let them shrink instead of pushing the last
@@ -1857,108 +1881,3 @@ button.ad-gold {
 }
 
 
-/* ---------------------------------------------------------------------------
-   The party, above the button that summons it.
-
-   A row of faces rather than a list of names. It sits in .hud-foot with the
-   raid button because that is the one place in the panel that never scrolls -
-   information about what you are about to do is worthless if it is above the
-   fold of a panel you have scrolled past.
-   --------------------------------------------------------------------------- */
-.party-preview {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  padding-bottom: 8px;
-  font-size: var(--fs-xs);
-  overflow: hidden;
-}
-
-.party-preview .face {
-  position: relative;
-  flex: none;
-  width: 3.3em;
-  height: 3.3em;
-  border-radius: 6px;
-  border: 1px solid var(--edge-dark);
-  background: var(--stone-deep);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-
-/* The figure, with the empty frame trimmed off.
-
-   Measured, the bake puts a 41x49 figure in the middle of a 96px canvas, so
-   the model is only 43% of the picture and the rest is air - drawn straight
-   into a 37px box that is eleven pixels of adventurer and every class looks
-   the same. Cropping tighter, to the head, does not work either: there are
-   about twelve source pixels of head, and magnifying twelve pixels gives
-   twelve bigger pixels.
-
-   So the whole figure is kept and only the air is cut. 165% with the anchor
-   at the measured centre (51%, 49%) lands the silhouette across ~85% of the
-   box, still downsampling from the source rather than stretching it - and a
-   silhouette is what separates a mage's robe and staff from a knight's
-   plate at this size. Not the face. Nothing is the face at this size.
-
-   Done here rather than in the bake because the same photographs feed the
-   toolbar, where the air around the object is what keeps a wall from
-   touching the edges of its button. */
-.party-preview .face img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 165%;
-  height: 165%;
-  object-fit: contain;
-  transform: translate(-51%, -49%);
-}
-
-.party-preview .letter {
-  font-weight: var(--fw-bold);
-  color: var(--muted);
-}
-
-/* The level rides the corner of the portrait rather than sitting beside it:
-   beside it, five faces and five numbers read as ten things. */
-.party-preview .lv {
-  position: absolute;
-  right: 1px;
-  bottom: 0;
-  padding: 0 2px;
-  border-radius: 3px;
-  background: rgba(12, 11, 9, 0.85);
-  font-size: var(--fs-2xs);
-  line-height: 1.3;
-  color: var(--ink);
-}
-
-/* Been here before. A notch of torchlight along the top edge - enough to
-   pick the returning faces out of the row, not enough to become a legend. */
-.party-preview .veteran {
-  border-top-color: rgba(232, 164, 76, 0.75);
-}
-
-/* The leader, marked the same way it is marked on the board: bigger. */
-.party-preview .champion {
-  width: 4.1em;
-  height: 4.1em;
-  border-color: rgba(232, 164, 76, 0.65);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.5),
-    0 0 10px rgba(232, 164, 76, 0.3);
-}
-
-.party-preview .champion .lv { color: var(--accent); }
-
-.party-preview .lead {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--accent);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-normal);
-}

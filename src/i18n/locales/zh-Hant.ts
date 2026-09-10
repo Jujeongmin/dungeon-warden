@@ -241,6 +241,6 @@ export const zhHant: Record<StringKey, string> = {
   adv_ranger: "遊俠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本機模式，不會保存。",
   rotate_hint: "請將裝置直立",
-  party_level: "Lv",
   result_champion: "擊潰首領",
+  party_summary: "Lv{level} · {count}人",
 };

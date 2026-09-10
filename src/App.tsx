@@ -33,7 +33,6 @@ import coinIcon from "./assets/icons/coin.svg";
 import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
-import { PartyPreview } from "./ui/PartyPreview";
 import { previewParty } from "./game/party";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
@@ -471,6 +470,27 @@ export default function App() {
     rendererRef.current?.setArena(arena, entrance, core);
   }, [arena, entrance, core]);
 
+  /*
+   * Who is coming, ticked rather than read during render.
+   *
+   * previewParty asks the clock: an adventurer regrouping after a raid
+   * becomes available at a moment nothing fires an event for, and calling
+   * Date.now() in the render body would make the component impure and the
+   * figures at the door silently stale. Five seconds is far finer than the
+   * regroup window and costs one array rebuild.
+   */
+  const [partyClock, setPartyClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (raid.raiding) return;
+    const id = window.setInterval(() => setPartyClock(Date.now()), 5000);
+    return () => window.clearInterval(id);
+  }, [raid.raiding]);
+
+  const nextParty = useMemo(
+    () => (meta ? previewParty(adventurers, meta.threat, partyClock) : []),
+    [adventurers, meta, partyClock],
+  );
+
   // During a raid the simulation owns the units; otherwise the placed roster is
   // shown so the player can see what they built.
   const units: UnitView[] = useMemo(() => {
@@ -842,27 +862,6 @@ export default function App() {
       ? null
       : teaching?.target ?? null;
   const spotlight = useSpotlight(pointer, locateTile);
-
-  /*
-   * Who is coming, ticked rather than read during render.
-   *
-   * previewParty asks the clock: an adventurer regrouping after a raid
-   * becomes available at a moment nothing fires an event for, and calling
-   * Date.now() in the render body makes the component impure and the row
-   * silently stale. Five seconds is far finer than the regroup window and
-   * costs one array rebuild.
-   */
-  const [partyClock, setPartyClock] = useState(() => Date.now());
-  useEffect(() => {
-    if (raid.raiding) return;
-    const id = window.setInterval(() => setPartyClock(Date.now()), 5000);
-    return () => window.clearInterval(id);
-  }, [raid.raiding]);
-
-  const nextParty = useMemo(
-    () => (meta ? previewParty(adventurers, meta.threat, partyClock) : []),
-    [adventurers, meta, partyClock],
-  );
 
   const toolHint = (() => {
     if (raid.pendingSkill)
@@ -1305,9 +1304,6 @@ export default function App() {
             inside it the button that starts the game scrolled off the bottom
             of the phone behind fifteen other controls. */}
         <div className="hud-foot">
-          {/* Directly above the button that summons them, so the answer to
-              "what am I about to press" is in the same glance as the press. */}
-          {!raid.raiding && <PartyPreview party={nextParty} icons={toolIcons} />}
           {/*
             * One button, doing whatever comes next.
             *
@@ -1336,6 +1332,31 @@ export default function App() {
               : hasUnsaved
                 ? `${t("save_now")} −${pendingCost}`
                 : t("start_raid")}
+
+            {/*
+              * Who is about to walk in, on the button that lets them in.
+              *
+              * This was a row of model photographs above the button, and it
+              * was wrong twice: an adventurer rendered at 37px is a smudge
+              * that identifies nothing, and the row cost 49px of a panel
+              * whose contents already had to scroll - so it hid the dungeon
+              * in order to show nothing. Standing them on the board instead
+              * was no better: a unit is about 20px tall on a phone.
+              *
+              * What the player actually needs before pressing is two numbers
+              * and one fact - how strong, how many, and whether it is led.
+              * Numbers survive being small. The crown is a flat glyph rather
+              * than a render, for the same reason.
+              */}
+            {!hasUnsaved && !raid.starting && nextParty.length > 0 && (
+              <span className="go-sub">
+                {nextParty.some((m) => m.champion) && <Icon name="crown" size={13} />}
+                {t("party_summary", {
+                  level: Math.max(...nextParty.map((m) => m.level)),
+                  count: nextParty.length,
+                })}
+              </span>
+            )}
           </button>
         </div>
       </aside>

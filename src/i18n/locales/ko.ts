@@ -253,6 +253,6 @@ export const ko = {
   adv_ranger: "레인저",
   banner_offline: "VITE_AGENT8_VERSE 없음 — 로컬 모드, 미저장.",
   rotate_hint: "세로로 돌려주세요",
-  party_level: "Lv",
   result_champion: "우두머리 격파",
+  party_summary: "Lv{level} · {count}명",
 };
