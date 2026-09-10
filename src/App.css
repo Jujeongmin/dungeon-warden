@@ -155,9 +155,19 @@ h3.section {
   user-select: none;
 }
 
-.topbar {
+/* One absolutely-positioned column holding all of the top chrome. Its
+   children are in flow, so none of them needs to know how tall the one above
+   it happens to be - which is what broke when the bar started scaling. */
+.topdock {
   position: absolute;
   inset: 0 0 auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -361,10 +371,7 @@ h3.section {
 }
 
 .topstack {
-  position: absolute;
-  top: 52px;
-  left: 16px;
-  right: 16px;
+  padding: 0 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -732,14 +739,17 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
   overflow-y: auto;
 }
 
+/* Below the stack rather than beside it, which is where it already ended up
+   on screen - so the width the bar above had to reserve for it was reserved
+   against nothing. */
 .skillbar {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
+  align-self: flex-end;
+  margin-right: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 150px;
+  pointer-events: auto;
 }
 
 .skill {
@@ -1056,11 +1066,7 @@ button.primary {
 
 .legend { display: none; }
 
-.topstack {
-  top: 46px;
-  left: 8px;
-  right: 8px;
-}
+.topstack { padding: 0 8px; }
 
 .tutorial {
   align-self: stretch;
@@ -1077,18 +1083,13 @@ button.primary {
 .brand span { display: none; }
 
 .skillbar {
-  right: 8px;
-  bottom: auto;
-  top: 96px;
+  margin-right: 8px;
   width: 116px;
 }
 
 .raid-bar {
   align-self: stretch;
-  /* Kept narrower than the stack so it can never grow under the skillbar,
-     which sits at a fixed spot to its right — however tall a banner above
-     pushes this bar down. What doesn't fit scrolls (already overflow-x). */
-  max-width: calc(100% - 124px);
+  /* What doesn't fit scrolls; it is already overflow-x. */
   gap: 8px;
   font-size: var(--fs-2xs);
   justify-content: space-between;
@@ -1435,10 +1436,8 @@ button.primary {
 
 /* 2 — the chrome around the room. These do not overlap each other; they are
    named together so the layer they share is deliberate. */
-.topbar,
-.topstack,
-.hud,
-.skillbar { z-index: 2; }
+.topdock,
+.hud { z-index: 2; }
 
 /* 2.5 — the tutorial's ring, which has to sit over the control it is pointing
    at. It takes no clicks, so being on top costs nothing. */
@@ -1470,14 +1469,6 @@ button.primary {
    while it shows. */
 .rotate-guard { z-index: 50; }
 
-/* The one place two same-layer pieces of chrome can reach each other: during
-   a raid the skill buttons are pinned to the right of the top stack, and a
-   banner in that stack is full width. The raid bar already reserves the gap;
-   this extends it to whatever else the stack is holding. */
-.topstack.raiding > * {
-  align-self: flex-start;
-  max-width: calc(100% - 124px);
-}
 
 /* Watching an ad for gold is an offer, not a control the game needs — marked
    in the gold it pays out rather than in the torch colour that means "this is
@@ -1933,7 +1924,19 @@ button.ad-gold {
   background: linear-gradient(180deg, #2b241c, #1b1610);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--edge-lit);
   white-space: nowrap;
-  animation: panel-fade 120ms ease-out;
+  /* Its own keyframes, not the shared panel-fade.
+
+     panel-fade ends at `transform: none`, and an animation owns the whole
+     property for its duration - so for 120ms the centring translate was
+     simply gone and the prompt was drawn half its own width to the right of
+     the cursor, then jumped left when the animation finished. It has to fade
+     in without ever letting go of the offset that positions it. */
+  animation: prompt-in 120ms ease-out;
+}
+
+@keyframes prompt-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 10px); }
 }
 
 .tile-prompt b {

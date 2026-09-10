@@ -1007,6 +1007,19 @@ export default function App() {
         ))}
       </div>
 
+      {/*
+        * The top chrome as one column, rather than three things pinned at
+        * three guessed offsets.
+        *
+        * The stack used to start at a hardcoded 46px and the skill buttons at
+        * 96px, which held only while the bar above them was exactly the
+        * height those numbers were measured against. The moment the bar's
+        * padding started scaling with the stage it outgrew them: at a 534px
+        * stage the bar is 73px tall and the stack was still starting at 46,
+        * so a banner or the raid readout was drawn under the gold and the
+        * icons. Laid out in flow, the offsets cannot be wrong.
+        */}
+      <div className="topdock">
       <header className="topbar">
         <div className="brand">DUNGEON WARDEN</div>
         <div className="stats">
@@ -1180,6 +1193,7 @@ export default function App() {
           )}
         </div>
       )}
+      </div>
 
       {/* Drawn over the control the tutorial is talking about, measured from
           outside it — see useSpotlight. Takes no clicks, so the thing it is
