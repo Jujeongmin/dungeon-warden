@@ -9,7 +9,7 @@ import type {
   TrapType,
   WardenSkill,
 } from "../types";
-import { minionStatsFor, scaledAdventurer } from "./units";
+import { minionStatsFor, partyMemberStats, scaledAdventurer } from "./units";
 import {
   BLESSING_HEAL,
   BLESSING_SHIELD,
@@ -113,6 +113,8 @@ export interface SimAdventurer {
   fate: "none" | "killed" | "captured";
   action: SimAction;
   facing: number;
+  /** Leads the party: tougher, worth more, drawn larger. Set once, at spawn. */
+  champion: boolean;
   /** This adventurer's own route. A falling wall changes it for everyone. */
   path: Point[];
   /** True while walking a route that runs through obstacles it must break. */
@@ -276,12 +278,13 @@ export class RaidSim {
 
     const start = options.entrance;
     this.adventurers = options.party.map((member, index) => {
-      const stats = scaledAdventurer(member.cls, member.level);
+      const stats = partyMemberStats(member.cls, member.level, member.champion);
       return {
         id: member.id,
         cls: member.cls,
         name: member.name,
         level: member.level,
+        champion: member.champion === true,
         x: start.x,
         y: start.y,
         hp: stats.hp,
@@ -815,7 +818,7 @@ export class RaidSim {
     for (const adventurer of this.adventurers) {
       if (!adventurer.alive || !adventurer.spawned || adventurer.downed > 0) continue;
 
-      const stats = scaledAdventurer(adventurer.cls, adventurer.level);
+      const stats = partyMemberStats(adventurer.cls, adventurer.level, adventurer.champion);
       adventurer.cooldown = Math.max(0, adventurer.cooldown - SIM_DT);
 
       /*

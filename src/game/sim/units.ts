@@ -1,4 +1,10 @@
-import { LOOT_DAMAGE_BONUS, type AdventurerClass, type MinionType } from "../types";
+import {
+  CHAMPION_DAMAGE_SCALE,
+  CHAMPION_HP_SCALE,
+  LOOT_DAMAGE_BONUS,
+  type AdventurerClass,
+  type MinionType,
+} from "../types";
 
 export interface MinionStats {
   hp: number;
@@ -113,6 +119,28 @@ function convertStats(cls: AdventurerClass, level: number): MinionStats {
     // A turned knight keeps everything else it had, but not a reach that would
     // leave it useless the moment it is not the thing in the way.
     range: Math.max(stats.range, MIN_REACH),
+  };
+}
+
+/**
+ * A party member as it actually arrives: level scaling, then the leader bonus.
+ *
+ * Kept apart from scaledAdventurer because the champion bonus is a property
+ * of one raid, not of the adventurer - the same person leads one party and
+ * follows in the next, and the roster record must not carry the multiplier
+ * around with it.
+ */
+export function partyMemberStats(
+  cls: AdventurerClass,
+  level: number,
+  champion = false,
+): AdventurerStats {
+  const stats = scaledAdventurer(cls, level);
+  if (!champion) return stats;
+  return {
+    ...stats,
+    hp: Math.round(stats.hp * CHAMPION_HP_SCALE),
+    damage: Math.round(stats.damage * CHAMPION_DAMAGE_SCALE),
   };
 }
 

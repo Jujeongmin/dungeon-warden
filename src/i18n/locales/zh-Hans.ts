@@ -47,7 +47,7 @@ export const zhHans: Record<StringKey, string> = {
   tier_reached: "{name}找到了你的地下城",
   stat_unsaved: "未保存",
   save_now: "立即保存",
-  start_raid: "开始入侵",
+  start_raid: "开始防守",
   preparing: "准备中…",
   unsaved_changes: "有尚未保存的更改。",
   hover_hint: "把光标移到格子上看看",
@@ -241,4 +241,6 @@ export const zhHans: Record<StringKey, string> = {
   adv_ranger: "游侠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本地模式，不会保存。",
   rotate_hint: "请将设备竖起",
+  party_level: "Lv",
+  result_champion: "击溃首领",
 };

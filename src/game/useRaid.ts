@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { RaidSim, SIM_DT, type RaidState, type SimEvent } from "./sim/RaidSim";
 import { lureTiles } from "./rooms";
+import { previewParty } from "./party";
 import { SKILL_STATS } from "./sim/traps";
 import type { Arena } from "./arena";
 import type { ResearchEffects } from "./research";
@@ -247,11 +248,14 @@ export function useRaid({
         start = await server.remoteFunction("startRaid", []);
       } else {
         // Offline preview so the raid loop is playable before the first deploy.
+        // Built from the same mirror the party row draws, so what walks in is
+        // what was shown - a single hardcoded knight made every offline raid
+        // identical no matter how loud the dungeon had become.
         start = {
           raidId: "local",
           seed: 1,
           threat: meta.threat,
-          party: [{ id: "adv-0", cls: "knight", name: "Aldric", level: 1 }],
+          party: previewParty([], meta.threat, Date.now()),
           availableMinionIds: minions.map((m) => m.id),
           jailFree,
         };

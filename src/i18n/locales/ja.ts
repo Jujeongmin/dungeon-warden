@@ -52,7 +52,7 @@ export const ja: Record<StringKey, string> = {
   tier_reached: "{name}がダンジョンを見つけました",
   stat_unsaved: "未保存",
   save_now: "保存する",
-  start_raid: "襲撃開始",
+  start_raid: "防衛開始",
   preparing: "準備中…",
   unsaved_changes: "保存していない変更があります。",
   hover_hint: "タイルにカーソルを合わせてください",
@@ -246,4 +246,6 @@ export const ja: Record<StringKey, string> = {
   adv_ranger: "レンジャー",
   banner_offline: "VITE_AGENT8_VERSE がありません — ローカルモード、未保存。",
   rotate_hint: "端末を縦向きにしてください",
+  party_level: "Lv",
+  result_champion: "頭目を倒した",
 };

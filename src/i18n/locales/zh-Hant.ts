@@ -47,7 +47,7 @@ export const zhHant: Record<StringKey, string> = {
   tier_reached: "{name}找到了你的地城",
   stat_unsaved: "未儲存",
   save_now: "立即儲存",
-  start_raid: "開始入侵",
+  start_raid: "開始防守",
   preparing: "準備中…",
   unsaved_changes: "有尚未儲存的變更。",
   hover_hint: "把游標移到格子上看看",
@@ -241,4 +241,6 @@ export const zhHant: Record<StringKey, string> = {
   adv_ranger: "遊俠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本機模式，不會保存。",
   rotate_hint: "請將裝置直立",
+  party_level: "Lv",
+  result_champion: "擊潰首領",
 };

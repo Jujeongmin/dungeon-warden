@@ -65,8 +65,13 @@ export function ResultDialog({ result, onClose }: Props) {
           </div>
         )}
 
-        {(captured.length > 0 || loot.length > 0) && (
+        {(captured.length > 0 || loot.length > 0 || result.championStopped) && (
           <div className="spoils">
+            {/* First in the row: it is the biggest single thing that can
+                happen in a raid, and it carries its own bounty. */}
+            {result.championStopped && (
+              <span className="chip champion">{t("result_champion")}</span>
+            )}
             {captured.map((name) => (
               <span key={`c-${name}`} className="chip captured">
                 {t("result_captured")} · {name}

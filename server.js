@@ -239,6 +239,18 @@ function decayThreat(dungeon, now) {
 const RAID_BASE_REWARD = 35;
 const RAID_REWARD_PER_KILL = 25;
 const RAID_BREACH_REWARD_PER_KILL = 8;
+
+/**
+ * Threat at which the party starts arriving with a leader, and what stopping
+ * that leader is worth on top of the usual per-head bounty.
+ *
+ * Mirrored in src/game/types.ts (CHAMPION_THREAT) and src/game/party.ts,
+ * which shows the player who is coming before the raid opens. The scales the
+ * champion actually fights at live client-side with the rest of the combat
+ * numbers; only the payout is decided here, where it cannot be invented.
+ */
+const CHAMPION_THREAT = 9;
+const RAID_CHAMPION_REWARD = 60;
 const RAID_PLUNDER_RATE = 0.15;
 const RAID_PLUNDER_CAP = 120;
 
@@ -529,6 +541,10 @@ function pickParty(dungeon, threat, now) {
   ready.sort((a, b) => b.level - a.level);
   const party = ready.slice(0, size);
 
+  // The party is sorted by level, so its leader is the strongest thing the
+  // town can field - which is exactly who should be wearing the crown.
+  const champion = threat >= CHAMPION_THREAT && party.length > 0 ? party[0].id : null;
+
   for (const member of party) member.state = "raiding";
   dungeon.adventurers = roster;
 
@@ -537,6 +553,7 @@ function pickParty(dungeon, threat, now) {
     cls: member.cls,
     name: member.name,
     level: member.level,
+    champion: member.id === champion,
   }));
 }
 
@@ -1346,6 +1363,15 @@ class Server {
 
     const kills = killedList.length + captured.length;
 
+    // Stopping the leader is the whole point of the raid it leads, so it pays
+    // whether it was killed or taken - and it pays on a breach too, because a
+    // party that got through having lost its champion is still a party that
+    // lost its champion.
+    const championId = ((pending.party || []).find((m) => m.champion) || {}).id || null;
+    const championStopped =
+      championId !== null &&
+      (killedList.indexOf(championId) !== -1 || captured.indexOf(championId) !== -1);
+
     let reward = 0;
     let plundered = 0;
 
@@ -1355,11 +1381,15 @@ class Server {
 
     if (outcome === "repelled") {
       reward = RAID_BASE_REWARD + RAID_REWARD_PER_KILL * kills;
+      if (championStopped) reward += RAID_CHAMPION_REWARD;
       // Treasuries pay out only when the loot is successfully defended.
       reward += TREASURY_REWARD * effects.treasuryCount;
       reward = Math.round(reward * threatBonus);
     } else {
-      reward = Math.round(RAID_BREACH_REWARD_PER_KILL * kills * threatBonus);
+      reward = Math.round(
+        (RAID_BREACH_REWARD_PER_KILL * kills + (championStopped ? RAID_CHAMPION_REWARD : 0)) *
+          threatBonus,
+      );
       const gold = await $asset.get("gold");
       const rate = RAID_PLUNDER_RATE * effects.plunderScale;
       plundered = Math.min(Math.floor(gold * rate), RAID_PLUNDER_CAP);
@@ -1443,6 +1473,7 @@ class Server {
     return {
       outcome,
       reward,
+      championStopped,
       plundered,
       gold: await $asset.get("gold"),
       threat,

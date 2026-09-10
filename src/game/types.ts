@@ -135,11 +135,47 @@ export const ADVENTURER_LABEL: Record<AdventurerClass, StringKey> = {
   ranger: "adv_ranger",
 };
 
+/**
+ * The order classes join the roster in as threat rises, so a new dungeon only
+ * ever faces knights. Mirrored from `ADVENTURER_CLASSES` in server.js.
+ */
+export const ADVENTURER_CLASSES: AdventurerClass[] = [
+  "knight", "barbarian", "rogue", "ranger", "mage",
+];
+
+/**
+ * Threat at which the party starts arriving with a leader.
+ *
+ * This is the `tier_company` milestone, deliberately: the tiers already
+ * existed and already changed the party, but they changed it by adding a
+ * fourth identical figure to a line of three. Nothing on screen said the
+ * dungeon had graduated. A champion says it in one look.
+ *
+ * Mirrored in server.js.
+ */
+export const CHAMPION_THREAT = 9;
+
+/**
+ * What leading the party is worth.
+ *
+ * Enough health that it outlives the grunts behind it and has to be dealt
+ * with on purpose, and only a modest damage bump - a champion that also hit
+ * like two adventurers would delete a blocker before the traps ever fired.
+ * Mirrored in server.js, which pays the bounty.
+ */
+export const CHAMPION_HP_SCALE = 2.4;
+
+/** How much larger the champion is drawn. The only thing that marks it. */
+export const CHAMPION_MODEL_SCALE = 1.35;
+export const CHAMPION_DAMAGE_SCALE = 1.35;
+
 export interface PartyMember {
   id: string;
   cls: AdventurerClass;
   name: string;
   level: number;
+  /** Leads the party: tougher, worth more, and drawn larger. */
+  champion?: boolean;
 }
 
 export interface Dungeon {
@@ -198,6 +234,8 @@ export interface RaidFinishResult {
   lootGained?: LootItem[];
   prisoners?: Prisoner[];
   capturedNames?: string[];
+  /** The party leader was killed or taken. Paid a bounty, and worth saying. */
+  championStopped?: boolean;
   adventurers?: AdventurerRecord[];
   /** Offline preview result: counters are not real and are hidden. */
   local?: boolean;

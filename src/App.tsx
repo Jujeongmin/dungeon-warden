@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DungeonRenderer, type UnitView, type MarkerView, type ObstacleView } from "./game/DungeonRenderer";
+import {
+  DungeonRenderer,
+  type MarkerView,
+  type ObstacleView,
+  type UnitView,
+} from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
@@ -28,8 +33,13 @@ import coinIcon from "./assets/icons/coin.svg";
 import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
+import { PartyPreview } from "./ui/PartyPreview";
+import { previewParty } from "./game/party";
+import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
 import {
+  ADVENTURER_CLASSES,
+  CHAMPION_MODEL_SCALE,
   MAX_ROOMS,
   MAX_TRAPS,
   MINION_COST,
@@ -111,6 +121,14 @@ const TOOL_MODEL: Record<string, string | null> = {
 };
 
 const TOOL_MODEL_KEYS = Object.values(TOOL_MODEL).filter((k): k is string => k !== null);
+
+/**
+ * The five adventurer models, photographed for the party row.
+ *
+ * Baked from the same pack the raid draws, so the face above the raid button
+ * is the figure that walks in when it is pressed.
+ */
+const PARTY_MODEL_KEYS = ADVENTURER_CLASSES.map((cls) => `a_${cls}`);
 
 const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
   { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
@@ -248,15 +266,44 @@ export default function App() {
   >([]);
   const floaterSeq = useRef(0);
 
+  /**
+   * The raid, recorded while it happens.
+   *
+   * A ref rather than state on purpose: this is written from the event drain
+   * many times a second and read exactly twice - once when the raid ends, to
+   * paint the map, and once when the next one starts, to wipe it. Putting it
+   * in state would re-render the tree on every arrow hit for a picture that
+   * is not drawn until the fighting stops.
+   */
+  const aftermathRef = useRef<RaidTally>(emptyTally());
+
+  /**
+   * Whether the board is showing the last raid or the next one.
+   *
+   * Both are painted on the same floor and they answer different questions -
+   * "where were they hurt" and "where will they walk" - so drawn together the
+   * cool end of the record is indistinguishable from the route and neither
+   * reads. The record wins from the moment the fighting stops until the
+   * player touches the dungeon, which is exactly when their attention moves
+   * from what happened to what happens next.
+   */
+  const [showAftermath, setShowAftermath] = useState(false);
+
   const onSimEvents = useCallback((events: SimEvent[]) => {
     const renderer = rendererRef.current;
     if (!renderer) return;
+
+    // Accumulated as it happens rather than replayed afterwards: the events
+    // are drained per frame and nobody keeps them, so this is the only place
+    // the raid can be recorded at all.
+    recordEvents(aftermathRef.current, events);
 
     const added: Array<{ id: number; text: string; x: number; y: number; kind: string }> = [];
 
     for (const event of events) {
       if (event.kind === "damage") {
         renderer.flashUnit(`a:${event.targetId}`);
+
         // Burn ticks every frame; showing each one would be a wall of 1s.
         if (event.source === "burn" || event.amount < 1) continue;
 
@@ -385,7 +432,15 @@ export default function App() {
     else ok = save.placeRoom(tool.type, x, y);
 
     if (!ok) audio.play("error");
-    else audio.play("place");
+    else {
+      audio.play("place");
+      // Building is the answer to the map, so the map steps aside for the
+      // route the change just altered.
+      if (showAftermath) {
+        setShowAftermath(false);
+        rendererRef.current?.setAftermath(null);
+      }
+    }
   };
 
   useEffect(() => {
@@ -401,7 +456,7 @@ export default function App() {
     // keeps its labels and nothing else changes.
     let alive = true;
     void renderer
-      .bakeToolIcons(TOOL_MODEL_KEYS)
+      .bakeToolIcons([...TOOL_MODEL_KEYS, ...PARTY_MODEL_KEYS])
       .then((icons) => { if (alive) setToolIcons(icons); })
       .catch(() => {});
 
@@ -437,6 +492,10 @@ export default function App() {
         live.push({
           id: `a:${a.id}`, x: a.x, y: a.y, kind: `a_${a.cls}`, hp: a.hp, maxHp: a.maxHp,
           action: a.action, facing: a.facing,
+          // The champion is announced by being bigger than everyone else on
+          // the board. No label, no crown model to source - a head taller is
+          // a thing every player reads without being taught it.
+          scale: a.champion ? CHAMPION_MODEL_SCALE : undefined,
         });
       }
       return live;
@@ -600,7 +659,7 @@ export default function App() {
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
   useEffect(() => {
-    if (!meta || raid.raiding) {
+    if (!meta || raid.raiding || showAftermath) {
       rendererRef.current?.setPathPreview(null);
       return;
     }
@@ -615,7 +674,37 @@ export default function App() {
         new Set([...terrain, ...blockedSet(arena, [...obstacles, ...minions])]),
       ),
     );
-  }, [arena, entrance, core, terrain, obstacles, minions, meta, rooms, raid.raiding]);
+  }, [arena, entrance, core, terrain, obstacles, minions, meta, rooms, raid.raiding, showAftermath]);
+
+  /**
+   * Paint the aftermath when the fighting stops; wipe it when it starts again.
+   *
+   * Driven off `raid.raiding` rather than off the result, because the result
+   * arrives from the server and the map is the client's own record - it has
+   * to appear even on the offline preview, and it has to survive the player
+   * dismissing the settlement screen, which is the moment they actually start
+   * looking at the board.
+   *
+   * It then stays until the next raid opens. Editing does not clear it: the
+   * map is the reason to edit, and rebuilding a corridor with the record of
+   * why still under it is the entire point.
+   */
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    if (raid.raiding) {
+      aftermathRef.current = emptyTally();
+      renderer.setAftermath(null);
+      setShowAftermath(false);
+      return;
+    }
+
+    const cells = tallyCells(aftermathRef.current);
+    if (!cells) return;
+    renderer.setAftermath(cells, aftermathRef.current.marks);
+    setShowAftermath(true);
+  }, [raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
@@ -753,6 +842,27 @@ export default function App() {
       ? null
       : teaching?.target ?? null;
   const spotlight = useSpotlight(pointer, locateTile);
+
+  /*
+   * Who is coming, ticked rather than read during render.
+   *
+   * previewParty asks the clock: an adventurer regrouping after a raid
+   * becomes available at a moment nothing fires an event for, and calling
+   * Date.now() in the render body makes the component impure and the row
+   * silently stale. Five seconds is far finer than the regroup window and
+   * costs one array rebuild.
+   */
+  const [partyClock, setPartyClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (raid.raiding) return;
+    const id = window.setInterval(() => setPartyClock(Date.now()), 5000);
+    return () => window.clearInterval(id);
+  }, [raid.raiding]);
+
+  const nextParty = useMemo(
+    () => (meta ? previewParty(adventurers, meta.threat, partyClock) : []),
+    [adventurers, meta, partyClock],
+  );
 
   const toolHint = (() => {
     if (raid.pendingSkill)
@@ -1195,6 +1305,9 @@ export default function App() {
             inside it the button that starts the game scrolled off the bottom
             of the phone behind fifteen other controls. */}
         <div className="hud-foot">
+          {/* Directly above the button that summons them, so the answer to
+              "what am I about to press" is in the same glance as the press. */}
+          {!raid.raiding && <PartyPreview party={nextParty} icons={toolIcons} />}
           {/*
             * One button, doing whatever comes next.
             *

@@ -46,7 +46,7 @@ export const en: Record<StringKey, string> = {
   tier_reached: "The {name} have found your dungeon",
   stat_unsaved: "Unsaved",
   save_now: "Save now",
-  start_raid: "Start raid",
+  start_raid: "Begin defense",
   preparing: "Preparing…",
   unsaved_changes: "You have unsaved changes.",
   hover_hint: "Hover a tile to inspect it",
@@ -240,4 +240,6 @@ export const en: Record<StringKey, string> = {
   adv_ranger: "Ranger",
   banner_offline: "Missing VITE_AGENT8_VERSE — local mode, unsaved.",
   rotate_hint: "Turn your device upright",
+  party_level: "Lv",
+  result_champion: "Champion stopped",
 };

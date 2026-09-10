@@ -49,7 +49,7 @@ export const ko = {
   tier_reached: "{name}이 던전을 찾아냈습니다",
   stat_unsaved: "미저장",
   save_now: "지금 저장",
-  start_raid: "침입 시작",
+  start_raid: "방어 시작",
   preparing: "준비 중…",
   unsaved_changes: "저장하지 않은 변경이 있습니다.",
   hover_hint: "타일 위에 커서를 올려보세요",
@@ -253,4 +253,6 @@ export const ko = {
   adv_ranger: "레인저",
   banner_offline: "VITE_AGENT8_VERSE 없음 — 로컬 모드, 미저장.",
   rotate_hint: "세로로 돌려주세요",
+  party_level: "Lv",
+  result_champion: "우두머리 격파",
 };
