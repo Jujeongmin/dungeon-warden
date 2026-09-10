@@ -460,15 +460,63 @@ h3.section:first-child { margin-top: 2px; }
   backdrop-filter: blur(8px);
 }
 
-.tutorial-head {
+/* One row: how far along, what to do, and a way out. The step used to be a
+   heading with a paragraph under it, which is two lines of prose to say what
+   the ring below now says by pointing. */
+.tutorial {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
-.tutorial-head b { color: var(--accent); font-size: var(--fs-sm); }
-.tutorial p { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
+.tutorial-count {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(232, 164, 76, 0.16);
+  color: var(--accent);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tutorial p {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.tutorial .icon-btn { flex: none; }
+
+/* The ring the tutorial points with.
+ *
+ * Drawn over the control rather than inside it, so no button has to know the
+ * tutorial exists. It must never take a click — the whole point is that the
+ * thing under it is the thing you press. */
+.spotlight {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px var(--torch),
+    0 0 0 6px rgba(232, 164, 76, 0.22),
+    0 0 22px rgba(232, 164, 76, 0.45);
+  animation: spotlight-pulse 1.5s ease-in-out infinite;
+}
+
+.spotlight.tile { border-radius: 50%; }
+
+@keyframes spotlight-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight { animation: none; }
+}
 
 .rank-submit {
   display: flex;
@@ -1314,6 +1362,10 @@ button.primary {
 .topstack,
 .hud,
 .skillbar { z-index: 2; }
+
+/* 2.5 — the tutorial's ring, which has to sit over the control it is pointing
+   at. It takes no clicks, so being on top costs nothing. */
+.spotlight { z-index: 3; }
 
 /* 3 — the title screen. It stands in front of the room, but it is still a
    screen with buttons on it, and the settings, leaderboard and shop open from

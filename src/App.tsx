@@ -9,7 +9,7 @@ import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
 import { blockedSet, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
-import { TUTORIAL, currentStep } from "./game/tutorial";
+import { TUTORIAL, guideFor } from "./game/tutorial";
 import { audio } from "./game/audio";
 import type { SimEvent } from "./game/sim/RaidSim";
 import { installDevTools } from "./game/devtools";
@@ -20,6 +20,7 @@ import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
 import { ResultDialog } from "./ui/ResultDialog";
 import { useCountUp } from "./ui/useCountUp";
+import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
 import { translate, type StringKey } from "./i18n/strings";
@@ -192,6 +193,18 @@ export default function App() {
     isOffline,
   } = save;
 
+  /*
+   * The two fixed tiles, derived — never read out of the save.
+   *
+   * The server derives them too, from the same research list, so the copy it
+   * sends back is only ever a chance for the two sides to disagree. They did:
+   * the renderer computed them while the tutorial and the placement rules read
+   * the save's pair, and against a save written by an older layout the ring
+   * pointed at one tile while the board drew the entrance at another.
+   */
+  const entrance = useMemo(() => entranceOf(arena), [arena]);
+  const core = useMemo(() => coreOf(arena), [arena]);
+
   /**
    * Floating damage numbers.
    *
@@ -342,8 +355,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    rendererRef.current?.setArena(arena, entranceOf(arena), coreOf(arena));
-  }, [arena]);
+    rendererRef.current?.setArena(arena, entrance, core);
+  }, [arena, entrance, core]);
 
   // During a raid the simulation owns the units; otherwise the placed roster is
   // shown so the player can see what they built.
@@ -433,8 +446,8 @@ export default function App() {
   const ghostLegal = useCallback(
     (x: number, y: number): boolean => {
       if (!meta || !inArena(arena, x, y)) return false;
-      if (x === meta.entrance.x && y === meta.entrance.y) return false;
-      if (x === meta.core.x && y === meta.core.y) return false;
+      if (x === entrance.x && y === entrance.y) return false;
+      if (x === core.x && y === core.y) return false;
 
       const taken = (tx: number, ty: number) =>
         obstacles.some((o) => o.x === tx && o.y === ty) ||
@@ -449,14 +462,14 @@ export default function App() {
           (tile) =>
             inArena(arena, tile.x, tile.y) &&
             !taken(tile.x, tile.y) &&
-            !(tile.x === meta.entrance.x && tile.y === meta.entrance.y) &&
-            !(tile.x === meta.core.x && tile.y === meta.core.y),
+            !(tile.x === entrance.x && tile.y === entrance.y) &&
+            !(tile.x === core.x && tile.y === core.y),
         );
       }
 
       return !taken(x, y);
     },
-    [arena, meta, obstacles, minions, traps, rooms, tool],
+    [arena, entrance, core, meta, obstacles, minions, traps, rooms, tool],
   );
 
   useEffect(() => {
@@ -513,9 +526,9 @@ export default function App() {
       return;
     }
     rendererRef.current?.setPathPreview(
-      buildRaidPath(arena, meta.entrance, meta.core, lureTiles(rooms), blockedSet(arena, obstacles)),
+      buildRaidPath(arena, entrance, core, lureTiles(rooms), blockedSet(arena, obstacles)),
     );
-  }, [arena, obstacles, meta, rooms, raid.raiding]);
+  }, [arena, entrance, core, obstacles, meta, rooms, raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
@@ -590,18 +603,45 @@ export default function App() {
   // of the pop says whether the change was earned or spent.
   const purse = useCountUp(gold);
 
-  const stepIndex = currentStep({
+  const guide = guideFor({
     obstacles,
-    entrance: meta?.entrance ?? null,
-    core: meta?.core ?? null,
+    entrance,
+    core,
     minions,
     traps,
     hasUnsaved,
     wavesRepelled: meta?.wavesRepelled ?? 0,
     coreBreaches: meta?.coreBreaches ?? 0,
+    toolId,
   });
-  const step =
-    settings.tutorialDone || stepIndex >= TUTORIAL.length ? null : TUTORIAL[stepIndex];
+  // The tutorial is dismissed for good, finished, or out of the way while a
+  // raid plays — there is nothing to do during one but watch.
+  const teaching = settings.tutorialDone || raid.raiding ? null : guide;
+
+  /** Where a board tile is on screen, so the ring can sit on one. */
+  const locateTile = useCallback((x: number, y: number) => {
+    const point = rendererRef.current?.project(x, y, 0.12);
+    const canvas = canvasRef.current;
+    if (!point || !canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const size = 44;
+    return {
+      left: rect.left + point.x - size / 2,
+      top: rect.top + point.y - size / 2,
+      width: size,
+      height: size,
+    };
+  }, []);
+
+  // A suggested tile the player has already built on is not a suggestion any
+  // more, so the pointer is dropped rather than sending them somewhere the tap
+  // will be refused.
+  const pointer =
+    teaching?.target?.kind === "tile" && !ghostLegal(teaching.target.x, teaching.target.y)
+      ? null
+      : teaching?.target ?? null;
+  const spotlight = useSpotlight(pointer, locateTile);
 
   const toolHint = (() => {
     if (raid.pendingSkill)
@@ -690,19 +730,22 @@ export default function App() {
           </div>
         )}
 
-        {step && !raid.raiding && (
-          <div key={step.id} className="tutorial">
-            <div className="tutorial-head">
-              <b>{stepIndex + 1}/{TUTORIAL.length} · {t(step.title as StringKey)}</b>
-              <button
-                className="icon-btn"
-                onClick={() => patchSettings({ tutorialDone: true })}
-                aria-label="close"
-              >
-                ×
-              </button>
-            </div>
-            <p>{t(step.body as StringKey)}</p>
+        {/* One line and a count. The ring below says where; this only has to
+            say what, and the two together are shorter than the sentence they
+            replaced. */}
+        {teaching && (
+          <div key={teaching.hint} className="tutorial">
+            <b className="tutorial-count">
+              {teaching.index + 1}/{TUTORIAL.length}
+            </b>
+            <p>{t(teaching.hint as StringKey)}</p>
+            <button
+              className="icon-btn"
+              onClick={() => patchSettings({ tutorialDone: true })}
+              aria-label="close"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -758,6 +801,23 @@ export default function App() {
         </div>
       )}
 
+      {/* Drawn over the control the tutorial is talking about, measured from
+          outside it — see useSpotlight. Takes no clicks, so the thing it is
+          pointing at is still the thing you press. */}
+      {spotlight && (
+        <div
+          // A ring on the floor is round; a ring on a button follows the
+          // button.
+          className={pointer?.kind === "tile" ? "spotlight tile" : "spotlight"}
+          style={{
+            left: spotlight.left,
+            top: spotlight.top,
+            width: spotlight.width,
+            height: spotlight.height,
+          }}
+        />
+      )}
+
       {raid.result && <ResultDialog result={raid.result} onClose={raid.dismissResult} />}
 
       <aside ref={hudRef} className={hudOpen ? "hud" : "hud collapsed"}>
@@ -787,6 +847,7 @@ export default function App() {
                   return (
                     <button
                       key={entry.id}
+                      data-tut={`tool:${entry.id}`}
                       className={toolId === entry.id ? "tool active" : "tool"}
                       onClick={() => { audio.play("click"); setToolId(entry.id); }}
                       disabled={raid.raiding || locked}
@@ -817,6 +878,7 @@ export default function App() {
               <div className="actions">
                 <button
                   className="primary"
+                  data-tut="action:raid"
                   onClick={() => { audio.play("raidStart"); void raid.startRaid(); }}
                   disabled={raid.raiding || raid.starting || hasUnsaved}
                 >
@@ -826,7 +888,7 @@ export default function App() {
               {hasUnsaved && <p className="hint small warn">{t("unsaved_changes")}</p>}
 
               <div className="actions">
-                <button onClick={() => void save.saveNow()} disabled={!hasUnsaved}>{t("save_now")}</button>
+                <button data-tut="action:save" onClick={() => void save.saveNow()} disabled={!hasUnsaved}>{t("save_now")}</button>
                 <button className="danger" onClick={() => void save.resetGame()} disabled={raid.raiding}>
                   {t("settings_reset")}
                 </button>
