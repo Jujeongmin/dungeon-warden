@@ -77,6 +77,34 @@ const CLIP_PATTERNS: Record<string, RegExp[]> = {
   down: [/^death_a$/i, /death/i, /defeat/i, /^die/i],
 };
 
+/**
+ * One piece of floor clutter and everything that can happen to it.
+ *
+ * `present` is how much of it is there — it drops to zero when a placement
+ * claims the tile and climbs back when the tile is freed. `tilt` and the slide
+ * are the shove: set once when a raider walks through, and left where they
+ * land, so the wreckage of the last wave is still on the floor afterwards.
+ */
+interface Clutter {
+  object: THREE.Object3D;
+  x: number;
+  y: number;
+  /** Where it stands when nothing has happened to it. */
+  restX: number;
+  restZ: number;
+  restScale: number;
+  present: number;
+  wanted: number;
+  tilt: number;
+  tiltTarget: number;
+  /** Unit vector the topple leans along, in world XZ. */
+  leanX: number;
+  leanZ: number;
+  slideX: number;
+  slideZ: number;
+  shoved: boolean;
+}
+
 /** A flat tile decoration: a trap plate or a room floor. */
 export interface MarkerView {
   id: string;
@@ -150,6 +178,22 @@ const ROOM_PROPS: Record<string, string[]> = {
 /** Props scattered on empty room floor, and how often a tile gets one. */
 const CLUTTER = ["prop_barrel", "prop_box", "prop_rubble", "prop_bottle", "prop_pillar"];
 const CLUTTER_CHANCE = 0.14;
+
+/**
+ * How the clutter behaves once the room is in use.
+ *
+ * Scenery that never moves is scenery the player stops seeing. Two things
+ * happen to a barrel: the tile it stands on gets claimed, and it is cleared
+ * away to make room; or a raider walks through it, and it goes over.
+ */
+const CLUTTER_CLEAR_RATE = 5.5; // presence gained or lost per second
+const SHOVE_RADIUS = 0.45; // tiles: how close a unit has to pass to knock it
+const SHOVE_TILT = 1.25; // radians it topples through
+const SHOVE_SLIDE = 0.34; // tiles it skids
+const SHOVE_RATE = 8; // how fast it falls over
+
+/** Torch flame wobble, as a fraction of the light's steady intensity. */
+const FLICKER_DEPTH = 0.16;
 
 /** How many of the room's wall panels carry a torch. */
 const TORCH_CHANCE = 0.22;
@@ -262,8 +306,16 @@ export class DungeonRenderer {
 
   private landmarks: THREE.Object3D[] = [];
   private decor: THREE.Object3D[] = [];
+  /** The floor clutter, with the state that lets it get out of the way. */
+  private clutter: Clutter[] = [];
+  /** Whether a raid is on screen, so the clutter can be stood back up. */
+  private raidersPresent = false;
   /** Lights belonging to the torch props; cleared with them. */
   private torchLights: THREE.PointLight[] = [];
+  /** The subset of those that are flames, and so flicker. */
+  private flames: Array<{ light: THREE.PointLight; base: number; phase: number }> = [];
+  /** Seconds since the renderer started, for anything that wobbles. */
+  private elapsed = 0;
 
   /** Pixels of canvas hidden behind the HUD, so the board can frame above it. */
   private bottomInset = 0;
@@ -456,6 +508,23 @@ export class DungeonRenderer {
    */
   setUnits(units: UnitView[]): void {
     this.lastUnits = units;
+
+    /*
+     * A wave arriving stands the room back up.
+     *
+     * Adventurers are the only units that appear and disappear as a group, so
+     * their arrival is the raid starting without the renderer needing to be
+     * told. The clutter is left where the last wave knocked it until then: the
+     * player should be able to look at the floor after a fight and see that
+     * one happened.
+     */
+    const raiders = units.some((unit) => unit.kind.startsWith("a_"));
+    if (raiders && !this.raidersPresent) this.standClutterUp();
+    this.raidersPresent = raiders;
+
+    this.syncClutter();
+    this.shoveClutter();
+
     const seen = new Set<string>();
 
     for (const unit of units) {
@@ -803,6 +872,8 @@ export class DungeonRenderer {
       this.disposeObject(this.markerGroup, object);
       this.markerMeshes.delete(id);
     }
+
+    this.syncClutter();
   }
 
   /**
@@ -842,6 +913,8 @@ export class DungeonRenderer {
       this.disposeObject(this.obstacleGroup, object);
       this.obstacleMeshes.delete(id);
     }
+
+    this.syncClutter();
   }
 
   private clearObstacles(): void {
@@ -895,10 +968,13 @@ export class DungeonRenderer {
    *
    * Without this an open room is bare flagstones: correct, readable, and
    * completely lifeless. Placement is driven by tileNoise so it survives a
-   * rebuild unchanged, and it deliberately skips the tiles that mean something
-   * — the entrance, the core, and anywhere an obstacle, trap, room or minion
-   * can stand — because a barrel that hides a spike plate, or sits inside a
-   * wall, is a bug, not decoration.
+   * rebuild unchanged.
+   *
+   * A prop is made for every tile the noise picks, including tiles that are
+   * currently occupied — `syncClutter` clears those away and brings them back
+   * as the board changes. Skipping them here instead, which is what this used
+   * to do, deleted the prop permanently: the tile only had to be busy at the
+   * one moment a rebuild happened for its barrel never to return.
    */
   private buildDecor(floors: Array<{ x: number; y: number }>): void {
     // Counted here rather than off torchLights.length: that array also holds
@@ -906,15 +982,6 @@ export class DungeonRenderer {
     let litTorches = 0;
     const arena = this.arena;
     if (!arena) return;
-
-    const occupied = new Set<string>();
-    for (const marker of this.lastMarkers) occupied.add(`${marker.x},${marker.y}`);
-    for (const unit of this.lastUnits) {
-      occupied.add(`${Math.round(unit.x)},${Math.round(unit.y)}`);
-    }
-    for (const obstacle of this.lastObstacles) {
-      occupied.add(`${Math.round(obstacle.x)},${Math.round(obstacle.y)}`);
-    }
 
     const steps: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
@@ -952,11 +1019,18 @@ export class DungeonRenderer {
           flame.position.set(torch.position.x, FLOOR_HEIGHT + 1.1, torch.position.z);
           this.scene.add(flame);
           this.torchLights.push(flame);
+          // Only the flames wobble. The entrance and core glows share the
+          // torchLights array for cleanup but are markers, and a landmark that
+          // breathes reads as broken rather than lit.
+          this.flames.push({
+            light: flame,
+            base: flame.intensity,
+            phase: tileNoise(floor.x, floor.y, 29) * Math.PI * 2,
+          });
         }
         break;
       }
 
-      if (occupied.has(`${floor.x},${floor.y}`)) continue;
       const roll = tileNoise(floor.x, floor.y, 11);
       if (roll > CLUTTER_CHANCE) continue;
 
@@ -972,6 +1046,126 @@ export class DungeonRenderer {
       prop.rotation.y = tileNoise(floor.x, floor.y, 23) * Math.PI * 2;
       this.scene.add(prop);
       this.decor.push(prop);
+      this.clutter.push({
+        object: prop,
+        x: floor.x,
+        y: floor.y,
+        restX: prop.position.x,
+        restZ: prop.position.z,
+        restScale: prop.scale.x || 1,
+        present: 1,
+        wanted: 1,
+        tilt: 0,
+        tiltTarget: 0,
+        leanX: 0,
+        leanZ: 1,
+        slideX: 0,
+        slideZ: 0,
+        shoved: false,
+      });
+    }
+
+    // The room being built into may already be full of placements. Snap rather
+    // than ease: those props were never on screen, so there is nothing to
+    // animate away from.
+    this.syncClutter();
+    for (const item of this.clutter) item.present = item.wanted;
+  }
+
+  /**
+   * Decides which props are in the way.
+   *
+   * A barrel standing inside the stone wall the player just dropped on it is
+   * the single clearest sign that the scenery is not part of the game, and it
+   * was happening on every placement: the clutter was chosen once at startup
+   * from whatever was on the board then, and never looked again. So the tiles
+   * that hold something are recomputed whenever the board changes, and the
+   * props on them are cleared away — and put back when the tile is freed,
+   * because a player who removes a wall should get their dungeon back.
+   *
+   * Minions count as occupants; adventurers do not. A minion is placed and
+   * stands there, so it owns its tile the way a trap does, while a raider is
+   * passing through — and what happens when a raider passes through is the
+   * shove below, not a disappearing barrel.
+   */
+  private syncClutter(): void {
+    if (this.clutter.length === 0) return;
+
+    const taken = new Set<number>();
+    const key = (x: number, y: number) => Math.round(y) * 1000 + Math.round(x);
+    for (const marker of this.lastMarkers) taken.add(key(marker.x, marker.y));
+    for (const obstacle of this.lastObstacles) taken.add(key(obstacle.x, obstacle.y));
+    for (const unit of this.lastUnits) {
+      if (unit.kind.startsWith("m_")) taken.add(key(unit.x, unit.y));
+    }
+
+    for (const item of this.clutter) item.wanted = taken.has(key(item.x, item.y)) ? 0 : 1;
+  }
+
+  /**
+   * Knocks a prop over when a unit walks through it, and stands the room's
+   * clutter back up when a new wave arrives.
+   *
+   * The wreckage is left on the floor once the wave is over. A room that looks
+   * the same after a fight as it did before is a room the fight did not happen
+   * in.
+   */
+  private shoveClutter(): void {
+    if (this.clutter.length === 0) return;
+
+    for (const unit of this.lastUnits) {
+      for (const item of this.clutter) {
+        if (item.shoved || item.present < 0.5) continue;
+        const dx = item.restX - unit.x;
+        const dz = item.restZ - unit.y;
+        const distance = Math.hypot(dx, dz);
+        if (distance > SHOVE_RADIUS) continue;
+
+        // Away from whoever walked into it. Two bodies exactly on top of each
+        // other have no direction between them, so fall back to the prop's
+        // own facing rather than dividing by zero.
+        const away = distance > 1e-4 ? { x: dx / distance, z: dz / distance } : { x: 0, z: 1 };
+        item.shoved = true;
+        item.tiltTarget = SHOVE_TILT;
+        item.leanX = away.x;
+        item.leanZ = away.z;
+        item.slideX = away.x * SHOVE_SLIDE;
+        item.slideZ = away.z * SHOVE_SLIDE;
+      }
+    }
+  }
+
+  /** Puts every toppled prop back on its feet, ready for the next wave. */
+  private standClutterUp(): void {
+    for (const item of this.clutter) {
+      item.shoved = false;
+      item.tiltTarget = 0;
+      item.slideX = 0;
+      item.slideZ = 0;
+    }
+  }
+
+  /** Advances the clearing, the returning and the toppling. */
+  private updateClutter(delta: number): void {
+    for (const item of this.clutter) {
+      const rate = CLUTTER_CLEAR_RATE * delta;
+      if (item.present < item.wanted) item.present = Math.min(item.wanted, item.present + rate);
+      else if (item.present > item.wanted) item.present = Math.max(item.wanted, item.present - rate);
+
+      item.tilt += (item.tiltTarget - item.tilt) * Math.min(1, SHOVE_RATE * delta);
+
+      const object = item.object;
+      object.visible = item.present > 0.01;
+      if (!object.visible) continue;
+
+      const fallen = item.tilt / SHOVE_TILT;
+      object.scale.setScalar(item.restScale * item.present);
+      object.position.x = item.restX + item.slideX * fallen;
+      object.position.z = item.restZ + item.slideZ * fallen;
+      // Lean about the axis perpendicular to the direction it is going, so it
+      // falls away from whatever hit it rather than spinning on the spot.
+      object.rotation.x = item.tilt * item.leanZ;
+      object.rotation.z = -item.tilt * item.leanX;
     }
   }
 
@@ -989,8 +1183,10 @@ export class DungeonRenderer {
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);
     this.decor = [];
+    this.clutter = [];
     for (const light of this.torchLights) this.scene.remove(light);
     this.torchLights = [];
+    this.flames = [];
 
     const spots: Array<{ key: string; x: number; y: number }> = [];
     if (this.entrance) spots.push({ key: "entrance", x: this.entrance.x, y: this.entrance.y });
@@ -1229,6 +1425,10 @@ export class DungeonRenderer {
       wallInstances: this.wallMesh?.count ?? 0,
       landmarks: this.landmarks.length,
       decor: this.decor.length,
+      clutter: this.clutter.length,
+      clutterCleared: this.clutter.filter((c) => c.wanted === 0).length,
+      clutterShoved: this.clutter.filter((c) => c.shoved).length,
+      flames: this.flames.length,
       pathMarkers: this.pathMarkers.length,
       units: this.unitMeshes.size,
       markers: this.markerMeshes.size,
@@ -1563,13 +1763,34 @@ export class DungeonRenderer {
     const delta = Math.min((now - this.lastTick) / 1000, 0.25);
     this.lastTick = now;
 
+    this.elapsed += delta;
+
     for (const entry of this.mixers.values()) entry.mixer.update(delta);
     this.updateEffects(delta);
+    this.updateClutter(delta);
+    this.updateFlames();
     this.updateShake(delta);
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
   };
+
+  /**
+   * Makes the torches burn rather than shine.
+   *
+   * A point light held at a constant value is a lamp. Two sine waves at
+   * unrelated speeds, offset per torch so they never pulse in unison, is close
+   * enough to a flame at this distance — and it costs nothing, which matters
+   * because there are six of them on a phone.
+   */
+  private updateFlames(): void {
+    const t = this.elapsed;
+    for (const flame of this.flames) {
+      const wobble =
+        Math.sin(t * 7.3 + flame.phase) * 0.7 + Math.sin(t * 17.1 + flame.phase * 2.3) * 0.3;
+      flame.light.intensity = flame.base * (1 + FLICKER_DEPTH * wobble);
+    }
+  }
 
   /** Advances hit flashes, punches, knockbacks, corpses and trap rings. */
   private updateEffects(delta: number): void {
@@ -1643,8 +1864,10 @@ export class DungeonRenderer {
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);
     this.decor = [];
+    this.clutter = [];
     for (const light of this.torchLights) this.scene.remove(light);
     this.torchLights = [];
+    this.flames = [];
 
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();
