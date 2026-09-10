@@ -621,6 +621,26 @@ h3.section:first-child { margin-top: 2px; }
 }
 
 .hint.small { font-size: var(--fs-2xs); }
+
+/* A name in the roster that is in the party the next raid will be built
+   from. The list was a history - everyone who has ever come - and a history
+   with no mark on it cannot answer the only question the player asks it:
+   which of these is at the door. Lit rather than labelled, so the row costs
+   no extra words and no extra line. */
+.hint.small.next {
+  /* Deliberately not flex: the row is one sentence built from several JSX
+     chunks, and flex would make each chunk its own item - gapped, and unable
+     to wrap as a sentence. */
+  padding-left: 7px;
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
+}
+
+.hint.small.next .icon {
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: var(--accent);
+}
 .hint .warn { color: var(--danger); }
 .account {
   overflow: hidden;

@@ -38,6 +38,7 @@ import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aft
 import { translate, type StringKey } from "./i18n/strings";
 import {
   ADVENTURER_CLASSES,
+  ADVENTURER_LABEL,
   CHAMPION_MODEL_SCALE,
   MAX_ROOMS,
   MAX_TRAPS,
@@ -490,6 +491,19 @@ export default function App() {
     () => (meta ? previewParty(adventurers, meta.threat, partyClock) : []),
     [adventurers, meta, partyClock],
   );
+
+  /*
+   * Which of the names in the roster are the ones coming next.
+   *
+   * Only the ones the server already knows about: a preview that had to hire
+   * strangers to fill the party invented those, and they are not in the list
+   * being marked because they do not exist yet.
+   */
+  const nextIds = useMemo(
+    () => new Set(nextParty.filter((m) => m.known).map((m) => m.id)),
+    [nextParty],
+  );
+  const championId = nextParty.find((m) => m.champion && m.known)?.id ?? null;
 
   // During a raid the simulation owns the units; otherwise the placed roster is
   // shown so the player can see what they built.
@@ -1237,8 +1251,16 @@ export default function App() {
                 <>
                   <h3 className="section">{t("manage_nemesis")} {adventurers.filter((a) => a.state !== "converted").length}</h3>
                   {adventurers.map((a) => (
-                    <p key={a.id} className="hint small">
-                      {a.name} Lv{a.level} · {t(a.raids === 1 ? "times_one" : "times", { n: a.raids })} ·{" "}
+                    // Marked when this is one of the names the next raid is
+                    // built from, so the list stops being a history and
+                    // starts being a warning.
+                    <p
+                      key={a.id}
+                      className={nextIds.has(a.id) ? "hint small next" : "hint small"}
+                    >
+                      {a.id === championId && <Icon name="crown" size={12} />}
+                      {a.name} · {t(ADVENTURER_LABEL[a.cls])} Lv{a.level} ·{" "}
+                      {t(a.raids === 1 ? "times_one" : "times", { n: a.raids })} ·{" "}
                       {a.state === "captured"
                         ? t("state_jailed")
                         : a.state === "converted"
