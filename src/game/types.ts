@@ -163,6 +163,8 @@ export interface Dungeon {
 }
 
 export interface RaidStartResult {
+  /** Set on the raid that first arrives at a named tier. */
+  milestoneReached?: string | null;
   raidId: string;
   seed: number;
   party: PartyMember[];

@@ -435,6 +435,37 @@ function roomEffects(rooms, entitlements) {
   };
 }
 
+/**
+ * Named tiers, mirrored in src/game/milestones.ts.
+ *
+ * The thresholds are where pickParty below changes what it sends: a second
+ * adventurer at 3, a fourth at 9, and past 12 the party stops growing and only
+ * levels rise. Crossing one is announced once and then remembered, so it reads
+ * as progress rather than as a label that is always there.
+ */
+const MILESTONES = [
+  { threat: 3, label: "tier_scouts" },
+  { threat: 9, label: "tier_company" },
+  { threat: 20, label: "tier_crusade" },
+];
+
+/**
+ * Marks any tier this threat has newly reached and returns the highest of
+ * them, or null. Mutates the save, so the caller has to be writing it back.
+ */
+function crossMilestones(dungeon, threat) {
+  const seen = Array.isArray(dungeon.milestonesSeen) ? dungeon.milestonesSeen : [];
+  let reached = null;
+  for (const milestone of MILESTONES) {
+    if (threat < milestone.threat) continue;
+    if (seen.indexOf(milestone.label) !== -1) continue;
+    seen.push(milestone.label);
+    reached = milestone.label;
+  }
+  dungeon.milestonesSeen = seen;
+  return reached;
+}
+
 /** Loot tier scales with how tough the adventurer was. */
 function lootTierFor(level) {
   return Math.max(1, Math.min(3, Math.ceil(level / 3)));
@@ -911,6 +942,7 @@ function migrate(dungeon) {
     ...rest,
     version: SAVE_VERSION,
     obstacles: [],
+    milestonesSeen: [],
     minions: transposeAll(rest.minions),
     traps: transposeAll(rest.traps),
     rooms: transposeAll(rest.rooms),
@@ -945,6 +977,7 @@ function createDefaultDungeon() {
   return {
     version: SAVE_VERSION,
     obstacles: [],
+    milestonesSeen: [],
     minions: [],
     traps: [],
     rooms: [],
@@ -1179,6 +1212,8 @@ class Server {
       prisoners: prev.prisoners || [],
       adventurers: prev.adventurers || [],
       research: prev.research || [],
+      // Rebuilt from a field list, so anything not named here is dropped.
+      milestonesSeen: prev.milestonesSeen || [],
       threatCheckedAt: prev.threatCheckedAt,
       // Still written, but written derived. Keeping the fields means the save
       // shape does not change under the client, and every save quietly repairs
@@ -1228,6 +1263,9 @@ class Server {
     if (state.pendingRaid) abandonPendingRaid(dungeon, state.pendingRaid, now);
 
     const threat = decayThreat(dungeon, now);
+    // Announced once, on the raid that first arrives at the tier. The save is
+    // written back below, so the mark sticks.
+    const milestoneReached = crossMilestones(dungeon, threat);
     const party = pickParty(dungeon, threat, now);
 
     // Should be impossible now that abandoned raids release their party, but
@@ -1258,6 +1296,7 @@ class Server {
       seed,
       party,
       threat,
+      milestoneReached,
       availableMinionIds,
       jailFree,
       effects,

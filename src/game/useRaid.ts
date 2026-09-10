@@ -102,6 +102,8 @@ export function useRaid({
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
   const [adUsed, setAdUsed] = useState(false);
+  /** Named tier this raid is the first to arrive at, announced once. */
+  const [milestone, setMilestone] = useState<string | null>(null);
   const [adBusy, setAdBusy] = useState(false);
 
   const simRef = useRef<RaidSim | null>(null);
@@ -256,6 +258,7 @@ export function useRaid({
       }
 
       raidIdRef.current = start.raidId;
+      setMilestone(start.milestoneReached ?? null);
       setAdUsed(false);
 
       // Minions still reviving sit this one out.
@@ -393,6 +396,8 @@ export function useRaid({
     /** Dev only: drives the result screen without a server. See devtools. */
     showResult: setResult,
     dismissResult,
+    milestone,
+    dismissMilestone: () => setMilestone(null),
     reviveWithAd,
     adUsed,
     adBusy,

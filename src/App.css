@@ -1403,3 +1403,16 @@ button.ad-gold {
   color: var(--accent);
   font-size: var(--fs-xs);
 }
+
+/* The name the dungeon has earned, beside the number it earned it with. */
+.tier {
+  color: var(--accent);
+  font-weight: var(--fw-bold);
+}
+
+/* A tier is reached once. Marked apart from the error banners it shares a
+   stack with — this one is good news. */
+.banner-tier {
+  border-color: rgba(232, 164, 76, 0.5);
+  color: var(--accent);
+}

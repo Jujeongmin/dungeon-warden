@@ -11,6 +11,7 @@ import { blockedKey, blockedSet, coreOf, entranceOf, inArena } from "./game/aren
 import { decorBlocked } from "./game/decor";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
+import { tierFor } from "./game/milestones";
 import { audio } from "./game/audio";
 import { useAdGold } from "./game/useAdGold";
 import type { SimEvent } from "./game/sim/RaidSim";
@@ -670,6 +671,7 @@ export default function App() {
   // The purse counts to its new total rather than jumping to it, and the shape
   // of the pop says whether the change was earned or spent.
   const purse = useCountUp(gold);
+  const tier = tierFor(meta?.threat ?? 0);
 
   const guide = guideFor({
     obstacles,
@@ -740,7 +742,14 @@ export default function App() {
           {/* Keyed on the beat so the pop replays on every change; a CSS
               animation on a stable element only ever plays once. */}
           <span key={purse.beat} className={`gold ${purse.dir ?? ""}`}>🪙 {purse.shown}</span>
-          {meta && <span className="pending">{t("stat_threat")} {meta.threat}</span>}
+          {/* The threat number with the name the dungeon has earned, which is
+              the only measure of progress this game has. */}
+          {meta && (
+            <span className="pending">
+              {t("stat_threat")} {meta.threat}
+              {tier && <b className="tier"> {t(tier.label as StringKey)}</b>}
+            </span>
+          )}
           {pendingCost > 0 && <span className="pending">{t("stat_unsaved")} -{pendingCost}</span>}
           <span className={`status status-${status}`}>
             {STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status}
@@ -790,6 +799,14 @@ export default function App() {
         )}
 
         {error && <div className="banner banner-error">{t("save_error")}: {error}</div>}
+        {/* Said once, on the raid that first arrives at a tier. */}
+        {raid.milestone && (
+          <div className="banner banner-tier">
+            <button className="banner-close" onClick={raid.dismissMilestone} aria-label="close">×</button>
+            {t("tier_reached", { name: t(raid.milestone as StringKey) })}
+          </div>
+        )}
+
         {raid.error && (
           <div className="banner banner-error">
             {RAID_ERROR_LABEL[raid.error]
