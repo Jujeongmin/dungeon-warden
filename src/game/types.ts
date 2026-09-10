@@ -1,20 +1,12 @@
 import type { StringKey } from "../i18n/strings";
 
 export const TILE = {
-  ROCK: 0,
   FLOOR: 1,
   ENTRANCE: 2,
   CORE: 3,
 } as const;
 
 export type TileId = (typeof TILE)[keyof typeof TILE];
-
-export interface GridData {
-  w: number;
-  h: number;
-  /** Run-length encoded cells: "count*tile,count*tile". */
-  cells: string;
-}
 
 /** `convert` is a turned adventurer: only the server may create one. */
 export type MinionType = "warrior" | "mage" | "convert";
@@ -87,6 +79,48 @@ export interface PlacedRoom {
 
 export const ROOM_SIZE = 2;
 
+/** A wall the player puts down. Adventurers only attack one when sealed in. */
+export type ObstacleType = "barricade" | "wall";
+
+export interface PlacedObstacle {
+  id: string;
+  type: ObstacleType;
+  x: number;
+  y: number;
+}
+
+/** Kept in sync with server.js. */
+export const OBSTACLE_COST: Record<ObstacleType, number> = {
+  barricade: 12,
+  wall: 35,
+};
+
+export const BASE_MAX_OBSTACLES = 20;
+
+/**
+ * How many obstacles may stand at once.
+ *
+ * The budget rides on the expansion research rather than nodes of its own: a
+ * bigger room with the same wall budget makes the maze thinner, not deeper, so
+ * the two numbers have to move together.
+ */
+export function maxObstaclesFor(research: string[]): number {
+  let cap = BASE_MAX_OBSTACLES;
+  if (research.includes("expand1")) cap = 28;
+  if (research.includes("expand2")) cap = 36;
+  return cap;
+}
+
+export const OBSTACLE_LABEL: Record<ObstacleType, StringKey> = {
+  barricade: "obstacle_barricade",
+  wall: "obstacle_wall",
+};
+
+export const OBSTACLE_DESCRIPTION: Record<ObstacleType, StringKey> = {
+  barricade: "obstacle_barricade_desc",
+  wall: "obstacle_wall_desc",
+};
+
 export type WardenSkill = "blessing" | "rally" | "detonate";
 
 export type AdventurerClass = "knight" | "barbarian" | "rogue" | "mage" | "ranger";
@@ -108,7 +142,7 @@ export interface PartyMember {
 
 export interface Dungeon {
   version: number;
-  grid: GridData;
+  obstacles: PlacedObstacle[];
   minions: PlacedMinion[];
   traps: PlacedTrap[];
   rooms: PlacedRoom[];
@@ -189,15 +223,12 @@ export const PRODUCT_ID = {
 
 export interface SaveResult {
   ok: true;
-  digs: number;
   cost: number;
   gold: number;
   savedAt: number;
 }
 
 /** Kept in sync with server.js. */
-export const DIG_COST = 10;
-export const MAX_DIGS_PER_SAVE = 64;
 export const MAX_MINIONS = 8;
 
 export const MINION_COST: Record<MinionType, number> = {

@@ -1,28 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
-import { Grid, createLocalDungeon } from "./grid";
+import { arenaFor, coreOf, entranceOf, inArena, type Arena } from "./arena";
 import { maybeShowInterstitial } from "./ads";
 import { addCost, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
 import { installServerProbe } from "./devtools";
+import { maxIdSuffix } from "./idSeq";
 import {
-  DIG_COST,
   EMPTY_ENTITLEMENTS,
-  MAX_DIGS_PER_SAVE,
   MAX_ROOMS,
   MAX_TRAPS,
   MINION_COST,
+  OBSTACLE_COST,
   ROOM_COST,
-  TILE,
   TRAP_COST,
+  maxObstaclesFor,
   type AdventurerRecord,
   type Dungeon,
   type Entitlements,
   type LoadResult,
   type LootItem,
   type MinionType,
+  type ObstacleType,
   type PlacedMinion,
+  type PlacedObstacle,
   type PlacedRoom,
   type PlacedTrap,
   type Prisoner,
@@ -63,6 +65,34 @@ function metaOf(dungeon: Dungeon): DungeonMeta {
 }
 
 /**
+ * Offline fallback so `npm run dev` is playable before the first deploy, when
+ * VITE_AGENT8_VERSE does not exist yet. Never persisted.
+ */
+function createLocalDungeon(): Dungeon {
+  const arena = arenaFor([]);
+  const now = Date.now();
+  return {
+    version: 2,
+    obstacles: [],
+    minions: [],
+    traps: [],
+    rooms: [],
+    loot: [],
+    prisoners: [],
+    adventurers: [],
+    research: [],
+    entrance: entranceOf(arena),
+    core: coreOf(arena),
+    threat: 0,
+    wavesRepelled: 0,
+    coreBreaches: 0,
+    createdAt: now,
+    updatedAt: now,
+    lastSeenAt: now,
+  };
+}
+
+/**
  * Owns the save lifecycle: load on connect, batch edits in memory, flush at
  * checkpoints. Edits are never sent one-per-click because remoteFunction is
  * rate limited to roughly 10 calls per second.
@@ -74,9 +104,8 @@ export function useDungeonSave() {
   const [error, setError] = useState<string | null>(null);
   const [gold, setGold] = useState(0);
   const [entitlements, setEntitlements] = useState<Entitlements>(EMPTY_ENTITLEMENTS);
-  const [pendingDigs, setPendingDigs] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [gridVersion, setGridVersion] = useState(0);
+  const [obstacles, setObstacles] = useState<PlacedObstacle[]>([]);
   const [minions, setMinions] = useState<PlacedMinion[]>([]);
   const [traps, setTraps] = useState<PlacedTrap[]>([]);
   const [rooms, setRooms] = useState<PlacedRoom[]>([]);
@@ -86,28 +115,49 @@ export function useDungeonSave() {
   const [research, setResearch] = useState<string[]>([]);
   const [meta, setMeta] = useState<DungeonMeta | null>(null);
 
-  const gridRef = useRef<Grid | null>(null);
-  const baselineRef = useRef<number[] | null>(null);
   const savingRef = useRef(false);
   const loadedRef = useRef(false);
   const seqRef = useRef(0);
 
+  const arenaRef = useRef<Arena>(arenaFor([]));
+  const researchRef = useRef<string[]>([]);
+
   const savedMinionsRef = useRef<PlacedMinion[]>([]);
   const savedTrapsRef = useRef<PlacedTrap[]>([]);
   const savedRoomsRef = useRef<PlacedRoom[]>([]);
+  const savedObstaclesRef = useRef<PlacedObstacle[]>([]);
 
   const minionsRef = useRef<PlacedMinion[]>([]);
   const trapsRef = useRef<PlacedTrap[]>([]);
   const roomsRef = useRef<PlacedRoom[]>([]);
+  const obstaclesRef = useRef<PlacedObstacle[]>([]);
   minionsRef.current = minions;
   trapsRef.current = traps;
   roomsRef.current = rooms;
+  obstaclesRef.current = obstacles;
 
   const entitlementsRef = useRef(entitlements);
   entitlementsRef.current = entitlements;
 
+  // metaRef lets isEntrance/isCore stay referentially stable across renders
+  // while always reading the latest loaded meta.
+  const metaRef = useRef<DungeonMeta | null>(null);
+  metaRef.current = meta;
+
   const effects = roomEffects(rooms);
   const unlocked = researchEffects(research);
+  const arena = useMemo(() => arenaFor(research), [research]);
+  arenaRef.current = arena;
+  researchRef.current = research;
+
+  const isEntrance = useCallback(
+    (x: number, y: number) => x === metaRef.current?.entrance.x && y === metaRef.current?.entrance.y,
+    [],
+  );
+  const isCore = useCallback(
+    (x: number, y: number) => x === metaRef.current?.core.x && y === metaRef.current?.core.y,
+    [],
+  );
 
   // Dev-only console access to the server, for exercising functions that have
   // no UI path yet.
@@ -116,17 +166,16 @@ export function useDungeonSave() {
   }, [server]);
 
   const applyLoad = useCallback((result: LoadResult) => {
-    const grid = new Grid(result.dungeon.grid);
-    gridRef.current = grid;
-    baselineRef.current = grid.snapshot();
-
+    const loadedObstacles = result.dungeon.obstacles ?? [];
     const loadedMinions = result.dungeon.minions ?? [];
     const loadedTraps = result.dungeon.traps ?? [];
     const loadedRooms = result.dungeon.rooms ?? [];
 
+    savedObstaclesRef.current = loadedObstacles;
     savedMinionsRef.current = loadedMinions;
     savedTrapsRef.current = loadedTraps;
     savedRoomsRef.current = loadedRooms;
+    setObstacles(loadedObstacles);
     setMinions(loadedMinions);
     setTraps(loadedTraps);
     setRooms(loadedRooms);
@@ -136,16 +185,20 @@ export function useDungeonSave() {
     setResearch(result.dungeon.research ?? []);
     setMeta(metaOf(result.dungeon));
 
-    // Keep generated ids from colliding with ids already in the save.
+    // Keep generated ids from colliding with ids already in the save: seed
+    // from the highest numeric suffix actually in use per collection, not
+    // from a count (which falls behind as soon as low-numbered items are
+    // deleted and can then regenerate an id still present in the save).
     seqRef.current = Math.max(
       seqRef.current,
-      loadedMinions.length + loadedTraps.length + loadedRooms.length,
+      maxIdSuffix(loadedObstacles.map((o) => o.id), "o"),
+      maxIdSuffix(loadedMinions.map((m) => m.id), "m"),
+      maxIdSuffix(loadedTraps.map((t) => t.id), "t"),
+      maxIdSuffix(loadedRooms.map((r) => r.id), "r"),
     );
 
     setGold(result.gold);
     setEntitlements(result.entitlements ?? EMPTY_ENTITLEMENTS);
-    setPendingDigs(0);
-    setGridVersion((v) => v + 1);
   }, []);
 
   // Offline fallback so `npm run dev` works before the first deploy.
@@ -191,47 +244,39 @@ export function useDungeonSave() {
   }, [connecting]);
 
   const pendingCostOf = useCallback((): number => {
-    const grid = gridRef.current;
-    const baseline = baselineRef.current;
-    const digs = grid && baseline ? grid.diffCount(baseline) : 0;
     return (
-      digs * DIG_COST +
       addCost(minionsRef.current, savedMinionsRef.current, MINION_COST) +
       addCost(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
-      addCost(roomsRef.current, savedRoomsRef.current, ROOM_COST)
+      addCost(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
+      addCost(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST)
     );
   }, []);
 
   const isDirty = useCallback((): boolean => {
-    const grid = gridRef.current;
-    const baseline = baselineRef.current;
-    if (!grid || !baseline) return false;
     return (
-      grid.diffCount(baseline) > 0 ||
       !sameList(minionsRef.current, savedMinionsRef.current) ||
       !sameList(trapsRef.current, savedTrapsRef.current) ||
-      !sameList(roomsRef.current, savedRoomsRef.current)
+      !sameList(roomsRef.current, savedRoomsRef.current) ||
+      !sameList(obstaclesRef.current, savedObstaclesRef.current)
     );
   }, []);
 
   const saveNow = useCallback(async (): Promise<void> => {
-    const grid = gridRef.current;
-    const baseline = baselineRef.current;
-    if (!grid || !baseline || savingRef.current || !isDirty()) return;
+    if (savingRef.current || !isDirty()) return;
 
     const nextMinions = minionsRef.current;
     const nextTraps = trapsRef.current;
     const nextRooms = roomsRef.current;
+    const nextObstacles = obstaclesRef.current;
 
     if (!HAS_VERSE) {
       // Offline preview: commit locally and charge what the server would have.
       const cost = pendingCostOf();
-      baselineRef.current = grid.snapshot();
       savedMinionsRef.current = nextMinions;
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
+      savedObstaclesRef.current = nextObstacles;
       setGold((current) => Math.max(0, current - cost));
-      setPendingDigs(0);
       setLastSavedAt(Date.now());
       return;
     }
@@ -241,18 +286,17 @@ export function useDungeonSave() {
     try {
       const result: SaveResult = await server.remoteFunction("saveDungeon", [
         {
-          grid: grid.toData(),
+          obstacles: nextObstacles,
           minions: nextMinions,
           traps: nextTraps,
           rooms: nextRooms,
         },
       ]);
-      baselineRef.current = grid.snapshot();
       savedMinionsRef.current = nextMinions;
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
+      savedObstaclesRef.current = nextObstacles;
       setGold(result.gold);
-      setPendingDigs(0);
       setLastSavedAt(result.savedAt);
       setError(null);
       setStatus("ready");
@@ -273,41 +317,26 @@ export function useDungeonSave() {
   }, [server, applyLoad, isDirty, pendingCostOf]);
 
   /** Anything already standing on this tile — one occupant per tile. */
-  const occupantAt = useCallback((x: number, y: number): "minion" | "trap" | "room" | null => {
-    if (minionsRef.current.some((m) => m.x === x && m.y === y)) return "minion";
-    if (trapsRef.current.some((t) => t.x === x && t.y === y)) return "trap";
-    if (roomsRef.current.some((r) => roomCovers(r, x, y))) return "room";
-    return null;
-  }, []);
+  const occupantAt = useCallback(
+    (x: number, y: number): "minion" | "trap" | "room" | "obstacle" | null => {
+      if (minionsRef.current.some((m) => m.x === x && m.y === y)) return "minion";
+      if (trapsRef.current.some((t) => t.x === x && t.y === y)) return "trap";
+      if (roomsRef.current.some((r) => roomCovers(r, x, y))) return "room";
+      if (obstaclesRef.current.some((o) => o.x === x && o.y === y)) return "obstacle";
+      return null;
+    },
+    [],
+  );
 
   const canAfford = useCallback(
     (extra: number): boolean => pendingCostOf() + extra <= gold,
     [gold, pendingCostOf],
   );
 
-  const digTile = useCallback(
-    (x: number, y: number): boolean => {
-      const grid = gridRef.current;
-      const baseline = baselineRef.current;
-      if (!grid || !baseline || !grid.canDig(x, y)) return false;
-      if (!canAfford(DIG_COST)) return false;
-
-      grid.dig(x, y);
-      const digs = grid.diffCount(baseline);
-      setPendingDigs(digs);
-      setGridVersion((v) => v + 1);
-
-      // Flush before the batch grows past what one save call accepts.
-      if (digs >= MAX_DIGS_PER_SAVE) void saveNow();
-      return true;
-    },
-    [canAfford, saveNow],
-  );
-
   const placeMinion = useCallback(
     (type: MinionType, x: number, y: number): boolean => {
-      const grid = gridRef.current;
-      if (!grid || grid.get(x, y) !== TILE.FLOOR) return false;
+      if (!inArena(arenaRef.current, x, y)) return false;
+      if (isEntrance(x, y) || isCore(x, y)) return false;
       if (!unlocked.unlockedMinions.includes(type)) return false;
       if (minionsRef.current.length >= effects.minionCap) return false;
       if (occupantAt(x, y)) return false;
@@ -317,13 +346,13 @@ export function useDungeonSave() {
       setMinions([...minionsRef.current, { id: `m${seqRef.current}`, type, x, y }]);
       return true;
     },
-    [canAfford, occupantAt, effects.minionCap, unlocked.unlockedMinions],
+    [canAfford, occupantAt, isEntrance, isCore, effects.minionCap, unlocked.unlockedMinions],
   );
 
   const placeTrap = useCallback(
     (type: TrapType, x: number, y: number): boolean => {
-      const grid = gridRef.current;
-      if (!grid || grid.get(x, y) !== TILE.FLOOR) return false;
+      if (!inArena(arenaRef.current, x, y)) return false;
+      if (isEntrance(x, y) || isCore(x, y)) return false;
       if (!unlocked.unlockedTraps.includes(type)) return false;
       if (trapsRef.current.length >= MAX_TRAPS) return false;
       if (occupantAt(x, y)) return false;
@@ -333,20 +362,35 @@ export function useDungeonSave() {
       setTraps([...trapsRef.current, { id: `t${seqRef.current}`, type, x, y }]);
       return true;
     },
-    [canAfford, occupantAt, unlocked.unlockedTraps],
+    [canAfford, occupantAt, isEntrance, isCore, unlocked.unlockedTraps],
+  );
+
+  const placeObstacle = useCallback(
+    (type: ObstacleType, x: number, y: number): boolean => {
+      const arena = arenaRef.current;
+      if (!inArena(arena, x, y)) return false;
+      // The two tiles the whole game is measured between stay clear.
+      if (isEntrance(x, y) || isCore(x, y)) return false;
+      if (occupantAt(x, y)) return false;
+      if (obstaclesRef.current.length >= maxObstaclesFor(researchRef.current)) return false;
+      if (!canAfford(OBSTACLE_COST[type])) return false;
+
+      seqRef.current += 1;
+      setObstacles([...obstaclesRef.current, { id: `o${seqRef.current}`, type, x, y }]);
+      return true;
+    },
+    [canAfford, occupantAt, isEntrance, isCore],
   );
 
   /** Rooms anchor at (x, y) and claim a 2x2 block of corridor. */
   const placeRoom = useCallback(
     (type: RoomType, x: number, y: number): boolean => {
-      const grid = gridRef.current;
-      if (!grid) return false;
       if (!unlocked.unlockedRooms.includes(type)) return false;
       if (roomsRef.current.length >= MAX_ROOMS) return false;
 
       for (const tile of roomTiles({ x, y })) {
-        if (!grid.inBounds(tile.x, tile.y)) return false;
-        if (grid.get(tile.x, tile.y) !== TILE.FLOOR) return false;
+        if (!inArena(arenaRef.current, tile.x, tile.y)) return false;
+        if (isEntrance(tile.x, tile.y) || isCore(tile.x, tile.y)) return false;
         if (occupantAt(tile.x, tile.y)) return false;
       }
       if (!canAfford(ROOM_COST[type])) return false;
@@ -355,7 +399,7 @@ export function useDungeonSave() {
       setRooms([...roomsRef.current, { id: `r${seqRef.current}`, type, x, y }]);
       return true;
     },
-    [canAfford, occupantAt, unlocked.unlockedRooms],
+    [canAfford, occupantAt, isEntrance, isCore, unlocked.unlockedRooms],
   );
 
   /**
@@ -381,23 +425,18 @@ export function useDungeonSave() {
 
       await saveNow();
       try {
-        const result: { research: string[]; gold: number; dungeon: Dungeon } =
-          await server.remoteFunction("researchNode", [{ id }]);
+        const result: { research: string[]; gold: number } = await server.remoteFunction(
+          "researchNode",
+          [{ id }],
+        );
         setResearch(result.research);
         setGold(result.gold);
-        // Expansion rewrites the grid, so reload rather than patching pieces.
-        if (node.expandTo) applyLoad({
-          dungeon: result.dungeon,
-          entitlements: entitlementsRef.current,
-          gold: result.gold,
-          created: false,
-        });
         return null;
       } catch (e: unknown) {
         return e instanceof Error ? e.message : String(e);
       }
     },
-    [research, gold, server, saveNow, applyLoad],
+    [research, gold, server, saveNow],
   );
 
   /** Removes whatever occupies the tile. No refund, matching the server. */
@@ -408,6 +447,7 @@ export function useDungeonSave() {
     setMinions((current) => current.filter((m) => !(m.x === x && m.y === y)));
     setTraps((current) => current.filter((t) => !(t.x === x && t.y === y)));
     setRooms((current) => current.filter((r) => !roomCovers(r, x, y)));
+    setObstacles((current) => current.filter((o) => !(o.x === x && o.y === y)));
     return true;
   }, [occupantAt]);
 
@@ -455,6 +495,18 @@ export function useDungeonSave() {
     },
     [],
   );
+
+  /**
+   * Drops obstacles a raid destroyed from local state, matching the server
+   * (which already removed them in finishRaid) so the board never disagrees
+   * with the save until the next reload.
+   */
+  const clearDestroyedObstacles = useCallback((ids: string[]): void => {
+    if (ids.length === 0) return;
+    const destroyed = new Set(ids);
+    savedObstaclesRef.current = savedObstaclesRef.current.filter((o) => !destroyed.has(o.id));
+    setObstacles((current) => current.filter((o) => !destroyed.has(o.id)));
+  }, []);
 
   const refreshEntitlements = useCallback(async (): Promise<void> => {
     if (!HAS_VERSE) return;
@@ -508,10 +560,10 @@ export function useDungeonSave() {
   }, [saveNow]);
 
   return {
-    grid: gridRef.current,
-    gridVersion,
+    arena,
     gold,
     entitlements,
+    obstacles,
     minions,
     traps,
     rooms,
@@ -528,7 +580,6 @@ export function useDungeonSave() {
         .map((m) => [m.id, loot.find((l) => l.id === m.weaponId)?.tier ?? 0]),
     ),
     meta,
-    pendingDigs,
     pendingCost: pendingCostOf(),
     hasUnsaved: isDirty(),
     status,
@@ -536,14 +587,15 @@ export function useDungeonSave() {
     lastSavedAt,
     account,
     isOffline: !HAS_VERSE,
-    digTile,
     placeMinion,
     placeTrap,
     placeRoom,
+    placeObstacle,
     removeAt,
     equipWeapon,
     buyResearch,
     applyRaidResult,
+    clearDestroyedObstacles,
     saveNow,
     resetGame,
     refreshEntitlements,

@@ -25,6 +25,11 @@ export default defineConfig({
   },
 
   server: {
+    // Vite defaults to 5173 and silently walks to the next free port when it
+    // is taken, which leaves any tool that assigned us a port talking to the
+    // wrong one. Honour PORT when it is set; unset, this is the old default.
+    port: Number(process.env.PORT) || 5173,
+
     watch: {
       // public/assets holds ~530 CC0 model, texture and audio files. They are
       // static art: watching them buys no HMR and costs one inotify watch each,

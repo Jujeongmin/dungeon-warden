@@ -1,7 +1,7 @@
 # Dungeon Warden — defense pivot
 
 **Date:** 2026-09-09
-**Status:** approved, not yet implemented
+**Status:** implemented on `feat/defense-pivot`, not yet merged
 
 ## Why
 
@@ -28,14 +28,16 @@ stronger. A breached core costs gold, never the dungeon.
 
 ## The board
 
-A single open room. All floor. The **entrance** sits at `(0, midY)`, the
-**core** at `(w - 1, midY)` — the same fixed pair the game already uses.
+A single open room, all floor, in **portrait**: the width stays 12 and the room
+grows taller with research, because this game is played on the web and mostly on
+phones. The **entrance** sits at `(midX, 0)` and the **core** at
+`(midX, h - 1)`, so adventurers descend from the top.
 
 | Research | Room | Obstacle budget |
 |---|---|---|
 | — | 12 × 12 | 20 |
-| `expand1` (420 G) | 16 × 12 | 28 |
-| `expand2` (700 G) | 20 × 12 | 36 |
+| `expand1` (420 G) | 12 × 16 | 28 |
+| `expand2` (700 G) | 12 × 20 | 36 |
 
 The two existing expansion nodes carry the obstacle budget with them rather
 than adding new nodes. A bigger room with the same wall budget would make the
@@ -54,13 +56,23 @@ entrance or the core.
 | Wooden barricade | 12 G | 120 | Early mazing. Cheap, and expected to die. |
 | Stone wall | 35 G | 380 | Holds a sealed line long enough to matter. |
 
-**Costs and HP are provisional.** A level-1 knight deals 13 damage every 1.1 s
-(≈ 11.8 DPS), so a barricade is about ten seconds of one adventurer's attention
-and a stone wall about half a minute. Both numbers get verified against real
-parties after implementation, the same way the raid economy was.
+**Costs and HP are measured**, against headless `RaidSim` runs in
+`tests/balance.test.ts` rather than hand arithmetic. A lone level-1 knight
+breaks a barricade in 12.65 s and a stone wall in 34.65 s (2.74x the
+barricade) — inside the design's 5-15 s / 2x+ targets, so no retuning was
+needed. Checked further against the case that actually decides whether the
+design holds up: a level-5 party of three or four, where several attackers
+stand adjacent to the same blocking tile and stack their damage per swing. A
+barricade there falls in 4.6 s and a stone wall in 8.25-8.5 s — still roughly
+double, just no longer the 2x+ margin a lone attacker sees, because more
+hands are landing hits on the one obstacle in reach. A wall still buys the
+defender several real seconds even against a fully leveled party, so sealing
+keeps paying off late game, just proportionally less than it does early.
 
 Digging cost 10 G per tile and was the early gold sink. Obstacles take that
-job.
+job: with `START_GOLD` at 200, a first-time player can afford a 6-barricade
+route (72 G) plus a warrior (50 G) plus a spike trap (30 G) for 152 G, with
+48 G left over.
 
 ## How adventurers treat obstacles
 
@@ -123,9 +135,23 @@ legal, meaningful move, so nothing needs to forbid it. One rule fewer to learn.
 
 Version 2 loads a version 1 save by dropping `grid` and keeping everything
 else: gold, research, threat, records, nemeses, prisoners, loot, and the
-placed minions, traps and rooms. Those placements sat on carved floor, and the
-whole room is floor now, so their coordinates stay valid. Nobody loses a
-dungeon.
+placed minions, traps and rooms.
+
+Those placements are **turned a quarter turn** on the way through — every
+`(x, y)` becomes `(y, x)`. Version 1 was this same room in landscape: 12 tall,
+widening to 16 and then 20 with the expansion research, entrance on the left
+wall at `(0, midY)` and core on the right at `(w - 1, midY)`. Version 2 is
+portrait with those numbers on the other axis. Swapping the coordinates maps
+one onto the other exactly — the old far column becomes the new far row, and a
+player's maze keeps its shape relative to the two tiles it was built around.
+
+Leaving them alone, which is what this section used to say, would have put
+every placement in an expanded save outside a 12-wide room, and rotated
+everyone else's dungeon relative to the entrance. `tests/migration.test.ts`
+pins the correspondence the swap relies on; the server's own `migrate` cannot
+be imported to test directly, because server.js is a single unexported file.
+
+Nobody loses a dungeon.
 
 ## Code
 

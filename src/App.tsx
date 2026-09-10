@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DungeonRenderer, type UnitView, type MarkerView } from "./game/DungeonRenderer";
+import { DungeonRenderer, type UnitView, type MarkerView, type ObstacleView } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
 import { SKILL_STATS } from "./game/sim/traps";
-import { roomTiles, lureTiles } from "./game/rooms";
+import { OBSTACLE_STATS } from "./game/sim/obstacles";
+import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
+import { blockedSet, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, currentStep } from "./game/tutorial";
 import { audio } from "./game/audio";
@@ -16,22 +18,26 @@ import { LeaderboardDialog } from "./ui/LeaderboardDialog";
 import { TitleScreen } from "./ui/TitleScreen";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
+import { useCountUp } from "./ui/useCountUp";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
 import { translate, type StringKey } from "./i18n/strings";
 import {
-  DIG_COST,
   MAX_ROOMS,
   MAX_TRAPS,
   MINION_COST,
   MINION_LABEL,
+  OBSTACLE_COST,
+  OBSTACLE_LABEL,
   ROOM_COST,
   ROOM_DESCRIPTION,
   ROOM_LABEL,
   SKILL_LABEL,
   TRAP_COST,
   TRAP_LABEL,
+  maxObstaclesFor,
   type MinionType,
+  type ObstacleType,
   type RoomType,
   type TrapType,
   type WardenSkill,
@@ -48,7 +54,6 @@ const STATUS_LABEL: Record<string, StringKey> = {
 };
 
 const RAID_ERROR_LABEL: Record<string, StringKey> = {
-  NO_PATH: "need_path",
   NO_SAVE: "err_no_save",
   NO_ADVENTURERS: "err_no_adventurers",
 };
@@ -67,14 +72,42 @@ function remaining(at: number, t: Translate): string {
 }
 
 type Tool =
-  | { kind: "dig" }
+  | { kind: "obstacle"; type: ObstacleType }
   | { kind: "remove" }
   | { kind: "minion"; type: MinionType }
   | { kind: "trap"; type: TrapType }
   | { kind: "room"; type: RoomType };
 
+/**
+ * Which model stands in for each tool in the toolbar.
+ *
+ * These are the same keys the renderer draws with, so a tool's icon is a
+ * photograph of the thing it puts on the board rather than an approximation of
+ * it. `remove` has no model because it places nothing.
+ */
+const TOOL_MODEL: Record<string, string | null> = {
+  barricade: "obstacle_barricade",
+  wall: "obstacle_wall",
+  remove: null,
+  warrior: "m_warrior",
+  mage: "m_mage",
+  spike: "spike",
+  arrow: "arrow",
+  rockfall: "rockfall",
+  flame: "flame",
+  treasury: "treasury",
+  vault: "vault",
+  barracks: "barracks",
+  altar: "altar",
+  workshop: "workshop",
+  jail: "jail",
+};
+
+const TOOL_MODEL_KEYS = Object.values(TOOL_MODEL).filter((k): k is string => k !== null);
+
 const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
-  { id: "dig", tool: { kind: "dig" }, label: "tool_dig", cost: DIG_COST },
+  { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
+  { id: "wall", tool: { kind: "obstacle", type: "wall" }, label: OBSTACLE_LABEL.wall, cost: OBSTACLE_COST.wall },
   { id: "remove", tool: { kind: "remove" }, label: "tool_remove", cost: null },
   { id: "warrior", tool: { kind: "minion", type: "warrior" }, label: MINION_LABEL.warrior, cost: MINION_COST.warrior },
   { id: "mage", tool: { kind: "minion", type: "mage" }, label: MINION_LABEL.mage, cost: MINION_COST.mage },
@@ -96,13 +129,16 @@ type Tab = "build" | "manage" | "research";
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<DungeonRenderer | null>(null);
+  const hudRef = useRef<HTMLElement>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  /** Baked from the tool models once the pack loads; empty until then. */
+  const [toolIcons, setToolIcons] = useState<Record<string, string>>({});
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
   const [shopOpen, setShopOpen] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
   const [adNotice, setAdNotice] = useState<string | null>(null);
-  const [toolId, setToolId] = useState("dig");
+  const [toolId, setToolId] = useState("barricade");
   const [researchError, setResearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("build");
   const [hudOpen, setHudOpen] = useState(true);
@@ -130,8 +166,8 @@ export default function App() {
 
   const save = useDungeonSave();
   const {
-    grid,
-    gridVersion,
+    arena,
+    obstacles,
     gold,
     entitlements,
     minions,
@@ -146,7 +182,6 @@ export default function App() {
     jailFree,
     weaponTiers,
     meta,
-    pendingDigs,
     pendingCost,
     hasUnsaved,
     status,
@@ -192,11 +227,24 @@ export default function App() {
         });
       } else if (event.kind === "trap") {
         renderer.spawnRing(event.x, event.y);
+        renderer.shake(0.14); // a spike plate going off is a tap, not a jolt
         audio.play("trap", 90);
+      } else if (event.kind === "down") {
+        // The blow that actually finishes the adventurer — they stay on the
+        // board a few seconds yet (down, not gone), so this is the moment a
+        // knockback is guaranteed to be seen rather than removed same-frame.
+        renderer.knockbackUnit(`a:${event.targetId}`);
+        renderer.shake(0.22);
       } else if (event.kind === "minionDown") {
         renderer.spawnRing(event.x, event.y, 0x9d8bd8);
+        renderer.knockbackUnit(`m:${event.targetId}`);
+      } else if (event.kind === "obstacleDown") {
+        renderer.shake(0.45); // a wall coming down is the biggest thump here
       } else if (event.kind === "captured" || event.kind === "killed") {
         renderer.spawnRing(event.x, event.y, event.kind === "captured" ? 0x7fc98a : 0xd86a4c);
+        // A fresh jolt right as they actually leave the board, so the
+        // renderer's brief corpse-linger has a live knockback to play out.
+        renderer.knockbackUnit(`a:${event.targetId}`);
         const at = renderer.project(event.x, event.y);
         if (at) {
           floaterSeq.current += 1;
@@ -219,20 +267,22 @@ export default function App() {
 
   const raid = useRaid({
     onEvents: onSimEvents,
-    grid,
+    arena,
     meta,
     minions,
     traps,
     rooms,
+    obstacles,
     effects,
     jailFree,
     weaponTiers,
     research: unlocked,
     adsRemoved: entitlements.adsRemoved,
     onFinished: save.applyRaidResult,
+    onObstaclesDestroyed: save.clearDestroyedObstacles,
   });
 
-  const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "dig" as const };
+  const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "remove" as const };
 
   // Browsers only allow an AudioContext to start from a gesture.
   useEffect(() => {
@@ -256,14 +306,14 @@ export default function App() {
     if (raid.raiding) return; // no editing while a raid is running
 
     let ok = false;
-    if (tool.kind === "dig") ok = save.digTile(x, y);
+    if (tool.kind === "obstacle") ok = save.placeObstacle(tool.type, x, y);
     else if (tool.kind === "remove") ok = save.removeAt(x, y);
     else if (tool.kind === "minion") ok = save.placeMinion(tool.type, x, y);
     else if (tool.kind === "trap") ok = save.placeTrap(tool.type, x, y);
     else ok = save.placeRoom(tool.type, x, y);
 
     if (!ok) audio.play("error");
-    else audio.play(tool.kind === "dig" ? "dig" : "place");
+    else audio.play("place");
   };
 
   useEffect(() => {
@@ -273,19 +323,26 @@ export default function App() {
       onHoverChange: setHover,
     });
     rendererRef.current = renderer;
+
+    // Photograph the tool models once the pack has loaded. Icons are a nicety:
+    // if this fails or the device refuses a second GL context, the toolbar
+    // keeps its labels and nothing else changes.
+    let alive = true;
+    void renderer
+      .bakeToolIcons(TOOL_MODEL_KEYS)
+      .then((icons) => { if (alive) setToolIcons(icons); })
+      .catch(() => {});
+
     return () => {
+      alive = false;
       renderer.dispose();
       rendererRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (grid) rendererRef.current?.setGrid(grid);
-  }, [grid]);
-
-  useEffect(() => {
-    if (gridVersion > 0) rendererRef.current?.refresh();
-  }, [gridVersion]);
+    rendererRef.current?.setArena(arena, entranceOf(arena), coreOf(arena));
+  }, [arena]);
 
   // During a raid the simulation owns the units; otherwise the placed roster is
   // shown so the player can see what they built.
@@ -349,6 +406,92 @@ export default function App() {
     return list;
   }, [traps, rooms]);
 
+  // During a raid the simulation owns obstacle HP as they get chopped down;
+  // otherwise the placed roster is shown whole, mirroring the `units` memo.
+  const obstacleViews: ObstacleView[] = useMemo(() => {
+    if (raid.raidState) {
+      return raid.raidState.obstacles
+        .filter((o) => o.alive)
+        .map((o) => ({ id: o.id, type: o.type, x: o.x, y: o.y, hp: o.hp, maxHp: o.maxHp }));
+    }
+    return obstacles.map((o) => {
+      const stats = OBSTACLE_STATS[o.type];
+      return { id: o.id, type: o.type, x: o.x, y: o.y, hp: stats.hp, maxHp: stats.hp };
+    });
+  }, [raid.raidState, obstacles]);
+
+  /**
+   * The preview of what the next tap will place.
+   *
+   * This repeats rules the server also enforces, which is normally worth
+   * avoiding — but the point of a preview is to answer before the tap, and
+   * asking the server would answer after it. The server stays the authority:
+   * if these two ever disagree the save is refused and the client is the one
+   * that was wrong.
+   */
+  const ghostLegal = useCallback(
+    (x: number, y: number): boolean => {
+      if (!meta || !inArena(arena, x, y)) return false;
+      if (x === meta.entrance.x && y === meta.entrance.y) return false;
+      if (x === meta.core.x && y === meta.core.y) return false;
+
+      const taken = (tx: number, ty: number) =>
+        obstacles.some((o) => o.x === tx && o.y === ty) ||
+        minions.some((m) => m.x === tx && m.y === ty) ||
+        traps.some((tr) => tr.x === tx && tr.y === ty) ||
+        rooms.some((r) => roomCovers(r, tx, ty));
+
+      // A room claims a 2x2 block anchored here, so every tile of it must be
+      // clear and inside the room — not just the one under the cursor.
+      if (tool.kind === "room") {
+        return roomTiles({ x, y }).every(
+          (tile) =>
+            inArena(arena, tile.x, tile.y) &&
+            !taken(tile.x, tile.y) &&
+            !(tile.x === meta.entrance.x && tile.y === meta.entrance.y) &&
+            !(tile.x === meta.core.x && tile.y === meta.core.y),
+        );
+      }
+
+      return !taken(x, y);
+    },
+    [arena, meta, obstacles, minions, traps, rooms, tool],
+  );
+
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    const modelKey = TOOL_MODEL[toolId] ?? null;
+    if (!modelKey || raid.raiding || !hover) {
+      renderer.setGhost(null, true);
+      return;
+    }
+    renderer.setGhost(modelKey, ghostLegal(hover.x, hover.y));
+  }, [toolId, hover, raid.raiding, ghostLegal]);
+
+  /**
+   * Tell the camera how much of itself the HUD is covering.
+   *
+   * The canvas is full-screen and the panel floats on its lower part, so
+   * without this the board frames to the middle of the canvas — which on a
+   * phone is behind the panel, with the core out of sight. Measured rather
+   * than assumed, because the panel's height changes when it collapses and
+   * when the viewport does.
+   */
+  useEffect(() => {
+    const measure = () => {
+      const renderer = rendererRef.current;
+      const panel = hudRef.current;
+      if (!renderer || !panel) return;
+      const gap = window.innerHeight - panel.getBoundingClientRect().top;
+      renderer.setBottomInset(Math.max(0, gap));
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [hudOpen, tab, obstacles.length, minions.length, traps.length, rooms.length, research.length]);
+
   useEffect(() => {
     rendererRef.current?.setUnits(units);
   }, [units]);
@@ -357,17 +500,21 @@ export default function App() {
     rendererRef.current?.setMarkers(markers);
   }, [markers]);
 
+  useEffect(() => {
+    rendererRef.current?.setObstacles(obstacleViews);
+  }, [obstacleViews]);
+
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
   useEffect(() => {
-    if (!grid || !meta || raid.raiding) {
+    if (!meta || raid.raiding) {
       rendererRef.current?.setPathPreview(null);
       return;
     }
     rendererRef.current?.setPathPreview(
-      buildRaidPath(grid, meta.entrance, meta.core, lureTiles(rooms)),
+      buildRaidPath(arena, meta.entrance, meta.core, lureTiles(rooms), blockedSet(arena, obstacles)),
     );
-  }, [grid, gridVersion, meta, rooms, raid.raiding]);
+  }, [arena, obstacles, meta, rooms, raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
@@ -386,9 +533,9 @@ export default function App() {
 
   useEffect(() => {
     installDevTools({
-      grid, minions, traps, rooms, loot, prisoners, adventurers,
+      arena, obstacles, minions, traps, rooms, loot, prisoners, adventurers,
       research, unlocked, effects, jailFree, meta, gold,
-      digTile: save.digTile,
+      placeObstacle: save.placeObstacle,
       placeMinion: save.placeMinion,
       placeTrap: save.placeTrap,
       placeRoom: save.placeRoom,
@@ -401,8 +548,9 @@ export default function App() {
       stepRaid: raid.stepRaid,
       raidState: raid.raidState,
       raidResult: raid.result,
-      pathExists: raid.pathExists,
       rendererStats: () => rendererRef.current?.debugStats() ?? null,
+      rendererShakeState: () => rendererRef.current?.debugShakeState() ?? null,
+      renderer: () => rendererRef.current,
     });
   });
 
@@ -436,8 +584,12 @@ export default function App() {
     }
   }, [settings.introSeen, patchSettings]);
 
+  // The purse counts to its new total rather than jumping to it, and the shape
+  // of the pop says whether the change was earned or spent.
+  const purse = useCountUp(gold);
+
   const stepIndex = currentStep({
-    grid,
+    obstacles,
     entrance: meta?.entrance ?? null,
     core: meta?.core ?? null,
     minions,
@@ -452,7 +604,7 @@ export default function App() {
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
-    if (tool.kind === "dig") return t("hint_dig");
+    if (tool.kind === "obstacle") return `${t("hint_obstacle")} ${obstacles.length}/${maxObstaclesFor(research)}`;
     if (tool.kind === "remove") return t("hint_remove");
     if (tool.kind === "minion") return `${t("hint_minion")} ${minions.length}/${effects.minionCap}`;
     if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
@@ -475,7 +627,9 @@ export default function App() {
       <header className="topbar">
         <div className="brand">DUNGEON WARDEN</div>
         <div className="stats">
-          <span className="gold">🪙 {gold}</span>
+          {/* Keyed on the beat so the pop replays on every change; a CSS
+              animation on a stable element only ever plays once. */}
+          <span key={purse.beat} className={`gold ${purse.dir ?? ""}`}>🪙 {purse.shown}</span>
           {meta && <span className="pending">{t("stat_threat")} {meta.threat}</span>}
           {pendingCost > 0 && <span className="pending">{t("stat_unsaved")} -{pendingCost}</span>}
           <span className={`status status-${status}`}>
@@ -535,7 +689,7 @@ export default function App() {
         )}
 
         {step && !raid.raiding && (
-          <div className="tutorial">
+          <div key={step.id} className="tutorial">
             <div className="tutorial-head">
               <b>{stepIndex + 1}/{TUTORIAL.length} · {t(step.title as StringKey)}</b>
               <button
@@ -643,7 +797,7 @@ export default function App() {
         </div>
       )}
 
-      <aside className={hudOpen ? "hud" : "hud collapsed"}>
+      <aside ref={hudRef} className={hudOpen ? "hud" : "hud collapsed"}>
         <div className="hud-tabs">
           <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>{t("tab_build")}</button>
           <button className={tab === "manage" ? "active" : ""} onClick={() => { audio.play("click"); setTab("manage"); }}>{t("tab_manage")}</button>
@@ -655,7 +809,8 @@ export default function App() {
           </button>
         </div>
 
-        <div className="hud-body">
+        {/* Keyed on the tab so each one fades in as its own page of controls. */}
+        <div key={tab} className="hud-body">
           {tab === "build" && (
             <>
               <div className="toolbar">
@@ -674,8 +829,15 @@ export default function App() {
                       disabled={raid.raiding || locked}
                       title={locked ? t("locked_hint") : undefined}
                     >
-                      <b>{locked ? `🔒 ${label}` : label}</b>
-                      <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
+                      {(() => {
+                        const modelKey = TOOL_MODEL[entry.id];
+                        const icon = modelKey ? toolIcons[modelKey] : undefined;
+                        return icon ? <img className="tool-icon" src={icon} alt="" /> : null;
+                      })()}
+                      <span className="tool-text">
+                        <b>{locked ? `🔒 ${label}` : label}</b>
+                        <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
+                      </span>
                     </button>
                   );
                 })}
@@ -683,21 +845,21 @@ export default function App() {
 
               <p className="hint">{toolHint}</p>
               <p className="hint small">
-                {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
+                {t("count_obstacles")} {obstacles.length}/{maxObstaclesFor(research)} · {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
                 {effects.jailCapacity > 0 && ` · ${t("count_jail")} ${prisoners.length}/${effects.jailCapacity}`}
               </p>
+              <p className="hint small">{t("obstacle_note")}</p>
               <p className="hint small">{t("controls")}</p>
 
               <div className="actions">
                 <button
                   className="primary"
                   onClick={() => { audio.play("raidStart"); void raid.startRaid(); }}
-                  disabled={raid.raiding || raid.starting || !raid.pathExists || hasUnsaved}
+                  disabled={raid.raiding || raid.starting || hasUnsaved}
                 >
                   {raid.starting ? t("preparing") : t("start_raid")}
                 </button>
               </div>
-              {!raid.pathExists && <p className="hint small warn">{t("need_path")}</p>}
               {hasUnsaved && <p className="hint small warn">{t("unsaved_changes")}</p>}
 
               <div className="actions">
@@ -710,7 +872,6 @@ export default function App() {
 
               <p className="hint small">
                 {hover ? `${t("tile")} (${hover.x}, ${hover.y})` : t("hover_hint")}
-                {pendingDigs > 0 && ` · ${t("pending_digs")} ${pendingDigs}`}
                 {lastSavedAt && ` · ${t("saved_at")} ${new Date(lastSavedAt).toLocaleTimeString()}`}
               </p>
             </>

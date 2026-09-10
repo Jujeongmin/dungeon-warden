@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { RaidSim, SIM_DT, type RaidState, type SimEvent } from "./sim/RaidSim";
-import { buildRaidPath, findPath } from "./sim/pathfinding";
 import { lureTiles } from "./rooms";
 import { SKILL_STATS } from "./sim/traps";
+import type { Arena } from "./arena";
 import type { ResearchEffects } from "./research";
 import { maybeShowInterstitial, watchReviveAd } from "./ads";
-import type { Grid } from "./grid";
 import type { DungeonMeta } from "./useDungeonSave";
 import type {
   PlacedMinion,
+  PlacedObstacle,
   PlacedRoom,
   PlacedTrap,
   RaidFinishResult,
@@ -23,23 +23,48 @@ const HAS_VERSE = Boolean(import.meta.env.VITE_AGENT8_VERSE);
 /** Guards against a tab that was backgrounded dumping a huge catch-up burst. */
 const MAX_STEPS_PER_FRAME = 8;
 
+/**
+ * Hit stop: a brief freeze of wall-clock time whenever the sim reports a
+ * decisive event, so the moment reads instead of sliding past. This only
+ * ever withholds delta from the accumulator below — it never touches
+ * `sim.step()` — so it cannot change how many steps a raid takes or what
+ * events it produces; the determinism test covers exactly that guarantee.
+ * 100ms reads as a solid beat without feeling like input lag.
+ */
+const HIT_STOP_SECONDS = 0.1;
+/** A player who chose fast-forward asked for less drama, not more. */
+const HIT_STOP_SPEED_SCALE: Record<RaidSpeed, number> = { 1: 1, 2: 0.4, 4: 0 };
+const DECISIVE_EVENTS = new Set<SimEvent["kind"]>([
+  "killed",
+  "captured",
+  "minionDown",
+  "obstacleDown",
+]);
+
 export const RAID_SPEEDS = [1, 2, 4] as const;
 export type RaidSpeed = (typeof RAID_SPEEDS)[number];
 
 interface Options {
   /** Called with everything the simulation reported this frame. */
   onEvents?: (events: SimEvent[]) => void;
-  grid: Grid | null;
+  arena: Arena;
   meta: DungeonMeta | null;
   minions: PlacedMinion[];
   traps: PlacedTrap[];
   rooms: PlacedRoom[];
+  obstacles: PlacedObstacle[];
   effects: RoomEffects;
   jailFree: number;
   weaponTiers: Record<string, number>;
   research: ResearchEffects;
   adsRemoved: boolean;
   onFinished: (result: RaidFinishResult) => void;
+  /**
+   * Walls the party broke through to reach the core are gone for good. The
+   * server already drops them in `finishRaid`; this keeps local state from
+   * disagreeing with the save until the next reload.
+   */
+  onObstaclesDestroyed: (ids: string[]) => void;
 }
 
 /**
@@ -50,17 +75,19 @@ interface Options {
  * regardless of frame rate or speed setting.
  */
 export function useRaid({
-  grid,
+  arena,
   meta,
   minions,
   traps,
   rooms,
+  obstacles,
   effects,
   jailFree,
   weaponTiers,
   research,
   adsRemoved,
   onFinished,
+  onObstaclesDestroyed,
   onEvents,
 }: Options) {
   const eventsRef = useRef(onEvents);
@@ -81,12 +108,11 @@ export function useRaid({
   const frameRef = useRef(0);
   const accumulatorRef = useRef(0);
   const lastFrameRef = useRef(0);
+  /** Seconds of hit-stop still owed to the current freeze, if any. */
+  const hitStopRef = useRef(0);
   const speedRef = useRef<RaidSpeed>(1);
   speedRef.current = speed;
   const settlingRef = useRef(false);
-
-  const pathExists =
-    grid && meta ? findPath(grid, meta.entrance, meta.core) !== null : false;
 
   /** Skill targeting: rally waits for the next tile tap. */
   const [pendingSkill, setPendingSkill] = useState<WardenSkill | null>(null);
@@ -97,8 +123,11 @@ export function useRaid({
       settlingRef.current = true;
 
       const raidId = raidIdRef.current;
+      const destroyedObstacleIds = simRef.current?.destroyedObstacleIds ?? [];
       simRef.current = null;
       raidIdRef.current = null;
+
+      onObstaclesDestroyed(destroyedObstacleIds);
 
       const outcome = finalState.status === "breached" ? "breached" : "repelled";
       const lostMinionIds = finalState.minions.filter((m) => !m.alive).map((m) => m.id);
@@ -131,6 +160,7 @@ export function useRaid({
             killedIds: finalState.killedIds,
             capturedIds: finalState.capturedIds,
             lostMinionIds,
+            destroyedObstacleIds,
           },
         ]);
         setResult(finish);
@@ -144,7 +174,7 @@ export function useRaid({
         void maybeShowInterstitial(adsRemoved);
       }
     },
-    [server, onFinished, adsRemoved],
+    [server, onFinished, onObstaclesDestroyed, adsRemoved],
   );
 
   // Fixed-step loop, keyed on the run id so it starts once per raid instead of
@@ -160,7 +190,16 @@ export function useRaid({
 
       const delta = Math.min((now - lastFrameRef.current) / 1000, 0.25);
       lastFrameRef.current = now;
-      accumulatorRef.current += delta * speedRef.current;
+
+      // Hit stop withholds this frame's delta from the accumulator instead
+      // of feeding it in — the freeze is entirely a wall-clock pacing effect
+      // on top of the fixed-step loop, so it cannot change how many times
+      // sim.step() below ends up running for a given raid.
+      if (hitStopRef.current > 0) {
+        hitStopRef.current = Math.max(0, hitStopRef.current - delta);
+      } else {
+        accumulatorRef.current += delta * speedRef.current;
+      }
 
       let steps = 0;
       while (accumulatorRef.current >= SIM_DT && steps < MAX_STEPS_PER_FRAME) {
@@ -171,7 +210,13 @@ export function useRaid({
       }
 
       const drained = sim.drainEvents();
-      if (drained.length > 0) eventsRef.current?.(drained);
+      if (drained.length > 0) {
+        eventsRef.current?.(drained);
+        if (drained.some((e) => DECISIVE_EVENTS.has(e.kind))) {
+          const duration = HIT_STOP_SECONDS * HIT_STOP_SPEED_SCALE[speedRef.current];
+          hitStopRef.current = Math.max(hitStopRef.current, duration);
+        }
+      }
 
       const next = sim.state;
       setRaidState({ ...next, minions: [...next.minions], adventurers: [...next.adventurers] });
@@ -184,20 +229,14 @@ export function useRaid({
 
     lastFrameRef.current = performance.now();
     accumulatorRef.current = 0;
+    hitStopRef.current = 0;
     frameRef.current = requestAnimationFrame(tick);
 
     return () => cancelAnimationFrame(frameRef.current);
   }, [runId, settle]);
 
   const startRaid = useCallback(async (): Promise<void> => {
-    if (!grid || !meta || starting || simRef.current) return;
-
-    // Treasuries drag the party off the direct route on the way in.
-    const path = buildRaidPath(grid, meta.entrance, meta.core, lureTiles(rooms));
-    if (!path) {
-      setError("NO_PATH");
-      return;
-    }
+    if (!meta || starting || simRef.current) return;
 
     setStarting(true);
     setError(null);
@@ -226,8 +265,12 @@ export function useRaid({
       const sim = new RaidSim({
         minions: minions.filter((m) => available.has(m.id)),
         traps,
+        obstacles,
         party: start.party,
-        path,
+        arena,
+        entrance: meta.entrance,
+        core: meta.core,
+        lures: lureTiles(rooms),
         seed: start.seed,
         trapCooldownScale: effects.trapCooldownScale,
         jailFree: start.jailFree ?? jailFree,
@@ -245,11 +288,12 @@ export function useRaid({
       setStarting(false);
     }
   }, [
-    grid,
+    arena,
     meta,
     minions,
     traps,
     rooms,
+    obstacles,
     effects.trapCooldownScale,
     jailFree,
     weaponTiers,
@@ -343,7 +387,6 @@ export function useRaid({
     setSpeed,
     result,
     error,
-    pathExists,
     pendingSkill,
     startRaid,
     useSkill,

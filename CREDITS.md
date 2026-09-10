@@ -1,8 +1,26 @@
 # Credits
 
 Every asset shipped in this repository is **CC0 1.0 Universal** (public domain
-dedication). No attribution is legally required; it is recorded here so the
-provenance of each file stays checkable.
+dedication) unless noted otherwise below. No attribution is legally required
+for CC0 assets; it is recorded here so the provenance of each file stays
+checkable.
+
+## Font — Pretendard, by Kil Hyung-jin
+
+<https://github.com/orioncactus/pretendard> · SIL Open Font License 1.1
+
+| File | Source |
+|---|---|
+| Pretendard-Regular.subset.woff2 | <https://github.com/orioncactus/pretendard/releases> |
+| Pretendard-Bold.subset.woff2 | <https://github.com/orioncactus/pretendard/releases> |
+
+Two weights only, from the "subset" build (KS X 1001 Hangul + Latin) rather
+than the full weight files or the variable font — full coverage isn't needed
+for a UI with a small, known string set, and the subset keeps a Korean-capable
+face from doubling the bundle. Registered in `src/index.css`; the type scale
+built on top of it lives in the same file (`--fs-*` / `--fw-*` / `--ls-*`) and
+is used throughout `src/App.css`. Unlike the CC0 assets above, the OFL
+requires this notice to travel with the font — that's this entry.
 
 ## Models — KayKit, by Kay Lousberg
 

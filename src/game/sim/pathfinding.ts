@@ -1,42 +1,38 @@
-import { TILE } from "../types";
-import type { Grid } from "../grid";
+import { blockedKey, inArena, type Arena } from "../arena";
 
 export interface Point {
   x: number;
   y: number;
 }
 
-/** Tiles an adventurer can stand on. Rock is solid. */
-function walkable(grid: Grid, x: number, y: number): boolean {
-  if (!grid.inBounds(x, y)) return false;
-  return grid.get(x, y) !== TILE.ROCK;
-}
-
-function key(x: number, y: number, w: number): number {
-  return y * w + x;
+/** A tile is walkable unless an obstacle stands on it. There is no terrain. */
+function walkable(arena: Arena, x: number, y: number, blocked: Set<number>): boolean {
+  if (!inArena(arena, x, y)) return false;
+  return !blocked.has(blockedKey(x, y, arena.w));
 }
 
 /**
  * 4-directional A* over walkable tiles.
  *
  * Returns the tile sequence from `start` to `goal` inclusive, or null when the
- * player has walled the core off. The caller treats null as "raid cannot
- * start", which is what stops a sealed dungeon from being a free win.
+ * player has walled the core off completely. A null path does not stop a
+ * raid: the caller has adventurers break through the nearest obstacle
+ * instead, which is what stops a sealed dungeon from being a free win.
  */
-export function findPath(grid: Grid, start: Point, goal: Point): Point[] | null {
-  if (!walkable(grid, start.x, start.y) || !walkable(grid, goal.x, goal.y)) {
+export function findPath(arena: Arena, start: Point, goal: Point, blocked: Set<number>): Point[] | null {
+  if (!walkable(arena, start.x, start.y, blocked) || !walkable(arena, goal.x, goal.y, blocked)) {
     return null;
   }
 
-  const w = grid.w;
-  const total = grid.w * grid.h;
+  const w = arena.w;
+  const total = arena.w * arena.h;
 
   const cameFrom = new Int32Array(total).fill(-1);
   const gScore = new Float64Array(total).fill(Infinity);
   const closed = new Uint8Array(total);
 
-  const startKey = key(start.x, start.y, w);
-  const goalKey = key(goal.x, goal.y, w);
+  const startKey = blockedKey(start.x, start.y, w);
+  const goalKey = blockedKey(goal.x, goal.y, w);
   gScore[startKey] = 0;
 
   const heuristic = (x: number, y: number) => Math.abs(x - goal.x) + Math.abs(y - goal.y);
@@ -78,9 +74,9 @@ export function findPath(grid: Grid, start: Point, goal: Point): Point[] | null 
     for (const [dx, dy] of neighbours) {
       const nx = cx + dx;
       const ny = cy + dy;
-      if (!walkable(grid, nx, ny)) continue;
+      if (!walkable(arena, nx, ny, blocked)) continue;
 
-      const neighbourKey = key(nx, ny, w);
+      const neighbourKey = blockedKey(nx, ny, w);
       if (closed[neighbourKey]) continue;
 
       const tentative = gScore[current] + 1;
@@ -96,11 +92,6 @@ export function findPath(grid: Grid, start: Point, goal: Point): Point[] | null 
   return null;
 }
 
-/** True when the entrance still reaches the core. */
-export function hasPathToCore(grid: Grid, entrance: Point, core: Point): boolean {
-  return findPath(grid, entrance, core) !== null;
-}
-
 /**
  * The route a raiding party actually walks.
  *
@@ -110,21 +101,22 @@ export function hasPathToCore(grid: Grid, entrance: Point, core: Point): boolean
  * route instead.
  */
 export function buildRaidPath(
-  grid: Grid,
-  entrance: Point,
+  arena: Arena,
+  start: Point,
   core: Point,
   lures: Point[],
+  blocked: Set<number>,
 ): Point[] | null {
-  const direct = findPath(grid, entrance, core);
+  const direct = findPath(arena, start, core, blocked);
   if (!direct || lures.length === 0) return direct;
 
   let best: Point[] | null = null;
   let bestLength = Infinity;
 
   for (const lure of lures) {
-    const toLure = findPath(grid, entrance, lure);
+    const toLure = findPath(arena, start, lure, blocked);
     if (!toLure) continue;
-    const toCore = findPath(grid, lure, core);
+    const toCore = findPath(arena, lure, core, blocked);
     if (!toCore) continue;
 
     // Nearest treasury wins; a party does not tour every vault in the dungeon.

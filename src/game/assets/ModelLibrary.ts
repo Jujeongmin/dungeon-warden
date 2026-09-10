@@ -17,11 +17,26 @@ export interface LoadedModel {
 
 const MANIFEST_URL = publicUrl("assets/kaykit/manifest.json");
 
-// Every KayKit .gltf in a pack points at the same texture and its own .bin, and
-// each load fetches them again on its own — one page load asked for
-// dungeon_texture.png thirteen times. three's loader cache is keyed by URL and
-// makes those duplicates free.
-THREE.Cache.enabled = true;
+/*
+ * three's loader cache stays OFF.
+ *
+ * Every KayKit .gltf in a pack points at the same texture, so turning
+ * `THREE.Cache` on to collapse those duplicate fetches looks like free money.
+ * It is not: with the cache enabled, every one of the nine textures in the
+ * scene came back with `image` undefined — the PNGs downloaded (200 OK) but
+ * never reached the materials. The dungeon drew untextured, and three warned
+ * "Texture marked for update but no image data found" once per texture per
+ * frame, which is where the ~90,000 console messages in a two-minute session
+ * were coming from.
+ *
+ * Measured both ways on the same page: cache on, 9 of 9 textures had no image;
+ * cache off, 9 of 9 carried a 1024px bitmap. The duplicate downloads are the
+ * cheaper problem, and `shareTextures` below takes most of that back anyway.
+ */
+THREE.Cache.enabled = false;
+
+/** Texture slots the KayKit materials actually use, in load order. */
+const TEXTURE_SLOTS = ["map", "normalMap", "emissiveMap", "roughnessMap", "metalnessMap"] as const;
 
 /**
  * Animation-only files.
@@ -49,6 +64,25 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   wall: [/^wall$/, /^wall_arched$/, /^wall_/],
   entrance: [/^stairs_/, /^stairs$/, /^door_/, /^doorway/],
   core: [/^chest_gold$/, /^chest$/, /^banner_red$/],
+
+  /*
+   * Obstacles — walls the player places to block a raiding party's route.
+   *
+   * Five pieces each, because a row of obstacles is a fence and a fence has
+   * ends, corners and junctions. The renderer picks between them from which
+   * neighbouring tiles are also built on; every set falls back to its own
+   * straight piece so a pack missing the fancier parts still draws a wall.
+   */
+  obstacle_barricade: [/^barrier$/, /^barrier_half$/, /^fence/],
+  obstacle_barricade_end: [/^barrier_half$/, /^barrier$/],
+  obstacle_barricade_corner: [/^barrier_corner$/, /^barrier$/],
+  obstacle_barricade_post: [/^barrier_column$/, /^barrier$/],
+
+  obstacle_wall: [/^wall$/, /^wall_arched$/],
+  obstacle_wall_end: [/^wall_endcap$/, /^wall$/],
+  obstacle_wall_corner: [/^wall_corner$/, /^wall$/],
+  obstacle_wall_tee: [/^wall_tsplit$/, /^wall$/],
+  obstacle_wall_cross: [/^wall_crossing$/, /^wall$/],
 
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
@@ -112,7 +146,10 @@ export class ModelLibrary {
   private cache = new Map<string, LoadedModel | null>();
   private pending = new Map<string, Promise<LoadedModel | null>>();
   private sharedClips: THREE.AnimationClip[] | null = null;
+  /** One Texture per image file, shared by every model that references it. */
+  private textures = new Map<string, THREE.Texture>();
   private ready = false;
+  private initTask: Promise<void> | null = null;
 
   get available(): boolean {
     return this.entries.length > 0;
@@ -122,10 +159,26 @@ export class ModelLibrary {
     return this.entries.length;
   }
 
-  /** Reads the manifest. Safe to call when no assets have been added yet. */
-  async init(): Promise<void> {
-    if (this.ready) return;
-    this.ready = true;
+  /**
+   * Reads the manifest. Safe to call when no assets have been added yet, and
+   * safe to call from two places at once.
+   *
+   * The second part is not free: this used to set a `ready` flag before
+   * awaiting the fetch, so a concurrent caller was told the library was ready
+   * while the manifest was still in flight and got an empty entry list. The
+   * in-flight promise is shared instead, so every caller waits for the same
+   * fetch and sees the same result.
+   */
+  init(): Promise<void> {
+    if (this.ready) return Promise.resolve();
+    this.initTask ??= this.readManifest().finally(() => {
+      this.ready = true;
+      this.initTask = null;
+    });
+    return this.initTask;
+  }
+
+  private async readManifest(): Promise<void> {
     try {
       const response = await fetch(MANIFEST_URL);
       if (!response.ok) return;
@@ -168,6 +221,7 @@ export class ModelLibrary {
     const task = this.loader
       .loadAsync(entry.url)
       .then((gltf) => {
+        this.shareTextures(gltf.scene, entry.url);
         const model: LoadedModel = { scene: gltf.scene, animations: gltf.animations };
         this.cache.set(key, model);
         return model;
@@ -181,6 +235,51 @@ export class ModelLibrary {
 
     this.pending.set(key, task);
     return task;
+  }
+
+  /**
+   * Points every material at one Texture per image file.
+   *
+   * A pack's models each parse their own copy of the shared palette PNG, so
+   * twenty-five dungeon props meant twenty-five 1024x1024 bitmaps uploaded to
+   * the GPU — the same pixels, over and over, for tens of megabytes of video
+   * memory on a phone. Keying by the image's own URL collapses them to one.
+   *
+   * The losing duplicate is disposed here rather than left to the collector,
+   * because it may already have been uploaded by the time this runs.
+   */
+  private shareTextures(scene: THREE.Group, modelUrl: string): void {
+    // The identity of an image, without an image URL to hand: GLTFLoader
+    // decodes through createImageBitmap where it can, and an ImageBitmap
+    // remembers nothing about where it came from. The glTF's own texture name
+    // plus the folder the model was loaded from names the same file just as
+    // exactly — every model in a KayKit pack sits beside the one palette PNG
+    // it references — and cannot collide across packs.
+    const folder = modelUrl.slice(0, modelUrl.lastIndexOf("/") + 1);
+
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        for (const slot of TEXTURE_SLOTS) {
+          const standard = material as unknown as Record<string, THREE.Texture | null>;
+          const texture = standard[slot];
+          if (!texture?.name) continue;
+
+          const id = `${folder}${texture.name}#${slot}`;
+          const shared = this.textures.get(id);
+          if (!shared) {
+            this.textures.set(id, texture);
+          } else if (shared !== texture) {
+            standard[slot] = shared;
+            material.needsUpdate = true;
+            texture.dispose();
+          }
+        }
+      }
+    });
   }
 
   /**

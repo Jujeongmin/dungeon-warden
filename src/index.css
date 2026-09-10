@@ -1,4 +1,55 @@
 /* Global reset only. Component styles live in App.css. */
+
+/* Self-hosted rather than linked from a CDN: the Verse8 container serves the
+   game with `cross-origin-embedder-policy: require-corp`, which blocks
+   cross-origin subresources that don't carry the right CORP/CORS headers.
+   Files under src/ go through Vite's asset pipeline instead, so they come
+   from the same origin as everything else and get hashed for cache-busting.
+
+   Two weights only (Regular/Bold) — the KS X 1001 "subset" build Pretendard
+   publishes, not the full weight files or the variable font, to keep a
+   Korean-capable face from doubling the bundle. See CREDITS.md. */
+@font-face {
+  font-family: "Pretendard";
+  src: url("./assets/fonts/Pretendard-Regular.subset.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pretendard";
+  src: url("./assets/fonts/Pretendard-Bold.subset.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Type scale. A handful of steps, reused everywhere, instead of a
+     one-off size per element. */
+  --fs-2xs: 11px;   /* micro labels: table headers, tool/skill sub-labels */
+  --fs-xs: 12px;    /* small print: hint text, legends, panels */
+  --fs-sm: 13px;    /* secondary body: banners, buttons, list rows, top-bar numbers */
+  --fs-base: 14px;  /* body copy */
+  --fs-md: 16px;    /* sub-headings: HUD/modal titles, brand */
+  --fs-lg: 18px;    /* rare emphasis (icon glyphs, crit floaters) */
+  --fs-xl: clamp(28px, 8vw, 48px); /* hero title */
+
+  /* Only two weights are shipped (see @font-face above), so that's the whole
+     scale — no synthetic-bold fallback for weights we don't have files for. */
+  --fw-regular: 400;
+  --fw-bold: 700;
+
+  --ls-tight: 0.03em;
+  --ls-normal: 0.04em;
+  --ls-wide: 0.08em;
+  --ls-wider: 0.12em;
+  --ls-widest: 0.18em;
+}
+
 html,
 body,
 #root {
@@ -24,19 +75,21 @@ body,
   padding: 24px;
   background: #14120f;
   color: #efe7d8;
-  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   text-align: center;
 }
 
 .crash h1 {
   margin: 0;
-  font-size: 1.1rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider);
 }
 
 .crash p {
   margin: 0;
   color: #a4998a;
+  font-size: var(--fs-sm);
 }
 
 .crash pre {
@@ -48,7 +101,7 @@ body,
   border-radius: 6px;
   background: #1c1915;
   color: #d8a07a;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   text-align: left;
   white-space: pre-wrap;
 }

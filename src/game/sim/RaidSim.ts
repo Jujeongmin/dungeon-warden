@@ -3,6 +3,7 @@ import type {
   MinionType,
   PartyMember,
   PlacedMinion,
+  PlacedObstacle,
   PlacedTrap,
   RaidOutcome,
   TrapType,
@@ -16,6 +17,9 @@ import {
   TRAP_STATS,
 } from "./traps";
 import type { Point } from "./pathfinding";
+import { buildRaidPath } from "./pathfinding";
+import { blockedSet, type Arena } from "../arena";
+import { OBSTACLE_STATS, type SimObstacle } from "./obstacles";
 
 /** Simulation step. Everything advances in whole steps so runs are reproducible. */
 export const SIM_DT = 1 / 20;
@@ -83,7 +87,9 @@ export type SimEvent =
   | { kind: "down"; targetId: string; x: number; y: number }
   | { kind: "killed"; targetId: string; x: number; y: number }
   | { kind: "captured"; targetId: string; x: number; y: number }
-  | { kind: "minionDown"; targetId: string; x: number; y: number };
+  | { kind: "minionDown"; targetId: string; x: number; y: number }
+  | { kind: "obstacleHit"; targetId: string; amount: number; x: number; y: number }
+  | { kind: "obstacleDown"; targetId: string; x: number; y: number };
 
 export interface SimAdventurer {
   id: string;
@@ -106,6 +112,10 @@ export interface SimAdventurer {
   fate: "none" | "killed" | "captured";
   action: SimAction;
   facing: number;
+  /** This adventurer's own route. A falling wall changes it for everyone. */
+  path: Point[];
+  /** True while walking a route that runs through obstacles it must break. */
+  breaking: boolean;
 }
 
 export type RaidStatus = "running" | RaidOutcome;
@@ -116,6 +126,7 @@ export interface RaidState {
   minions: SimMinion[];
   adventurers: SimAdventurer[];
   traps: SimTrap[];
+  obstacles: SimObstacle[];
   skillCooldowns: Record<WardenSkill, number>;
   killed: number;
   captured: number;
@@ -135,8 +146,12 @@ export interface RaidSimOptions {
   minions: PlacedMinion[];
   traps?: PlacedTrap[];
   party: PartyMember[];
-  /** Entrance-to-core tile sequence, precomputed by A*. */
-  path: Point[];
+  arena: Arena;
+  entrance: Point;
+  core: Point;
+  /** Treasury tiles that pull the party off the direct line. */
+  lures: Point[];
+  obstacles: PlacedObstacle[];
   seed: number;
   /** Workshop rooms shorten trap cooldowns. 1 = no rooms. */
   trapCooldownScale?: number;
@@ -157,7 +172,19 @@ export interface RaidSimOptions {
  */
 export class RaidSim {
   readonly seed: number;
-  private path: Point[];
+  private arena: Arena;
+  private core: Point;
+  private lures: Point[];
+  /**
+   * Every mutation of this array's `alive`/`hp` must be followed by a call to
+   * `routeAll()` in the same operation — a route computed against a stale
+   * obstacle set can strand an adventurer mid-`breaking` while a walkable
+   * path already exists elsewhere. Kill an obstacle through `killObstacle()`
+   * below rather than flipping `alive` inline, so there is exactly one place
+   * that has to get this right.
+   */
+  private obstacles: SimObstacle[];
+  private destroyed: string[] = [];
   private minions: SimMinion[];
   private traps: SimTrap[];
   private adventurers: SimAdventurer[];
@@ -177,7 +204,6 @@ export class RaidSim {
 
   constructor(options: RaidSimOptions) {
     this.seed = options.seed;
-    this.path = options.path;
     this.trapCooldownScale = options.trapCooldownScale ?? 1;
     this.jailFree = options.jailFree ?? 0;
 
@@ -218,7 +244,20 @@ export class RaidSim {
       triggers: 0,
     }));
 
-    const start = options.path[0];
+    this.arena = options.arena;
+    this.core = options.core;
+    this.lures = options.lures;
+    this.obstacles = options.obstacles.map((o) => ({
+      id: o.id,
+      type: o.type,
+      x: o.x,
+      y: o.y,
+      hp: OBSTACLE_STATS[o.type].hp,
+      maxHp: OBSTACLE_STATS[o.type].hp,
+      alive: true,
+    }));
+
+    const start = options.entrance;
     this.adventurers = options.party.map((member, index) => {
       const stats = scaledAdventurer(member.cls, member.level);
       return {
@@ -240,8 +279,101 @@ export class RaidSim {
         fate: "none",
         action: "walk" as SimAction,
         facing: 0,
+        path: [],
+        breaking: false,
       };
     });
+
+    this.routeAll();
+  }
+
+  /** Coordinates an adventurer cannot walk into right now. */
+  private blocked(): Set<number> {
+    return blockedSet(this.arena, this.obstacles.filter((o) => o.alive));
+  }
+
+  /**
+   * Gives one adventurer a route from where it stands.
+   *
+   * A walkable route always wins, however long it is — that is the whole rule
+   * of this game, and it is what makes folding the corridor worth doing. Only
+   * when there is no way through at all does it fall back to the route it
+   * would walk if the walls were not there, and start hitting them.
+   */
+  private route(adventurer: SimAdventurer): void {
+    const from = { x: Math.round(adventurer.x), y: Math.round(adventurer.y) };
+    const open = buildRaidPath(this.arena, from, this.core, this.lures, this.blocked());
+    if (open) {
+      adventurer.path = open;
+      adventurer.breaking = false;
+    } else {
+      // No walkable route exists right now, so fall back to the route the
+      // party would take if no obstacle stood in the way at all — that is
+      // what breaking through means. If even THAT is unreachable, `from` or
+      // `this.core` sits outside the arena, which is a bug, not a game state:
+      // resolveStatus() treats "already at path end" as a breach, so silently
+      // falling back to a length-1 path here would hand the attacker a free,
+      // unreported win instead of surfacing the broken input.
+      const fallback = buildRaidPath(this.arena, from, this.core, this.lures, new Set());
+      if (!fallback) {
+        throw new Error(
+          `RaidSim: no route from (${from.x}, ${from.y}) to the core (${this.core.x}, ${this.core.y}) exists even with no obstacles — start or core must be outside the arena.`,
+        );
+      }
+      adventurer.path = fallback;
+      adventurer.breaking = true;
+    }
+    adventurer.pathIndex = 0;
+  }
+
+  private routeAll(): void {
+    for (const adventurer of this.adventurers) {
+      if (adventurer.alive) this.route(adventurer);
+    }
+  }
+
+  private obstacleAt(x: number, y: number): SimObstacle | null {
+    for (const o of this.obstacles) {
+      if (o.alive && o.x === x && o.y === y) return o;
+    }
+    return null;
+  }
+
+  /** The obstacle standing on this adventurer's next step, if any. */
+  private blockingObstacle(adventurer: SimAdventurer): SimObstacle | null {
+    if (!adventurer.breaking) return null;
+    const next = adventurer.path[adventurer.pathIndex + 1];
+    if (!next) return null;
+    return this.obstacleAt(next.x, next.y);
+  }
+
+  /**
+   * Kills one obstacle: zeroes it out, reports `obstacleDown`, and re-routes
+   * every adventurer.
+   *
+   * This is the only place allowed to set an obstacle's `alive` to false —
+   * see the comment on the `obstacles` field. Routing every kill through here
+   * means a second kill site added later (a warden skill that collapses a
+   * wall, say) gets the mandatory re-route for free instead of relying on
+   * whoever writes it to remember the rule.
+   */
+  private killObstacle(obstacle: SimObstacle): void {
+    obstacle.hp = 0;
+    obstacle.alive = false;
+    this.destroyed.push(obstacle.id);
+    this.events.push({
+      kind: "obstacleDown",
+      targetId: obstacle.id,
+      x: obstacle.x,
+      y: obstacle.y,
+    });
+    // One hole changes the map for everyone, so everyone re-routes.
+    this.routeAll();
+  }
+
+  /** A copy, not a live reference — callers must not be able to mutate sim state. */
+  get destroyedObstacleIds(): string[] {
+    return [...this.destroyed];
   }
 
   get state(): RaidState {
@@ -251,6 +383,7 @@ export class RaidSim {
       minions: this.minions,
       adventurers: this.adventurers,
       traps: this.traps,
+      obstacles: this.obstacles.map((o) => ({ ...o })),
       skillCooldowns: this.skillCooldowns,
       killed: this.adventurers.filter((a) => a.fate === "killed").length,
       captured: this.adventurers.filter((a) => a.fate === "captured").length,
@@ -537,6 +670,29 @@ export class RaidSim {
         continue;
       }
 
+      // A wall only gets hit when there is no way round it at all. Whatever is
+      // on the next step of the route is what gets hit — not the weakest wall
+      // in the room, which would read as attacking nothing in particular.
+      const barrier = this.blockingObstacle(adventurer);
+      if (barrier) {
+        adventurer.action = "attack";
+        adventurer.facing = Math.atan2(barrier.x - adventurer.x, barrier.y - adventurer.y);
+
+        if (adventurer.cooldown === 0) {
+          adventurer.cooldown = stats.attackInterval;
+          barrier.hp -= stats.damage;
+          this.events.push({
+            kind: "obstacleHit",
+            targetId: barrier.id,
+            amount: stats.damage,
+            x: barrier.x,
+            y: barrier.y,
+          });
+          if (barrier.hp <= 0) this.killObstacle(barrier);
+        }
+        continue;
+      }
+
       adventurer.action = "walk";
       const beforeX = adventurer.x;
       const beforeY = adventurer.y;
@@ -550,8 +706,8 @@ export class RaidSim {
   private advanceAlongPath(adventurer: SimAdventurer, speed: number): void {
     let remaining = speed * SIM_DT;
 
-    while (remaining > 0 && adventurer.pathIndex < this.path.length - 1) {
-      const next = this.path[adventurer.pathIndex + 1];
+    while (remaining > 0 && adventurer.pathIndex < adventurer.path.length - 1) {
+      const next = adventurer.path[adventurer.pathIndex + 1];
       const gap = distance(adventurer.x, adventurer.y, next.x, next.y);
 
       if (gap <= remaining) {
@@ -633,7 +789,7 @@ export class RaidSim {
 
   private resolveStatus(): void {
     const reachedCore = this.adventurers.some(
-      (a) => a.alive && a.spawned && a.downed <= 0 && a.pathIndex >= this.path.length - 1,
+      (a) => a.alive && a.spawned && a.downed <= 0 && a.pathIndex >= a.path.length - 1,
     );
     if (reachedCore) {
       this.status = "breached";
