@@ -7,9 +7,19 @@ export interface MinionStats {
   attackInterval: number;
   /** Attack reach in tiles. */
   range: number;
-  /** Melee minions body-block a corridor; ranged ones do not. */
-  blocks: boolean;
 }
+
+/**
+ * The shortest reach a minion may have.
+ *
+ * Everything the player places shoots. A minion standing beside the corridor
+ * has to be able to hit what walks down it, because that is the only thing it
+ * will ever get to do — adventurers do not stop for anything that is not
+ * standing in their way. A melee convert with a one-tile reach would be a
+ * purchase that does nothing unless it happens to be blocking, so its reach is
+ * lifted to here.
+ */
+const MIN_REACH = 2.2;
 
 export interface AdventurerStats {
   hp: number;
@@ -20,48 +30,52 @@ export interface AdventurerStats {
   speed: number;
   /** Multiplier on damage taken from traps. Rogues know what to look for. */
   trapResistance: number;
-  /** Ranged classes shoot the minion furthest from the front line instead of
-   *  the nearest one, so they pick off mages hiding behind a wall of bone. */
-  targetsBackline: boolean;
 }
 
-/** Mirrored in server.js for reward calculation. Keep the two in sync. */
+/**
+ * Mirrored in server.js for reward calculation. Keep the two in sync.
+ *
+ * Both shoot. The pair is a trade between reach and survival rather than
+ * between melee and ranged: the warrior is twice the health at half the reach,
+ * so it is what you put where the route runs close and the mage is what you
+ * put where it does not.
+ */
 export const MINION_STATS: Record<Exclude<MinionType, "convert">, MinionStats> = {
-  warrior: { hp: 90, damage: 9, attackInterval: 1.0, range: 1.0, blocks: true },
-  mage: { hp: 45, damage: 7, attackInterval: 1.4, range: 3.2, blocks: false },
+  warrior: { hp: 90, damage: 9, attackInterval: 1.0, range: 2.4 },
+  mage: { hp: 45, damage: 7, attackInterval: 1.4, range: 4.2 },
 };
 
 /**
  * The five classes the KayKit Adventurers pack ships.
  *
- * Each one asks the dungeon a different question: the knight tests raw
- * blocking, the barbarian tests whether a single blocker is enough, the rogue
- * punishes trap-only builds, and the two ranged classes punish leaving squishy
- * minions where they can be shot.
+ * Each one asks the dungeon a different question: the knight tests whether a
+ * blocker holds at all, the barbarian tests whether one is enough, the rogue
+ * punishes trap-only builds, and the ranged classes chew through a blocker
+ * from outside its own reach.
  */
 export const ADVENTURER_STATS: Record<AdventurerClass, AdventurerStats> = {
   knight: {
     hp: 130, damage: 13, attackInterval: 1.1, range: 1.0, speed: 1.5,
-    trapResistance: 1, targetsBackline: false,
+    trapResistance: 1,
   },
   barbarian: {
     // Hits hardest, dies fastest to sustained damage.
     hp: 110, damage: 22, attackInterval: 1.3, range: 1.0, speed: 1.7,
-    trapResistance: 1.15, targetsBackline: false,
+    trapResistance: 1.15,
   },
   rogue: {
     // Fast and trap-aware: a corridor of spikes barely slows one down.
     hp: 85, damage: 11, attackInterval: 0.75, range: 1.0, speed: 2.1,
-    trapResistance: 0.45, targetsBackline: false,
+    trapResistance: 0.45,
   },
   mage: {
-    // Outranges a warrior, so a lone blocker never gets to swing.
+    // Outranges a blocking warrior, so it never gets a shot back.
     hp: 70, damage: 15, attackInterval: 1.6, range: 3.0, speed: 1.3,
-    trapResistance: 1.2, targetsBackline: true,
+    trapResistance: 1.2,
   },
   ranger: {
     hp: 80, damage: 10, attackInterval: 0.9, range: 3.8, speed: 1.6,
-    trapResistance: 1, targetsBackline: true,
+    trapResistance: 1,
   },
 };
 
@@ -96,8 +110,9 @@ function convertStats(cls: AdventurerClass, level: number): MinionStats {
     hp: stats.hp,
     damage: stats.damage,
     attackInterval: stats.attackInterval,
-    range: stats.range,
-    blocks: true,
+    // A turned knight keeps everything else it had, but not a reach that would
+    // leave it useless the moment it is not the thing in the way.
+    range: Math.max(stats.range, MIN_REACH),
   };
 }
 

@@ -287,9 +287,19 @@ export class RaidSim {
     this.routeAll();
   }
 
-  /** Coordinates an adventurer cannot walk into right now. */
+  /**
+   * Coordinates an adventurer cannot walk into right now.
+   *
+   * Minions count. Everything the player puts on a tile occupies it, so a
+   * minion standing in a corridor is a wall that shoots back, and one standing
+   * beside the corridor is simply not in the way. That is the whole shape of
+   * the game: the player decides which of the two they are building.
+   */
   private blocked(): Set<number> {
-    return blockedSet(this.arena, this.obstacles.filter((o) => o.alive));
+    return blockedSet(this.arena, [
+      ...this.obstacles.filter((o) => o.alive),
+      ...this.minions.filter((m) => m.alive),
+    ]);
   }
 
   /**
@@ -339,12 +349,33 @@ export class RaidSim {
     return null;
   }
 
-  /** The obstacle standing on this adventurer's next step, if any. */
-  private blockingObstacle(adventurer: SimAdventurer): SimObstacle | null {
+  private minionAt(x: number, y: number): SimMinion | null {
+    for (const m of this.minions) {
+      if (m.alive && Math.round(m.x) === x && Math.round(m.y) === y) return m;
+    }
+    return null;
+  }
+
+  /**
+   * Whatever stands on this adventurer's next step — a wall or a minion.
+   *
+   * This is the only thing an adventurer ever attacks. They are here for the
+   * core, not for the garrison: a minion beside the route is shooting them the
+   * whole way past and they do not so much as turn their head. The player who
+   * wants that minion fought has to put it in the road.
+   */
+  private blockingTarget(
+    adventurer: SimAdventurer,
+  ): { obstacle: SimObstacle } | { minion: SimMinion } | null {
     if (!adventurer.breaking) return null;
     const next = adventurer.path[adventurer.pathIndex + 1];
     if (!next) return null;
-    return this.obstacleAt(next.x, next.y);
+
+    const obstacle = this.obstacleAt(next.x, next.y);
+    if (obstacle) return { obstacle };
+
+    const minion = this.minionAt(next.x, next.y);
+    return minion ? { minion } : null;
   }
 
   /**
@@ -357,6 +388,25 @@ export class RaidSim {
    * wall, say) gets the mandatory re-route for free instead of relying on
    * whoever writes it to remember the rule.
    */
+  /**
+   * Kills one minion and re-routes.
+   *
+   * The same rule as an obstacle, and for the same reason: a minion occupies
+   * its tile, so its death opens a way through that every adventurer has to be
+   * told about. This is the only place allowed to clear a minion's `alive`.
+   */
+  private killMinion(minion: SimMinion): void {
+    minion.hp = 0;
+    minion.alive = false;
+    this.events.push({
+      kind: "minionDown",
+      targetId: minion.id,
+      x: minion.x,
+      y: minion.y,
+    });
+    this.routeAll();
+  }
+
   private killObstacle(obstacle: SimObstacle): void {
     obstacle.hp = 0;
     obstacle.alive = false;
@@ -642,53 +692,45 @@ export class RaidSim {
       const stats = scaledAdventurer(adventurer.cls, adventurer.level);
       adventurer.cooldown = Math.max(0, adventurer.cooldown - SIM_DT);
 
-      // Anything in reach is dealt with before advancing. A blocking minion
-      // standing on the corridor is reached naturally by walking into range.
-      const target = this.pickMinion(adventurer.x, adventurer.y, stats.range, stats.targetsBackline);
-      if (target) {
+      /*
+       * The only thing an adventurer attacks is whatever is standing in the
+       * way, and only when there is no way round it at all.
+       *
+       * They used to swing at any minion within reach, which made a minion
+       * beside the corridor a thing to be killed rather than a thing to walk
+       * past. Now the garrison is ignored: it shoots them the whole way and
+       * they keep running for the core. A minion the player wants fought has
+       * to be a minion the player put in the road.
+       */
+      const barrier = this.blockingTarget(adventurer);
+      if (barrier) {
+        const spot = "obstacle" in barrier ? barrier.obstacle : barrier.minion;
         adventurer.action = "attack";
-        adventurer.facing = Math.atan2(target.x - adventurer.x, target.y - adventurer.y);
+        adventurer.facing = Math.atan2(spot.x - adventurer.x, spot.y - adventurer.y);
 
         if (adventurer.cooldown === 0) {
           adventurer.cooldown = stats.attackInterval;
-          // A blessed minion still occupies the corridor, it just takes no
-          // damage — the skill buys time rather than removing the fight.
-          if (target.shield <= 0) {
-            target.hp -= stats.damage;
-            if (target.hp <= 0) {
-              target.hp = 0;
-              target.alive = false;
-              this.events.push({
-                kind: "minionDown",
-                targetId: target.id,
-                x: target.x,
-                y: target.y,
-              });
+
+          if ("obstacle" in barrier) {
+            const wall = barrier.obstacle;
+            wall.hp -= stats.damage;
+            this.events.push({
+              kind: "obstacleHit",
+              targetId: wall.id,
+              amount: stats.damage,
+              x: wall.x,
+              y: wall.y,
+            });
+            if (wall.hp <= 0) this.killObstacle(wall);
+          } else {
+            const guard = barrier.minion;
+            // A blessed minion still occupies the corridor, it just takes no
+            // damage — the skill buys time rather than removing the fight.
+            if (guard.shield <= 0) {
+              guard.hp -= stats.damage;
+              if (guard.hp <= 0) this.killMinion(guard);
             }
           }
-        }
-        continue;
-      }
-
-      // A wall only gets hit when there is no way round it at all. Whatever is
-      // on the next step of the route is what gets hit — not the weakest wall
-      // in the room, which would read as attacking nothing in particular.
-      const barrier = this.blockingObstacle(adventurer);
-      if (barrier) {
-        adventurer.action = "attack";
-        adventurer.facing = Math.atan2(barrier.x - adventurer.x, barrier.y - adventurer.y);
-
-        if (adventurer.cooldown === 0) {
-          adventurer.cooldown = stats.attackInterval;
-          barrier.hp -= stats.damage;
-          this.events.push({
-            kind: "obstacleHit",
-            targetId: barrier.id,
-            amount: stats.damage,
-            x: barrier.x,
-            y: barrier.y,
-          });
-          if (barrier.hp <= 0) this.killObstacle(barrier);
         }
         continue;
       }
@@ -744,33 +786,15 @@ export class RaidSim {
     }
   }
 
-  /**
-   * Which minion an adventurer swings at.
+  /*
+   * There is no minion-picking any more.
    *
-   * Melee classes take whatever is in the way. Ranged classes reach past it
-   * for the furthest thing they can hit, which is how a mage tucked behind a
-   * warrior gets punished for standing too close to the corridor.
+   * An adventurer used to choose a minion within reach — the nearest one, or
+   * for the ranged classes the furthest, so a mage behind a warrior got picked
+   * off. All of it is gone with the rule it served: adventurers attack what
+   * blocks them and nothing else, so the only minion that is ever a target is
+   * the one on the next tile of the route, and `blockingTarget` finds it.
    */
-  private pickMinion(
-    x: number,
-    y: number,
-    range: number,
-    backline: boolean,
-  ): SimMinion | null {
-    let best: SimMinion | null = null;
-    let bestDistance = backline ? -Infinity : Infinity;
-
-    for (const minion of this.minions) {
-      if (!minion.alive) continue;
-      const d = distance(x, y, minion.x, minion.y);
-      if (d > range) continue;
-      if (backline ? d > bestDistance : d < bestDistance) {
-        best = minion;
-        bestDistance = d;
-      }
-    }
-    return best;
-  }
 
   private nearestAdventurer(x: number, y: number, range: number): SimAdventurer | null {
     let best: SimAdventurer | null = null;

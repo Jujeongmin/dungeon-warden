@@ -5,7 +5,7 @@ import { lureTiles } from "./rooms";
 import { SKILL_STATS } from "./sim/traps";
 import type { Arena } from "./arena";
 import type { ResearchEffects } from "./research";
-import { maybeShowInterstitial, watchReviveAd } from "./ads";
+import { watchReviveAd } from "./ads";
 import type { DungeonMeta } from "./useDungeonSave";
 import type {
   PlacedMinion,
@@ -57,7 +57,6 @@ interface Options {
   jailFree: number;
   weaponTiers: Record<string, number>;
   research: ResearchEffects;
-  adsRemoved: boolean;
   onFinished: (result: RaidFinishResult) => void;
   /**
    * Walls the party broke through to reach the core are gone for good. The
@@ -85,7 +84,6 @@ export function useRaid({
   jailFree,
   weaponTiers,
   research,
-  adsRemoved,
   onFinished,
   onObstaclesDestroyed,
   onEvents,
@@ -169,12 +167,9 @@ export function useRaid({
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         settlingRef.current = false;
-        // The natural break in the session, and the slot the remove_ads
-        // product buys out of.
-        void maybeShowInterstitial(adsRemoved);
       }
     },
-    [server, onFinished, onObstaclesDestroyed, adsRemoved],
+    [server, onFinished, onObstaclesDestroyed],
   );
 
   // Fixed-step loop, keyed on the run id so it starts once per raid instead of

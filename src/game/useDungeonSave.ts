@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { arenaFor, coreOf, entranceOf, inArena, type Arena } from "./arena";
-import { maybeShowInterstitial } from "./ads";
 import { addCost, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
@@ -599,7 +598,6 @@ export function useDungeonSave() {
     saveNow,
     resetGame,
     refreshEntitlements,
-    maybeShowInterstitial: () => maybeShowInterstitial(entitlementsRef.current.adsRemoved),
   };
 }
 

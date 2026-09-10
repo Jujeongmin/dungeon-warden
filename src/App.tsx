@@ -291,7 +291,6 @@ export default function App() {
     jailFree,
     weaponTiers,
     research: unlocked,
-    adsRemoved: entitlements.adsRemoved,
     onFinished: save.applyRaidResult,
     onObstaclesDestroyed: save.clearDestroyedObstacles,
   });
@@ -547,9 +546,17 @@ export default function App() {
       return;
     }
     rendererRef.current?.setPathPreview(
-      buildRaidPath(arena, entrance, core, lureTiles(rooms), blockedSet(arena, obstacles)),
+      // Minions block, so the preview has to count them or it draws a route
+      // the raid will not take. Same set the simulation builds.
+      buildRaidPath(
+        arena,
+        entrance,
+        core,
+        lureTiles(rooms),
+        blockedSet(arena, [...obstacles, ...minions]),
+      ),
     );
-  }, [arena, entrance, core, obstacles, meta, rooms, raid.raiding]);
+  }, [arena, entrance, core, obstacles, minions, meta, rooms, raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
