@@ -253,6 +253,9 @@ const ENTRANCE_MARK = 0xff6a4a;
 const CORE_TINT = 0xffc766;
 
 /** The placement preview: legal here, and not. */
+/** The reach circle under a minion being placed. */
+const RANGE_RING = 0x9fd8ff;
+
 const GHOST_OK = 0x8fe6a0;
 const GHOST_NO = 0xff7a6a;
 
@@ -355,6 +358,8 @@ export class DungeonRenderer {
   private ghostKey: string | null = null;
   private ghostLegal = true;
   private ghostLift = 0;
+  private rangeRing: THREE.Mesh | null = null;
+  private rangeRadius = 0;
   private pathMarkers: THREE.Object3D[] = [];
   private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
 
@@ -1788,6 +1793,64 @@ export class DungeonRenderer {
     const tile = this.hovered;
     this.ghost.visible = tile !== null;
     if (tile) this.ghost.position.set(tile.x, FLOOR_HEIGHT + this.ghostLift, tile.y);
+    this.positionRangeRing();
+  }
+
+  /**
+   * How far the thing being placed can shoot, drawn on the floor.
+   *
+   * Reach is the whole decision when placing a minion — an archer behind a
+   * wall is a tower and one in the open is a target, and the difference is
+   * whether the route passes through this circle. Without seeing it the player
+   * is guessing at a number they were never told.
+   *
+   * Null clears it, which is what every tool that does not shoot passes.
+   */
+  setRangeRing(radius: number | null): void {
+    if (radius === null || radius <= 0) {
+      if (this.rangeRing) {
+        this.scene.remove(this.rangeRing);
+        this.rangeRing.geometry.dispose();
+        (this.rangeRing.material as THREE.Material).dispose();
+        this.rangeRing = null;
+      }
+      this.rangeRadius = 0;
+      return;
+    }
+
+    if (this.rangeRadius !== radius) {
+      if (this.rangeRing) {
+        this.scene.remove(this.rangeRing);
+        this.rangeRing.geometry.dispose();
+        (this.rangeRing.material as THREE.Material).dispose();
+      }
+      // A band rather than a disc: a filled circle hides the floor the player
+      // is trying to read the route off.
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(radius - 0.06, radius, 48),
+        new THREE.MeshBasicMaterial({
+          color: RANGE_RING,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      this.scene.add(ring);
+      this.rangeRing = ring;
+      this.rangeRadius = radius;
+    }
+
+    this.positionRangeRing();
+  }
+
+  private positionRangeRing(): void {
+    const ring = this.rangeRing;
+    if (!ring) return;
+    const tile = this.hovered;
+    ring.visible = tile !== null;
+    if (tile) ring.position.set(tile.x, FLOOR_HEIGHT + 0.02, tile.y);
   }
 
   private attachPointerEvents(): void {
@@ -2003,6 +2066,7 @@ export class DungeonRenderer {
     this.setPathPreview(null);
     this.pathGeometry.dispose();
     this.disposeEntranceMark();
+    this.setRangeRing(null);
     for (const object of this.landmarks) this.disposeObject(this.scene, object);
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);

@@ -289,6 +289,7 @@ export default function App() {
 
   const raid = useRaid({
     onEvents: onSimEvents,
+    initialSpeed: settings.raidSpeed,
     arena,
     meta,
     minions,
@@ -509,10 +510,23 @@ export default function App() {
     const modelKey = TOOL_MODEL[toolId] ?? null;
     if (!modelKey || raid.raiding || !hover) {
       renderer.setGhost(null, true);
+      renderer.setRangeRing(null);
       return;
     }
     renderer.setGhost(modelKey, ghostLegal(hover.x, hover.y));
-  }, [toolId, hover, raid.raiding, ghostLegal]);
+
+    /*
+     * Show the reach of anything that shoots.
+     *
+     * Where a minion goes is decided entirely by whether the route passes
+     * through this circle — inside it and the minion fires; inside it and
+     * reachable, and the party comes for the minion instead. That was a number
+     * the player was never shown.
+     */
+    renderer.setRangeRing(
+      tool.kind === "minion" ? minionStatsFor({ type: tool.type }).range : null,
+    );
+  }, [toolId, tool, hover, raid.raiding, ghostLegal]);
 
   /**
    * Tell the camera how much of itself the HUD is covering.
@@ -812,7 +826,11 @@ export default function App() {
             <span>{raid.raidState.elapsed.toFixed(0)}{t("seconds")}</span>
             <div className="speeds">
               {RAID_SPEEDS.map((s) => (
-                <button key={s} className={raid.speed === s ? "active" : ""} onClick={() => raid.setSpeed(s)}>
+                <button
+                  key={s}
+                  className={raid.speed === s ? "active" : ""}
+                  onClick={() => { raid.setSpeed(s); patchSettings({ raidSpeed: s }); }}
+                >
                   {s}×
                 </button>
               ))}

@@ -10,12 +10,26 @@ import { detectLocale, type Locale } from "../i18n/strings";
 
 export type Quality = "low" | "high";
 
+/**
+ * Mirrors RAID_SPEEDS in useRaid.ts. Declared here rather than imported so a
+ * preferences file does not depend on the raid loop.
+ */
+export type RaidSpeed = 1 | 2 | 4;
+
 export interface Settings {
   muted: boolean;
   /** The background loop, separately from the cues: it is the first thing a
    *  player turns off, and turning it off should not cost them the hits. */
   music: boolean;
   quality: Quality;
+  /**
+   * How fast raids run.
+   *
+   * Remembered because it is a preference, not a per-raid decision: a player
+   * twenty raids in watches at 4x, and resetting to 1x every time makes them
+   * say so again every time.
+   */
+  raidSpeed: RaidSpeed;
   locale: Locale;
   /** Set once the player has seen the opening explanation. */
   introSeen: boolean;
@@ -29,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   muted: false,
   music: true,
   quality: "high",
+  raidSpeed: 1,
   locale: "en",
   introSeen: false,
   tutorialDone: false,

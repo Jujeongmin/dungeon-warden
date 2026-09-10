@@ -64,6 +64,8 @@ interface Options {
    * disagreeing with the save until the next reload.
    */
   onObstaclesDestroyed: (ids: string[]) => void;
+  /** Where the speed control starts, remembered from last session. */
+  initialSpeed?: RaidSpeed;
 }
 
 /**
@@ -87,6 +89,7 @@ export function useRaid({
   onFinished,
   onObstaclesDestroyed,
   onEvents,
+  initialSpeed,
 }: Options) {
   const eventsRef = useRef(onEvents);
   eventsRef.current = onEvents;
@@ -94,7 +97,7 @@ export function useRaid({
 
   const [raidState, setRaidState] = useState<RaidState | null>(null);
   const [starting, setStarting] = useState(false);
-  const [speed, setSpeed] = useState<RaidSpeed>(1);
+  const [speed, setSpeed] = useState<RaidSpeed>(initialSpeed ?? 1);
   const [result, setResult] = useState<RaidFinishResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
