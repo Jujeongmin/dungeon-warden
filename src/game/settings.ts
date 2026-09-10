@@ -12,6 +12,9 @@ export type Quality = "low" | "high";
 
 export interface Settings {
   muted: boolean;
+  /** The background loop, separately from the cues: it is the first thing a
+   *  player turns off, and turning it off should not cost them the hits. */
+  music: boolean;
   quality: Quality;
   locale: Locale;
   /** Set once the player has seen the opening explanation. */
@@ -24,6 +27,7 @@ const KEY = "dw.settings";
 
 export const DEFAULT_SETTINGS: Settings = {
   muted: false,
+  music: true,
   quality: "high",
   locale: "en",
   introSeen: false,

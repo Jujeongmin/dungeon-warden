@@ -50,6 +50,15 @@ export function SettingsDialog({
           </button>
         </div>
 
+        {/* Separate from the sound switch above: the loop is the first thing a
+            player turns off, and turning it off should not cost them the hits. */}
+        <div className="setting-row">
+          <span>{t("settings_music")}</span>
+          <button onClick={() => onChange({ music: !settings.music })}>
+            {settings.music ? t("settings_on") : t("settings_off")}
+          </button>
+        </div>
+
         <div className="setting-row">
           <span>{t("settings_quality")}</span>
           <button

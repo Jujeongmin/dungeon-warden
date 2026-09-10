@@ -112,6 +112,7 @@ const ko = {
   result_waves: "누적 격퇴",
   result_breaches: "누적 돌파",
   result_continue: "계속",
+  settings_music: "음악",
 
   // Manage
   manage_empty: "아직 관리할 것이 없습니다. 침입을 한 번 막아보세요.",
@@ -354,6 +355,7 @@ const en: Record<StringKey, string> = {
   result_waves: "Total repelled",
   result_breaches: "Total breaches",
   result_continue: "Continue",
+  settings_music: "Music",
 
   manage_empty: "Nothing to manage yet. Survive a raid first.",
   manage_loot: "Looted weapons",

@@ -65,3 +65,16 @@ renamed on the way in — the originals are named below.
 Dropping more CC0 files into `public/assets/audio/` and re-running
 `npm run assets` is enough to extend or replace the set; the engine falls back
 to synthesised tones for any cue it cannot match.
+
+## Music — "Loopable Dungeon Ambience", by JaggedStone
+
+<https://opengameart.org/content/loopable-dungeon-ambience> · CC0
+
+| File | Source |
+|---|---|
+| dungeon_ambience.ogg | <https://opengameart.org/sites/default/files/dungeon_ambient_1_0.ogg> |
+
+The one music track: a 94-second seamless loop of low wind and water drips,
+renamed on the way in. It is not synthesised when missing, unlike the cues —
+a generated click is still a click, but two minutes of generated room tone is
+a fault rather than music, so the game simply runs silent without it.

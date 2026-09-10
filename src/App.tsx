@@ -309,6 +309,27 @@ export default function App() {
     };
   }, []);
 
+  /*
+   * The background loop runs while the dungeon is on screen.
+   *
+   * Not on the title, which is a menu over a dimmed room and wants the quiet.
+   * It waits for the AudioContext, which only exists after the player has
+   * touched something — and entering the game is exactly that touch.
+   */
+  useEffect(() => {
+    if (screen !== "game" || !settings.music) {
+      audio.stopMusic();
+      return;
+    }
+    void audio.startMusic();
+  }, [screen, settings.music]);
+
+  // A raid has its own noise — hits, traps, the result. The loop steps back
+  // rather than everything else being pushed forward.
+  useEffect(() => {
+    audio.duckMusic(raid.raiding);
+  }, [raid.raiding]);
+
   // The renderer is built once; handlers that change every render are reached
   // through a ref so the scene is never torn down mid-session.
   const tapRef = useRef<(x: number, y: number) => void>(() => {});
@@ -563,6 +584,7 @@ export default function App() {
       raidState: raid.raidState,
       raidResult: raid.result,
       showResult: raid.showResult,
+      audio,
       rendererStats: () => rendererRef.current?.debugStats() ?? null,
       rendererShakeState: () => rendererRef.current?.debugShakeState() ?? null,
       renderer: () => rendererRef.current,

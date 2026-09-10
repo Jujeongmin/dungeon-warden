@@ -76,6 +76,26 @@ const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   defeat: [/jingles.*lose/, /lose/, /^fail/, /^gameover/],
 };
 
+/**
+ * The background loop, matched out of the same manifest as the cues.
+ *
+ * There is only one, so it does not need a cue name — anything that reads as
+ * ambience or a loop is it.
+ */
+const MUSIC_PATTERNS: RegExp[] = [/ambience/, /ambient/, /^music/, /loop/];
+
+/**
+ * How loud the loop sits under everything else.
+ *
+ * Well under the cues: this is a room tone, and a player should notice it stop
+ * rather than notice it start. The duck is what the raid does to it, so a
+ * fight is still carried by its own hits.
+ */
+const MUSIC_LEVEL = 0.34;
+const MUSIC_DUCKED = 0.15;
+/** Long enough that neither end of the loop is an event. */
+const MUSIC_FADE = 1.8;
+
 const MANIFEST_URL = publicUrl("assets/audio/manifest.json");
 const STORAGE_KEY = "dw.muted";
 
@@ -94,6 +114,13 @@ class AudioEngine {
   private muted = false;
   /** Cues fired within this window collapse into one, so a wave of hits does not roar. */
   private lastPlayed = new Map<Cue, number>();
+
+  /** The background loop. `undefined` means "not looked for yet". */
+  private musicBuffer: AudioBuffer | null | undefined = undefined;
+  private musicSource: AudioBufferSourceNode | null = null;
+  private musicGain: GainNode | null = null;
+  private musicWanted = false;
+  private musicTarget = MUSIC_LEVEL;
 
   constructor() {
     try {
@@ -129,6 +156,7 @@ class AudioEngine {
   async unlock(): Promise<void> {
     if (this.initialised) {
       if (this.context?.state === "suspended") await this.context.resume();
+      if (this.musicWanted) void this.startMusic();
       return;
     }
     this.initialised = true;
@@ -155,6 +183,10 @@ class AudioEngine {
     } catch {
       this.entries = [];
     }
+
+    // The player may have reached the dungeon before the manifest did — the
+    // gesture that unlocks the context is usually the same tap that enters it.
+    if (this.musicWanted) void this.startMusic();
   }
 
   private resolve(cue: Cue): ManifestEntry | null {
@@ -211,6 +243,108 @@ class AudioEngine {
     // Kick off the file load for next time, and use the tone right now.
     if (!this.buffers.has(cue)) void this.loadBuffer(cue);
     this.playTone(cue);
+  }
+
+  /**
+   * Starts the background loop, or does nothing if there is no music file.
+   *
+   * Deliberately not synthesised when the file is missing, unlike the cues: a
+   * missing click can be a beep and still be a click, but two minutes of
+   * generated room tone is not music, it is a fault the player would want to
+   * turn off.
+   */
+  async startMusic(): Promise<void> {
+    this.musicWanted = true;
+    // No context yet means no gesture yet. The wish is recorded and `unlock`
+    // honours it, rather than this failing quietly and never being retried.
+    if (!this.context || !this.master || this.musicSource) return;
+
+    const buffer = await this.loadMusic();
+    // The player may have left, or muted and unmuted, while this was loading.
+    if (!buffer || !this.musicWanted || this.musicSource) return;
+    if (!this.context || !this.master) return;
+
+    const gain = this.context.createGain();
+    gain.gain.value = 0.0001;
+    gain.connect(this.master);
+
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain);
+    source.start();
+
+    this.musicGain = gain;
+    this.musicSource = source;
+    this.rampMusic(this.musicTarget, MUSIC_FADE);
+  }
+
+  /** Fades the loop out and releases it. */
+  stopMusic(): void {
+    this.musicWanted = false;
+    const source = this.musicSource;
+    const gain = this.musicGain;
+    if (!source || !gain || !this.context) return;
+
+    this.musicSource = null;
+    this.musicGain = null;
+
+    const end = this.context.currentTime + MUSIC_FADE * 0.5;
+    gain.gain.cancelScheduledValues(this.context.currentTime);
+    gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.0001), this.context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end);
+    // Stopped after the fade, not with it, or the fade is never heard.
+    source.stop(end + 0.05);
+  }
+
+  /**
+   * Pulls the loop down while something louder is happening.
+   *
+   * The raid is the case: hits, traps and the result jingle all have to cut
+   * through, and they do it by the music getting out of the way rather than by
+   * everything else getting louder.
+   */
+  duckMusic(ducked: boolean): void {
+    this.musicTarget = ducked ? MUSIC_DUCKED : MUSIC_LEVEL;
+    this.rampMusic(this.musicTarget, 0.9);
+  }
+
+  private rampMusic(level: number, seconds: number): void {
+    if (!this.musicGain || !this.context) return;
+    const now = this.context.currentTime;
+    this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.setValueAtTime(Math.max(this.musicGain.gain.value, 0.0001), now);
+    this.musicGain.gain.exponentialRampToValueAtTime(Math.max(level, 0.0001), now + seconds);
+  }
+
+  private async loadMusic(): Promise<AudioBuffer | null> {
+    if (this.musicBuffer !== undefined) return this.musicBuffer;
+    if (!this.context) return null;
+
+    // An empty list is "the manifest has not arrived", not "there is no music
+    // file". Caching a null here is what kept the loop permanently silent:
+    // startMusic ran the instant the player entered the dungeon, which is the
+    // same gesture that starts the manifest fetch, so it lost the race and
+    // then remembered losing it.
+    if (this.entries.length === 0) return null;
+
+    const entry = MUSIC_PATTERNS.map((pattern) =>
+      this.entries.find((candidate) => pattern.test(candidate.name)),
+    ).find(Boolean);
+
+    if (!entry) {
+      this.musicBuffer = null;
+      return null;
+    }
+
+    try {
+      const response = await fetch(entry.url);
+      const bytes = await response.arrayBuffer();
+      this.musicBuffer = await this.context.decodeAudioData(bytes);
+    } catch {
+      this.musicBuffer = null;
+    }
+    return this.musicBuffer;
   }
 
   private playTone(cue: Cue): void {

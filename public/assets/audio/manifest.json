@@ -19,6 +19,12 @@
       "bytes": 35662
     },
     {
+      "url": "/assets/audio/dungeon_ambience.ogg",
+      "name": "dungeon_ambience",
+      "group": "",
+      "bytes": 1626352
+    },
+    {
       "url": "/assets/audio/error_004.wav",
       "name": "error_004",
       "group": "",
