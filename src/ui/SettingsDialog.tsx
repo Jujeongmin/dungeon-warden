@@ -11,7 +11,8 @@ interface Props {
   onClose: () => void;
 }
 
-const LOCALES: Locale[] = ["ko", "en"];
+/** Derived from the table, so adding a language cannot forget the picker. */
+const LOCALES = Object.keys(LOCALE_LABEL) as Locale[];
 
 export function SettingsDialog({
   settings,

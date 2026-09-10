@@ -1582,3 +1582,79 @@ button.ad-gold {
 
 /* Room for the last row to clear the foot instead of being sliced by it. */
 .hud-body { padding-bottom: 6px; }
+
+/* ── Modals and the title, in the panel's language ────────────────────────
+ *
+ * The build panel got three weights — quiet nav, solid controls, one loud
+ * action — and the dialogs kept the old one, where every row and every button
+ * carried the same border and the same fill. Two vocabularies in one game is
+ * most of what "unfinished" looks like.
+ */
+
+/* A dialog heading is a heading, not a row of the same size as its contents. */
+.modal-head h2 {
+  font-size: var(--fs-lg);
+  letter-spacing: var(--ls-wide);
+}
+
+/* Settings rows: the label is the thing, the control sits quietly beside it.
+   They were two slabs of equal weight facing each other across a divider. */
+.setting-row button,
+.setting-row select {
+  background: none;
+  border: 1px solid var(--line);
+  box-shadow: none;
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  min-width: 88px;
+  padding: 6px 8px;
+}
+
+.setting-row button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+.setting-row button:active:not(:disabled) { transform: none; box-shadow: none; }
+.setting-row.danger-row button { border-color: rgba(215, 106, 90, 0.45); }
+
+/* One loud action per dialog, matching the panel's foot. */
+.modal .actions .primary,
+.title-start {
+  background: linear-gradient(180deg, #4a3a22, #2f2519);
+  border-color: rgba(232, 164, 76, 0.55);
+  color: var(--accent);
+  font-weight: var(--fw-bold);
+}
+
+/* The title's secondary row is navigation, so it reads like the tabs do. */
+.title-menu button {
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: var(--muted);
+  padding: 8px 4px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+.title-menu button:hover:not(:disabled) { background: none; color: var(--ink); }
+.title-menu button:active:not(:disabled) { transform: none; box-shadow: none; }
+
+/* The save summary is a reading, not a panel. */
+.title-save {
+  border: none;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Research and shop rows were bordered cards inside a bordered panel. One
+   border is enough; the rule between them says the rest. */
+.panel,
+.research,
+.shop-item {
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+
+.panel { background: none; padding-left: 0; padding-right: 0; }

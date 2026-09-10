@@ -26,7 +26,15 @@
 }
 
 :root {
-  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Pretendard is subset to Hangul and Latin, so Japanese kana and Chinese
+     hanzi fall through to whatever the device ships. Naming those faces here
+     rather than leaving it to `sans-serif` is the difference between a game
+     and a browser default on the three CJK locales. */
+  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP",
+    "PingFang TC", "Microsoft JhengHei", "Noto Sans TC",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    sans-serif;
 
   /* Type scale. A handful of steps, reused everywhere, instead of a
      one-off size per element. */
