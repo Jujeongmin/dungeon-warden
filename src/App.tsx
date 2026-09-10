@@ -18,6 +18,7 @@ import { LeaderboardDialog } from "./ui/LeaderboardDialog";
 import { TitleScreen } from "./ui/TitleScreen";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
+import { ResultDialog } from "./ui/ResultDialog";
 import { useCountUp } from "./ui/useCountUp";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
@@ -548,6 +549,7 @@ export default function App() {
       stepRaid: raid.stepRaid,
       raidState: raid.raidState,
       raidResult: raid.result,
+      showResult: raid.showResult,
       rendererStats: () => rendererRef.current?.debugStats() ?? null,
       rendererShakeState: () => rendererRef.current?.debugShakeState() ?? null,
       renderer: () => rendererRef.current,
@@ -671,7 +673,7 @@ export default function App() {
 
       {/* One stack so banners and the tutorial never sit on top of each other,
           on any screen size. */}
-      <div className="topstack">
+      <div className={raid.raiding ? "topstack raiding" : "topstack"}>
         {isOffline && showOfflineBanner && (
           <div className="banner">
             <button className="banner-close" onClick={() => setShowOfflineBanner(false)} aria-label="close">×</button>
@@ -756,46 +758,7 @@ export default function App() {
         </div>
       )}
 
-      {raid.result && (
-        <div className="modal-backdrop" onClick={raid.dismissResult}>
-          <div className="modal narrow" onClick={(e) => e.stopPropagation()}>
-            <header className="modal-head">
-              <h2>{raid.result.outcome === "repelled" ? t("result_repelled") : t("result_breached")}</h2>
-              <button className="icon-btn" onClick={raid.dismissResult} aria-label="close">×</button>
-            </header>
-            <p className="modal-note">
-              {raid.result.outcome === "repelled"
-                ? t("result_repelled_note")
-                : t("result_breached_note")}
-            </p>
-            {raid.result.capturedNames && raid.result.capturedNames.length > 0 && (
-              <p className="modal-note owned">
-                {t("result_captured")}: {raid.result.capturedNames.join(", ")} — {t("result_captured_note")}
-              </p>
-            )}
-            {raid.result.lootGained && raid.result.lootGained.length > 0 && (
-              <p className="modal-note">
-                {t("result_loot")}: {raid.result.lootGained.map((l) => `T${l.tier} ${t("weapon")}`).join(", ")}
-              </p>
-            )}
-            {raid.result.local ? (
-              <p className="modal-note warn">
-                {t("result_local")}
-              </p>
-            ) : (
-              <ul className="result-list">
-                <li><span>{t("result_reward")}</span><b>+{raid.result.reward}</b></li>
-                {raid.result.plundered > 0 && (
-                  <li><span>{t("result_plundered")}</span><b className="bad">-{raid.result.plundered}</b></li>
-                )}
-                <li><span>{t("stat_threat")}</span><b>{raid.result.threat}</b></li>
-                <li><span>{t("result_waves")}</span><b>{raid.result.wavesRepelled}</b></li>
-                <li><span>{t("result_breaches")}</span><b>{raid.result.coreBreaches}</b></li>
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      {raid.result && <ResultDialog result={raid.result} onClose={raid.dismissResult} />}
 
       <aside ref={hudRef} className={hudOpen ? "hud" : "hud collapsed"}>
         <div className="hud-tabs">

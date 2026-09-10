@@ -111,6 +111,7 @@ const ko = {
   result_plundered: "약탈당한 골드",
   result_waves: "누적 격퇴",
   result_breaches: "누적 돌파",
+  result_continue: "계속",
 
   // Manage
   manage_empty: "아직 관리할 것이 없습니다. 침입을 한 번 막아보세요.",
@@ -354,6 +355,7 @@ const en: Record<StringKey, string> = {
   result_plundered: "Gold plundered",
   result_waves: "Total repelled",
   result_breaches: "Total breaches",
+  result_continue: "Continue",
 
   manage_empty: "Nothing to manage yet. Survive a raid first.",
   manage_loot: "Looted weapons",

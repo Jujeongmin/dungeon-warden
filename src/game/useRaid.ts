@@ -392,6 +392,8 @@ export function useRaid({
     useSkill,
     resolveSkillTarget,
     stepRaid,
+    /** Dev only: drives the result screen without a server. See devtools. */
+    showResult: setResult,
     dismissResult,
     reviveWithAd,
     adUsed,
