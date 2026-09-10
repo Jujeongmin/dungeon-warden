@@ -135,9 +135,23 @@ legal, meaningful move, so nothing needs to forbid it. One rule fewer to learn.
 
 Version 2 loads a version 1 save by dropping `grid` and keeping everything
 else: gold, research, threat, records, nemeses, prisoners, loot, and the
-placed minions, traps and rooms. Those placements sat on carved floor, and the
-whole room is floor now, so their coordinates stay valid. Nobody loses a
-dungeon.
+placed minions, traps and rooms.
+
+Those placements are **turned a quarter turn** on the way through — every
+`(x, y)` becomes `(y, x)`. Version 1 was this same room in landscape: 12 tall,
+widening to 16 and then 20 with the expansion research, entrance on the left
+wall at `(0, midY)` and core on the right at `(w - 1, midY)`. Version 2 is
+portrait with those numbers on the other axis. Swapping the coordinates maps
+one onto the other exactly — the old far column becomes the new far row, and a
+player's maze keeps its shape relative to the two tiles it was built around.
+
+Leaving them alone, which is what this section used to say, would have put
+every placement in an expanded save outside a 12-wide room, and rotated
+everyone else's dungeon relative to the entrance. `tests/migration.test.ts`
+pins the correspondence the swap relies on; the server's own `migrate` cannot
+be imported to test directly, because server.js is a single unexported file.
+
+Nobody loses a dungeon.
 
 ## Code
 

@@ -849,8 +849,37 @@ function dedupeById(list) {
 function migrate(dungeon) {
   if (dungeon.version === SAVE_VERSION) return dungeon;
   if (dungeon.version !== 1) return null;
+
   const { grid, ...rest } = dungeon;
-  return { ...rest, version: SAVE_VERSION, obstacles: [] };
+  return {
+    ...rest,
+    version: SAVE_VERSION,
+    obstacles: [],
+    minions: transposeAll(rest.minions),
+    traps: transposeAll(rest.traps),
+    rooms: transposeAll(rest.rooms),
+  };
+}
+
+/**
+ * Turns a version 1 dungeon a quarter turn.
+ *
+ * Version 1 was landscape: 12 tall, widening to 16 and then 20 with the
+ * expansion research, with the entrance on the left wall at `(0, midY)` and
+ * the core on the right at `(w - 1, midY)`. Version 2 is portrait with the
+ * same numbers on the other axis — 12 wide, growing to 16 and 20 tall, the
+ * entrance at `(midX, 0)` and the core at `(midX, h - 1)`.
+ *
+ * The two describe the same room seen sideways, so swapping x and y carries a
+ * save across exactly: an expanded board's far column becomes its far row and
+ * lands inside the new arena instead of off the side of it, and a player's
+ * maze keeps its shape relative to the two tiles that matter. Leaving the
+ * coordinates alone would have put every placement from an expanded save out
+ * of bounds, and rotated everyone else's dungeon relative to the entrance.
+ */
+function transposeAll(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({ ...item, x: item.y, y: item.x }));
 }
 
 function createDefaultDungeon() {
