@@ -1370,7 +1370,15 @@ button.primary {
 /* 3 — the title screen. It stands in front of the room, but it is still a
    screen with buttons on it, and the settings, leaderboard and shop open from
    those buttons. Putting it above the modals is what buried them: the dialog
-   was open and rendering, behind a wall of title. */
+   was open and rendering, behind a wall of title.
+
+   This layer is not enough on its own. Both .title and .modal-backdrop carry a
+   backdrop-filter, and two overlapping filtered layers composite in document
+   order whatever their z-index says — so the title element also has to come
+   before the dialogs in App.tsx, which it does, with the reason written there
+   too. Hit-testing obeys z-index either way, which is what made this look like
+   nothing was wrong: the modal took the clicks while the title took the
+   screen. */
 .title { z-index: 30; }
 
 /* 4 — anything modal, over everything including the title. */

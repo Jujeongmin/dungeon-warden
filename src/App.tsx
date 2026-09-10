@@ -1038,6 +1038,31 @@ export default function App() {
         {account && <p className="hint small account">{account}</p>}
       </aside>
 
+      {/*
+        * Sits above the running scene, so the dungeon is already rendered and
+        * warm by the time the player presses start — and *before* the dialogs
+        * in the DOM, because its own buttons open them.
+        *
+        * The order matters here in a way z-index does not fix. Both this and a
+        * modal backdrop carry a backdrop-filter, and two overlapping filtered
+        * layers composite in document order whatever their z-index says.
+        * Written after the dialogs, the title painted over an open shop —
+        * hit-testing put the modal on top, the screen did not — which is a
+        * player pressing a button on the title and getting a ghost.
+        */}
+      {screen === "title" && (
+        <TitleScreen
+          hasProgress={hasProgress}
+          summary={meta}
+          loading={status === "connecting" || status === "loading"}
+          offline={isOffline}
+          onStart={enterGame}
+          onSettings={() => setSettingsOpen(true)}
+          onLeaderboard={() => setBoardOpen(true)}
+          onShop={() => setShopOpen(true)}
+        />
+      )}
+
       {shopOpen && (
         <ShopDialog
           entitlements={entitlements}
@@ -1067,21 +1092,6 @@ export default function App() {
       )}
 
       {introOpen && <IntroDialog onClose={() => setIntroOpen(false)} />}
-
-      {/* Sits above the running scene, so the dungeon is already rendered and
-          warm by the time the player presses start. */}
-      {screen === "title" && (
-        <TitleScreen
-          hasProgress={hasProgress}
-          summary={meta}
-          loading={status === "connecting" || status === "loading"}
-          offline={isOffline}
-          onStart={enterGame}
-          onSettings={() => setSettingsOpen(true)}
-          onLeaderboard={() => setBoardOpen(true)}
-          onShop={() => setShopOpen(true)}
-        />
-      )}
     </div>
     </LocaleProvider>
   );
