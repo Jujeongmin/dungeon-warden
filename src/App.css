@@ -1416,3 +1416,169 @@ button.ad-gold {
   border-color: rgba(232, 164, 76, 0.5);
   color: var(--accent);
 }
+
+/* ── The build panel, rebuilt ─────────────────────────────────────────────
+ *
+ * It was fifteen buttons of equal weight above four paragraphs of standing
+ * explanation, and the button that starts the game was below the fold. That is
+ * a form. A control surface says what matters by making it bigger, and asks
+ * one question at a time.
+ *
+ * Kind first, then the thing. At most six items are ever visible, the counters
+ * live on the kind that owns them, and the panel is short enough that the
+ * primary action is always on screen.
+ */
+
+.groups {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 2px 6px;
+  border-radius: 4px;
+}
+
+.group b {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+}
+
+/* The count is a reading, not a label: quieter than the name above it, and
+   tabular so switching kinds does not shuffle the row. */
+.group i {
+  font-style: normal;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.group.active b { color: var(--accent); }
+
+/* Removing is a mode, not a thing you place, so it is not one of the kinds. */
+.group.remove {
+  flex: 0 0 34px;
+  font-size: var(--fs-md);
+  padding: 7px 0;
+}
+
+/* One row of prices, one weight quieter than the names. */
+.tool i { color: var(--muted); }
+
+/* Gold is the score. It was the same size as a menu button. */
+.gold {
+  font-size: var(--fs-lg);
+  letter-spacing: var(--ls-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats .icon-toggle {
+  width: 30px;
+  height: 30px;
+  font-size: var(--fs-base);
+}
+
+/* The panel no longer needs half the screen to hold what is in it. */
+@media (max-width: 760px) {
+  .hud { max-height: 34%; }
+  .toolbar { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* The panel's foot: the one action, always on screen, never scrolled. */
+.hud-foot {
+  flex: none;
+  padding-top: 8px;
+  border-top: 1px solid var(--edge-dark);
+  box-shadow: 0 -1px 0 var(--edge-lit);
+}
+
+.hud-foot .go {
+  width: 100%;
+  padding: 11px 12px;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-normal);
+  background: linear-gradient(180deg, #4a3a22, #2f2519);
+  border-color: rgba(232, 164, 76, 0.55);
+  color: var(--accent);
+}
+
+.hud-foot .go:disabled { opacity: 0.45; }
+
+/* Five controls across a phone: let them shrink instead of pushing the last
+   one off the edge. */
+.group { min-width: 0; }
+.group b, .group i { white-space: nowrap; }
+
+/* Five across 328px: the last one was losing 2px off its right edge. */
+.groups { gap: 3px; }
+.group { padding: 7px 1px 6px; }
+.group.remove { flex: 0 0 30px; font-size: var(--fs-base); }
+
+/* Removing gets a name like everything beside it. A lone glyph on a phone is a
+   guess, and this one is the tool that takes things away. */
+.group.remove {
+  flex: 0 0 46px;
+  justify-content: center;
+  font-size: inherit;
+}
+
+/* Two rows of tools have to fit without the second one being sliced by the
+   panel edge, so the cards lose the height they were not using. */
+.tool { padding: 5px 3px; gap: 2px; }
+.tool-icon { width: 24px; height: 24px; }
+
+@media (max-width: 760px) {
+  .hud { max-height: 38%; }
+}
+
+/* ── Hierarchy inside the panel ───────────────────────────────────────────
+ *
+ * Tabs, kinds and the action were three rows of the same slab, so the panel
+ * read as a list of buttons with no shape. They do different jobs and should
+ * not look alike: the tabs are somewhere to go, the kinds are what you are
+ * holding, the action is the point of all of it.
+ *
+ * Quiet, solid, loud — top to bottom.
+ */
+.hud-tabs button {
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: var(--muted);
+  padding: 6px 4px 7px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  font-size: var(--fs-xs);
+}
+
+.hud-tabs button:hover:not(:disabled) { background: none; color: var(--ink); }
+.hud-tabs button:active:not(:disabled) { transform: none; box-shadow: none; }
+
+/* The torch marks the page you are on, and only that. */
+.hud-tabs button.active {
+  background: none;
+  border-bottom-color: var(--torch);
+  color: var(--accent);
+}
+
+.hud-tabs .hud-toggle {
+  border-bottom-color: transparent;
+  color: var(--muted);
+}
+
+/* The shared torch-lit rule is more specific than the reset above it, so the
+   active tab kept the lit inner edge that made it a slab again. */
+.hud-tabs button.active {
+  box-shadow: none;
+}
+
+/* Room for the last row to clear the foot instead of being sliced by it. */
+.hud-body { padding-bottom: 6px; }

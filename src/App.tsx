@@ -128,6 +128,23 @@ const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | nu
   { id: "jail", tool: { kind: "room", type: "jail" }, label: ROOM_LABEL.jail, cost: ROOM_COST.jail },
 ];
 
+/**
+ * The toolbar in two steps instead of one list.
+ *
+ * Fifteen buttons of equal weight is a form, not a control surface: nothing
+ * says what matters, the panel eats half the screen, and the button that
+ * actually starts the game ends up below the fold. Picking a kind first cuts
+ * the visible set to at most six and gives the panel a shape.
+ */
+type ToolGroup = "obstacle" | "minion" | "trap" | "room";
+
+const GROUPS: Array<{ id: ToolGroup; label: StringKey }> = [
+  { id: "obstacle", label: "group_obstacle" },
+  { id: "minion", label: "group_minion" },
+  { id: "trap", label: "group_trap" },
+  { id: "room", label: "group_room" },
+];
+
 const SKILLS: WardenSkill[] = ["blessing", "rally", "detonate"];
 type Tab = "build" | "manage" | "research";
 
@@ -144,6 +161,7 @@ export default function App() {
   const [boardOpen, setBoardOpen] = useState(false);
   const [adNotice, setAdNotice] = useState<string | null>(null);
   const [toolId, setToolId] = useState("barricade");
+  const [group, setGroup] = useState<ToolGroup>("obstacle");
   const [researchError, setResearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("build");
   const [hudOpen, setHudOpen] = useState(true);
@@ -673,6 +691,14 @@ export default function App() {
   const purse = useCountUp(gold);
   const tier = tierFor(meta?.threat ?? 0);
 
+  /** How full each kind is, shown on the kind button rather than in a row of counters. */
+  const groupUsage: Record<ToolGroup, { count: number; cap: number }> = {
+    obstacle: { count: obstacles.length, cap: maxObstaclesFor(research, entitlements) },
+    minion: { count: minions.length, cap: effects.minionCap },
+    trap: { count: traps.length, cap: MAX_TRAPS },
+    room: { count: rooms.length, cap: MAX_ROOMS },
+  };
+
   const guide = guideFor({
     obstacles,
     entrance,
@@ -762,11 +788,23 @@ export default function App() {
           >
             {settings.muted ? "🔇" : "🔊"}
           </button>
-          <button className="shop-btn" onClick={() => { audio.play("click"); setBoardOpen(true); }}>
-            {t("menu_leaderboard")}
+          {/* Icons, not labels. These are somewhere to go once in a while;
+              the gold beside them is the thing being played for. */}
+          <button
+            className="icon-toggle"
+            onClick={() => { audio.play("click"); setBoardOpen(true); }}
+            title={t("menu_leaderboard")}
+            aria-label={t("menu_leaderboard")}
+          >
+            🏆
           </button>
-          <button className="shop-btn" onClick={() => { audio.play("click"); setShopOpen(true); }}>
-            {t("menu_shop")}
+          <button
+            className="icon-toggle"
+            onClick={() => { audio.play("click"); setShopOpen(true); }}
+            title={t("menu_shop")}
+            aria-label={t("menu_shop")}
+          >
+            🛒
           </button>
           <button
             className="icon-toggle"
@@ -925,8 +963,35 @@ export default function App() {
         <div key={tab} className="hud-body">
           {tab === "build" && (
             <>
+              {/* Which kind of thing, then which one — and the counts live on
+                  the kind, so the four lines of counters underneath are gone. */}
+              <div className="groups">
+                {GROUPS.map((entry) => {
+                  const used = groupUsage[entry.id];
+                  return (
+                    <button
+                      key={entry.id}
+                      className={group === entry.id ? "group active" : "group"}
+                      onClick={() => { audio.play("click"); setGroup(entry.id); }}
+                      disabled={raid.raiding}
+                    >
+                      <b>{t(entry.label)}</b>
+                      <i>{used.count}/{used.cap}</i>
+                    </button>
+                  );
+                })}
+                <button
+                  className={toolId === "remove" ? "group remove active" : "group remove"}
+                  onClick={() => { audio.play("click"); setToolId("remove"); }}
+                  disabled={raid.raiding}
+                  title={t("tool_remove")}
+                >
+                  <b>{t("tool_remove")}</b>
+                </button>
+              </div>
+
               <div className="toolbar">
-                {TOOLS.map((entry) => {
+                {TOOLS.filter((e) => e.tool.kind === group).map((entry) => {
                   const locked =
                     (entry.tool.kind === "minion" && !unlocked.unlockedMinions.includes(entry.tool.type)) ||
                     (entry.tool.kind === "trap" && !unlocked.unlockedTraps.includes(entry.tool.type)) ||
@@ -956,32 +1021,17 @@ export default function App() {
                 })}
               </div>
 
+              {/* One line. The counters moved onto the kind buttons and the two
+                  standing explanations are the tutorial's job, not a paragraph
+                  the player reads past every session. */}
               <p className="hint">{toolHint}</p>
-              <p className="hint small">
-                {t("count_obstacles")} {obstacles.length}/{maxObstaclesFor(research, entitlements)} · {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
-                {effects.jailCapacity > 0 && ` · ${t("count_jail")} ${prisoners.length}/${effects.jailCapacity}`}
-              </p>
-              <p className="hint small">{t("obstacle_note")}</p>
-              <p className="hint small">{t("controls")}</p>
 
-              <div className="actions">
-                <button
-                  className="primary"
-                  data-tut="action:raid"
-                  onClick={() => { audio.play("raidStart"); void raid.startRaid(); }}
-                  disabled={raid.raiding || raid.starting || hasUnsaved}
-                >
-                  {raid.starting ? t("preparing") : t("start_raid")}
-                </button>
-              </div>
-              {hasUnsaved && <p className="hint small warn">{t("unsaved_changes")}</p>}
 
-              <div className="actions">
-                <button data-tut="action:save" onClick={() => void save.saveNow()} disabled={!hasUnsaved}>{t("save_now")}</button>
-                <button className="danger" onClick={() => void save.resetGame()} disabled={raid.raiding}>
-                  {t("settings_reset")}
-                </button>
-              </div>
+
+              {/* Saving is the foot button when there is anything to save, and
+                  resetting the dungeon is a destructive action that already
+                  lives in settings — both were duplicated here, one tap from
+                  the tools, and both were being sliced by the panel edge. */}
               {/* Only shown when the server says there is something to claim,
                   so a player is never sent to watch an ad that pays nothing. */}
               {adGold.status && adGold.status.remaining > 0 && (
@@ -1118,7 +1168,40 @@ export default function App() {
           )}
         </div>
 
-        {account && <p className="hint small account">{account}</p>}
+        {/* The one thing the whole panel is for. Outside .hud-body, because
+            inside it the button that starts the game scrolled off the bottom
+            of the phone behind fifteen other controls. */}
+        <div className="hud-foot">
+          {/*
+            * One button, doing whatever comes next.
+            *
+            * It used to be a raid button that greyed itself out whenever there
+            * were unsaved changes, with the reason in a line of small text
+            * underneath — so the player's move was to read an explanation and
+            * then find a different button. Unsaved work is a save; everything
+            * else is a raid.
+            */}
+          <button
+            className="primary go"
+            data-tut={hasUnsaved ? "action:save" : "action:raid"}
+            onClick={() => {
+              if (hasUnsaved) {
+                audio.play("click");
+                void save.saveNow();
+                return;
+              }
+              audio.play("raidStart");
+              void raid.startRaid();
+            }}
+            disabled={raid.raiding || raid.starting || status === "saving"}
+          >
+            {raid.starting
+              ? t("preparing")
+              : hasUnsaved
+                ? `${t("save_now")} −${pendingCost}`
+                : t("start_raid")}
+          </button>
+        </div>
       </aside>
 
       {/*

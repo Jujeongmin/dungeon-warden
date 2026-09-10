@@ -530,7 +530,7 @@ export class DungeonRenderer {
     const visibleShare = this.bottomInset > 0 ? (height + this.bottomInset) / height : 1;
 
     this.distance = THREE.MathUtils.clamp(
-      Math.max(forHeight, forWidth) * 0.72 * visibleShare,
+      Math.max(forHeight, forWidth) * 0.66 * visibleShare,
       MIN_DISTANCE,
       MAX_DISTANCE,
     );
