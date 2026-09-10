@@ -17,8 +17,8 @@ import {
   TRAP_STATS,
 } from "./traps";
 import type { Point } from "./pathfinding";
-import { buildRaidPath } from "./pathfinding";
-import { blockedSet, type Arena } from "../arena";
+import { buildRaidPath, findPath } from "./pathfinding";
+import { blockedKey, blockedSet, type Arena } from "../arena";
 import { decorBlocked } from "../decor";
 import { OBSTACLE_STATS, type SimObstacle } from "./obstacles";
 
@@ -117,6 +117,13 @@ export interface SimAdventurer {
   path: Point[];
   /** True while walking a route that runs through obstacles it must break. */
   breaking: boolean;
+  /**
+   * Id of a minion this adventurer has turned aside to kill.
+   *
+   * Set when that minion lands a hit and a way to reach it exists. Cleared
+   * when it dies or when the way to it turns out not to exist after all.
+   */
+  hunting: string | null;
 }
 
 export type RaidStatus = "running" | RaidOutcome;
@@ -291,6 +298,7 @@ export class RaidSim {
         facing: 0,
         path: [],
         breaking: false,
+        hunting: null,
       };
     });
 
@@ -324,6 +332,27 @@ export class RaidSim {
    */
   private route(adventurer: SimAdventurer): void {
     const from = { x: Math.round(adventurer.x), y: Math.round(adventurer.y) };
+
+    /*
+     * A hunt outranks the core.
+     *
+     * Something shot at it and it can get there, so it goes there first. The
+     * route is re-checked here rather than trusted from when the hunt started:
+     * this runs again every time a wall or a minion falls, and a way in that
+     * existed then may be the only thing that has changed since.
+     */
+    const hunted = this.huntedBy(adventurer);
+    if (hunted) {
+      const chase = this.pathToMinion(adventurer, hunted);
+      if (chase) {
+        adventurer.path = chase;
+        adventurer.pathIndex = 0;
+        adventurer.breaking = false;
+        return;
+      }
+      adventurer.hunting = null;
+    }
+
     const open = buildRaidPath(this.arena, from, this.core, this.lures, this.blocked());
     if (open) {
       adventurer.path = open;
@@ -361,6 +390,52 @@ export class RaidSim {
   private obstacleAt(x: number, y: number): SimObstacle | null {
     for (const o of this.obstacles) {
       if (o.alive && o.x === x && o.y === y) return o;
+    }
+    return null;
+  }
+
+  /**
+   * Whether being shot at is worth turning aside for.
+   *
+   * An adventurer that takes a hit from a minion looks for a way to reach it.
+   * If one exists it goes and kills it, however far round it has to walk, and
+   * then carries on to the core. If the minion is walled off with no way in,
+   * it is ignored and the party keeps walking — which is what makes putting a
+   * wall in front of your archers the difference between a tower and a target.
+   *
+   * Only the first attacker sticks. Re-picking on every hit would leave a
+   * party crossfired from two sides turning on the spot forever.
+   */
+  private considerHunting(adventurer: SimAdventurer, attacker: SimMinion): void {
+    if (adventurer.hunting || !attacker.alive) return;
+    if (!this.pathToMinion(adventurer, attacker)) return;
+
+    adventurer.hunting = attacker.id;
+    this.route(adventurer);
+  }
+
+  /**
+   * A route to the tile a minion is standing on.
+   *
+   * The minion's own tile is excluded from what blocks the way, or the goal
+   * would be unreachable by definition. Everything else still blocks: a wall
+   * in the way is a wall, and this is the check that decides whether an archer
+   * behind one is safe.
+   */
+  private pathToMinion(adventurer: SimAdventurer, minion: SimMinion): Point[] | null {
+    const blocked = this.blocked();
+    blocked.delete(blockedKey(Math.round(minion.x), Math.round(minion.y), this.arena.w));
+
+    const from = { x: Math.round(adventurer.x), y: Math.round(adventurer.y) };
+    const goal = { x: Math.round(minion.x), y: Math.round(minion.y) };
+    return findPath(this.arena, from, goal, blocked);
+  }
+
+  /** The minion this adventurer turned aside for, if it is still standing. */
+  private huntedBy(adventurer: SimAdventurer): SimMinion | null {
+    if (!adventurer.hunting) return null;
+    for (const m of this.minions) {
+      if (m.id === adventurer.hunting) return m.alive ? m : null;
     }
     return null;
   }
@@ -414,6 +489,10 @@ export class RaidSim {
   private killMinion(minion: SimMinion): void {
     minion.hp = 0;
     minion.alive = false;
+    // Whoever came for it has no reason to stand there any more.
+    for (const adventurer of this.adventurers) {
+      if (adventurer.hunting === minion.id) adventurer.hunting = null;
+    }
     this.events.push({
       kind: "minionDown",
       targetId: minion.id,
@@ -623,8 +702,12 @@ export class RaidSim {
     target: SimAdventurer,
     amount: number,
     source: "melee" | "trap" | "burn",
+    from?: SimMinion,
   ): void {
     if (!target.alive || target.downed > 0) return;
+
+    // Shot at by something it can get to: it turns aside and goes for it.
+    if (from) this.considerHunting(target, from);
 
     // Rogues take much less from traps, mages and barbarians a little more.
     if (source !== "melee") {
@@ -718,6 +801,28 @@ export class RaidSim {
        * they keep running for the core. A minion the player wants fought has
        * to be a minion the player put in the road.
        */
+      /*
+       * A hunt, if one is on: walk to whatever shot at it and kill that first.
+       *
+       * Attacked from its own reach rather than from the tile itself, so a
+       * ranged class stops short and shoots — the same way it deals with a
+       * minion standing in the road.
+       */
+      const quarry = this.huntedBy(adventurer);
+      if (quarry && distance(adventurer.x, adventurer.y, quarry.x, quarry.y) <= stats.range) {
+        adventurer.action = "attack";
+        adventurer.facing = Math.atan2(quarry.x - adventurer.x, quarry.y - adventurer.y);
+
+        if (adventurer.cooldown === 0) {
+          adventurer.cooldown = stats.attackInterval;
+          if (quarry.shield <= 0) {
+            quarry.hp -= stats.damage;
+            if (quarry.hp <= 0) this.killMinion(quarry);
+          }
+        }
+        continue;
+      }
+
       const barrier = this.blockingTarget(adventurer);
       if (barrier) {
         const spot = "obstacle" in barrier ? barrier.obstacle : barrier.minion;
@@ -798,7 +903,7 @@ export class RaidSim {
       if (minion.cooldown > 0 || !target) continue;
 
       minion.cooldown = stats.attackInterval;
-      this.damageAdventurer(target, stats.damage, "melee");
+      this.damageAdventurer(target, stats.damage, "melee", minion);
     }
   }
 

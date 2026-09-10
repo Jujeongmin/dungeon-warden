@@ -5,13 +5,19 @@ import { MINION_STATS } from "../src/game/sim/units";
 import type { PartyMember, PlacedMinion, PlacedObstacle } from "../src/game/types";
 
 /**
- * The rule that decides what a minion is for.
+ * What an adventurer will turn aside for, and what it walks past.
  *
- * Adventurers are here for the core, not the garrison. They attack what stands
- * in their way and nothing else, so a minion beside the route shoots them the
- * whole way past untouched, and a minion in the route is a wall that shoots
- * back. Which of those the player is building is the decision the game is made
- * of, and it lives entirely in `blocked()` and `blockingTarget()`.
+ * Three rules decide every fight in this game:
+ *
+ *   1. A minion standing in the road is fought, but only when there is no way
+ *      round it — the same rule walls have always had.
+ *   2. A minion that shoots is fought if a way to reach it exists, however far
+ *      round that way runs.
+ *   3. A minion that shoots from somewhere unreachable is ignored.
+ *
+ * Together they are the reason to build a wall in front of your archers rather
+ * than leaving them standing in the open, which is the decision the whole game
+ * is made of.
  */
 
 const arena = arenaFor([]);
@@ -49,90 +55,105 @@ const minion = (id: string, x: number, y: number): PlacedMinion => ({
   y,
 });
 
-describe("what an adventurer will and will not fight", () => {
-  it("walks past a minion beside the route without hitting it", () => {
-    // Two tiles off the straight line down the middle: close enough to shoot
-    // into it, never standing in it.
-    const guard = minion("m1", entrance.x + 2, 5);
-    const sim = makeSim([guard]);
-    run(sim, 40);
+const wall = (id: string, x: number, y: number): PlacedObstacle => ({
+  id,
+  type: "wall",
+  x,
+  y,
+});
 
-    const after = sim.state.minions.find((m) => m.id === "m1")!;
-    expect(after.alive).toBe(true);
-    expect(after.hp).toBe(after.maxHp);
-  });
+/** Every tile of a row except the ones listed, walled off. */
+function rowExcept(y: number, gaps: number[], type: "wall" | "barricade" = "wall") {
+  return [...Array(arena.w).keys()]
+    .filter((x) => !gaps.includes(x))
+    .map((x) => ({ id: `o-${x}`, type, x, y }) as PlacedObstacle);
+}
 
-  it("shoots from beside the route while being ignored", () => {
-    const guard = minion("m1", entrance.x + 2, 5);
-    const sim = makeSim([guard]);
-    run(sim, 40);
-
-    // It did its job: the party took damage from something it never fought.
-    const adventurer = sim.state.adventurers.find((a) => a.id === "a1")!;
-    expect(adventurer.hp).toBeLessThan(adventurer.maxHp);
-  });
-
-  it("reaches out of the corridor far enough to matter", () => {
-    // The warrior's reach has to clear at least one tile of wall, or a minion
-    // tucked behind the barricade it is guarding can never fire.
-    expect(MINION_STATS.warrior.range).toBeGreaterThan(2);
-    expect(MINION_STATS.mage.range).toBeGreaterThan(MINION_STATS.warrior.range);
-  });
-
-  it("fights a minion that is the only way through", () => {
-    // Seal the room with walls but leave one tile, and stand a minion in it.
-    // Now there is no route at all, so the minion is what gets hit.
+describe("a minion in the road", () => {
+  it("is fought when it is the only way through", () => {
     const gap = entrance.x;
-    const xs = [...Array(arena.w).keys()].filter((x) => x !== gap);
-    const obstacles: PlacedObstacle[] = xs.map((x) => ({
-      id: `o-${x}`,
-      type: "wall",
-      x,
-      y: 5,
-    }));
-    const sim = makeSim([minion("m1", gap, 5)], obstacles);
+    const sim = makeSim([minion("m1", gap, 5)], rowExcept(5, [gap]));
     run(sim, 60);
 
     const after = sim.state.minions.find((m) => m.id === "m1")!;
     expect(after.hp).toBeLessThan(after.maxHp);
   });
 
-  it("takes the long way round rather than through a minion", () => {
-    // Same seal, but the gap is left open beside the minion. A route exists,
-    // so nothing is touched — the minion is scenery with a bow.
-    const xs = [...Array(arena.w).keys()].filter((x) => x !== 0 && x !== 1);
-    const obstacles: PlacedObstacle[] = xs.map((x) => ({
-      id: `o-${x}`,
-      type: "wall",
-      x,
-      y: 5,
-    }));
-    const sim = makeSim([minion("m1", 1, 5)], obstacles);
-    run(sim, 60);
+  it("re-routes the party the moment it dies", () => {
+    const gap = entrance.x;
+    const sim = makeSim([minion("m1", gap, 5)], rowExcept(5, [gap], "barricade"));
+    run(sim, 90);
 
-    const after = sim.state.minions.find((m) => m.id === "m1")!;
-    expect(after.hp).toBe(after.maxHp);
-    expect(sim.state.obstacles.every((o) => o.hp === o.maxHp)).toBe(true);
+    expect(sim.state.minions.find((m) => m.id === "m1")!.alive).toBe(false);
+    // They walked on through the hole rather than standing on the corpse.
+    expect(sim.state.status).not.toBe("running");
+  });
+});
+
+describe("a minion that shoots", () => {
+  it("hits the party from beside the route", () => {
+    const sim = makeSim([minion("m1", entrance.x + 2, 5)]);
+    run(sim, 40);
+
+    const adventurer = sim.state.adventurers.find((a) => a.id === "a1")!;
+    expect(adventurer.hp).toBeLessThan(adventurer.maxHp);
   });
 
-  it("re-routes the moment a blocking minion dies", () => {
-    // One tile of gap, held by a minion, with a second gap opening behind it
-    // only once it falls. The party must not be left walking into a corpse.
-    const gap = entrance.x;
-    const xs = [...Array(arena.w).keys()].filter((x) => x !== gap);
-    const obstacles: PlacedObstacle[] = xs.map((x) => ({
-      id: `o-${x}`,
-      type: "barricade",
-      x,
-      y: 5,
-    }));
-    const sim = makeSim([minion("m1", gap, 5)], obstacles);
+  it("is hunted down when it stands in the open", () => {
+    const sim = makeSim([minion("m1", entrance.x + 2, 5)]);
     run(sim, 90);
 
     const after = sim.state.minions.find((m) => m.id === "m1")!;
-    expect(after.alive).toBe(false);
-    // Having killed the one thing in the way, they walked on through the hole
-    // rather than standing on it: the raid resolved.
+    expect(after.hp).toBeLessThan(after.maxHp);
+  });
+
+  it("lets the party carry on to the core once it is dead", () => {
+    const sim = makeSim([minion("m1", entrance.x + 2, 5)]);
+    run(sim, 180);
+
+    expect(sim.state.minions.find((m) => m.id === "m1")!.alive).toBe(false);
     expect(sim.state.status).not.toBe("running");
+  });
+
+  it("is left alone when there is no way in to it", () => {
+    // Boxed into the corner it stands in. It shoots the whole raid and nothing
+    // can reach it — and the party does not start breaking walls to try.
+    const sim = makeSim(
+      [minion("m1", 0, 5)],
+      [
+        wall("w1", 1, 5),
+        wall("w2", 0, 4),
+        wall("w3", 0, 6),
+        wall("w4", 1, 4),
+        wall("w5", 1, 6),
+      ],
+    );
+    run(sim, 90);
+
+    const after = sim.state.minions.find((m) => m.id === "m1")!;
+    expect(after.alive).toBe(true);
+    expect(after.hp).toBe(after.maxHp);
+    expect(sim.state.obstacles.every((o) => o.hp === o.maxHp)).toBe(true);
+  });
+});
+
+describe("a minion that never fires", () => {
+  it("is never touched", () => {
+    // Far corner, well outside its own reach of any route to the core: it
+    // never shoots, so nothing ever comes for it.
+    const sim = makeSim([minion("m1", arena.w - 1, core.y)]);
+    run(sim, 90);
+
+    const after = sim.state.minions.find((m) => m.id === "m1")!;
+    expect(after.hp).toBe(after.maxHp);
+  });
+});
+
+describe("reach", () => {
+  it("clears at least a tile of wall", () => {
+    // A minion tucked behind the barricade it is guarding has to be able to
+    // fire over it, or standing it there does nothing at all.
+    expect(MINION_STATS.warrior.range).toBeGreaterThan(2);
+    expect(MINION_STATS.mage.range).toBeGreaterThan(MINION_STATS.warrior.range);
   });
 });
