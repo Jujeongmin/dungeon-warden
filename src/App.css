@@ -67,6 +67,32 @@ html, body, #root {
   margin: 0;
 }
 
+/*
+ * The game is a 9:16 portrait screen, everywhere.
+ *
+ * It was designed portrait — the board is taller than it is wide, the route
+ * runs top to bottom, the panel is a bottom sheet. Every other shape was a
+ * worse version of it: a phone held sideways got 92 pixels of board under a
+ * panel taking three quarters of the screen, and a desktop window got the
+ * same layout stretched across space it had nothing to put in.
+ *
+ * So there is one shape now, letterboxed on anything wider. That deletes six
+ * responsive branches, and it means the composition a player sees is the one
+ * it was built and tested at rather than whatever their window happens to be.
+ */
+#root {
+  display: grid;
+  place-items: center;
+  /* dvh follows the mobile URL bar; vh is the fallback where it does not. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  /* The room's own darkness, lifted very slightly in the middle so the stage
+     edge reads as a frame rather than as the page failing to fill. */
+  background:
+    radial-gradient(ellipse at center, #1b1814 0%, #0c0b09 70%);
+}
+
 body {
   background: #14120f;
   color: var(--ink);
@@ -79,8 +105,25 @@ body {
 
 .app {
   position: relative;
-  width: 100%;
-  height: 100%;
+  /*
+   * Never wider than 9:16, and as tall as the screen allows.
+   *
+   * Locking the height to 9:16 as well would letterbox a modern phone, which
+   * is 19.5:9 — a 375x812 screen would play in 375x667 and throw away 145
+   * pixels of board on the one device the game is actually for. Capping only
+   * the width gives a phone its whole screen and a desktop the portrait column
+   * it should have had all along; the panel is docked to the foot, so the extra
+   * height on a tall screen goes to the room.
+   */
+  width: var(--stage-w);
+  height: 100vh;
+  height: 100dvh;
+  /* A lit edge and a cast shadow, the same two materials the panels are cut
+     from, so the letterboxing looks like a thing rather than a gap. */
+  box-shadow:
+    0 0 0 1px var(--edge-dark),
+    inset 0 1px 0 var(--edge-lit),
+    0 24px 70px rgba(0, 0, 0, 0.7);
   overflow: hidden;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
@@ -118,8 +161,12 @@ h3.section {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: calc(var(--stage-w) * 0.033);
+  /* Padding is a share of the stage, not a phone-shaped constant: the same
+     bar has to sit right in a 360px stage on a handset and a 608px one on a
+     desktop, and 16px reads as generous in the first and cramped in the
+     second. */
+  padding: calc(var(--stage-w) * 0.033) calc(var(--stage-w) * 0.042);
   background: linear-gradient(180deg, rgba(20, 18, 15, 0.92), transparent);
   pointer-events: none;
 }
@@ -497,7 +544,13 @@ h3.section:first-child { margin-top: 2px; }
  * tutorial exists. It must never take a click — the whole point is that the
  * thing under it is the thing you press. */
 .spotlight {
-  position: absolute;
+  /* fixed, not absolute: useSpotlight measures its target with
+     getBoundingClientRect, which is viewport coordinates. While the stage was
+     the whole window the two agreed; now the stage is a centred column and an
+     absolute ring was offset by the letterbox - on a 1920px screen it landed
+     at x=1682 against a stage ending at 1264, so overflow:hidden ate it and
+     the tutorial pointed at nothing on every desktop. */
+  position: fixed;
   pointer-events: none;
   border-radius: 8px;
   box-shadow:
@@ -945,101 +998,97 @@ button.primary {
   min-width: 84px;
 }
 
-@media (max-width: 760px) {
-  /* On a phone the HUD becomes a bottom sheet that can be folded away, so the
-     dungeon itself is never buried under controls. */
-  .hud {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    width: auto;
-    /* Capped well under half the screen so the board — the whole reason the
-       board went portrait — always keeps the other half. Whatever tab
-       content doesn't fit at this height scrolls inside .hud-body instead
-       of pushing the sheet taller. */
-    max-height: 44%;
-    padding: 10px 12px 8px;
-  }
-
-  .hud.collapsed { max-height: none; }
-
-  .toolbar {
-    /* A third column trades row count for width: 15 build tools land in 5
-       dense rows instead of 8, so most of them are visible without the
-       player ever needing to scroll .hud-body. */
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-    /* No scroll box of its own — .hud-body is the single scrollable region
-       for every tab, so build/manage/research all behave the same way. */
-    max-height: none;
-    overflow-y: visible;
-  }
-
-  .tool {
-    padding: 6px 6px;
-  }
-
-  .tool b { font-size: var(--fs-2xs); }
-  .tool i { font-size: var(--fs-2xs); }
-
-  .legend { display: none; }
-
-  .topstack {
-    top: 46px;
-    left: 8px;
-    right: 8px;
-  }
-
-  .tutorial {
-    align-self: stretch;
-    width: auto;
-  }
-
-  /* Only gold and the buttons survive on a phone; the rest is in the HUD. */
-  .stats .status,
-  .stats .pending {
-    display: none;
-  }
-
-  .brand { font-size: var(--fs-xs); letter-spacing: var(--ls-normal); }
-  .brand span { display: none; }
-
-  .skillbar {
-    right: 8px;
-    bottom: auto;
-    top: 96px;
-    width: 116px;
-  }
-
-  .raid-bar {
-    align-self: stretch;
-    /* Kept narrower than the stack so it can never grow under the skillbar,
-       which sits at a fixed spot to its right — however tall a banner above
-       pushes this bar down. What doesn't fit scrolls (already overflow-x). */
-    max-width: calc(100% - 124px);
-    gap: 8px;
-    font-size: var(--fs-2xs);
-    justify-content: space-between;
-    overflow-x: auto;
-  }
-
-  /* The speed toggles are controls; the counters beside them are read-only.
-     Lead with the controls so they land in the always-visible left edge of
-     the (possibly scrollable) bar instead of behind whichever counters
-     happen to be long enough to push them off. */
-  .raid-bar .speeds { order: -1; }
-
-  .stats { gap: 6px; font-size: var(--fs-xs); }
-  .banner { font-size: var(--fs-xs); }
-  .modal { max-height: 80%; }
+/* On a phone the HUD becomes a bottom sheet that can be folded away, so the
+   dungeon itself is never buried under controls. */
+.hud {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: auto;
+  /* Capped well under half the screen so the board — the whole reason the
+     board went portrait — always keeps the other half. Whatever tab
+     content doesn't fit at this height scrolls inside .hud-body instead
+     of pushing the sheet taller. */
+  max-height: 44%;
+  padding: 10px 12px 8px;
 }
+
+.hud.collapsed { max-height: none; }
+
+.toolbar {
+  /* A third column trades row count for width: 15 build tools land in 5
+     dense rows instead of 8, so most of them are visible without the
+     player ever needing to scroll .hud-body. */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  /* No scroll box of its own — .hud-body is the single scrollable region
+     for every tab, so build/manage/research all behave the same way. */
+  max-height: none;
+  overflow-y: visible;
+}
+
+.tool {
+  padding: 6px 6px;
+}
+
+.tool b { font-size: var(--fs-2xs); }
+.tool i { font-size: var(--fs-2xs); }
+
+.legend { display: none; }
+
+.topstack {
+  top: 46px;
+  left: 8px;
+  right: 8px;
+}
+
+.tutorial {
+  align-self: stretch;
+  width: auto;
+}
+
+/* Only gold and the buttons survive on a phone; the rest is in the HUD. */
+.stats .status,
+.stats .pending {
+  display: none;
+}
+
+.brand { font-size: var(--fs-xs); letter-spacing: var(--ls-normal); }
+.brand span { display: none; }
+
+.skillbar {
+  right: 8px;
+  bottom: auto;
+  top: 96px;
+  width: 116px;
+}
+
+.raid-bar {
+  align-self: stretch;
+  /* Kept narrower than the stack so it can never grow under the skillbar,
+     which sits at a fixed spot to its right — however tall a banner above
+     pushes this bar down. What doesn't fit scrolls (already overflow-x). */
+  max-width: calc(100% - 124px);
+  gap: 8px;
+  font-size: var(--fs-2xs);
+  justify-content: space-between;
+  overflow-x: auto;
+}
+
+/* The speed toggles are controls; the counters beside them are read-only.
+   Lead with the controls so they land in the always-visible left edge of
+   the (possibly scrollable) bar instead of behind whichever counters
+   happen to be long enough to push them off. */
+.raid-bar .speeds { order: -1; }
+
+.stats { gap: 0.45em; font-size: var(--fs-xs); }
+.banner { font-size: var(--fs-xs); }
+.modal { max-height: 80%; }
 
 /* Below this the brand no longer fits alongside the functional buttons —
    decoration yields to function, so it drops rather than push controls
    off the right edge. */
-@media (max-width: 460px) {
-  .brand { display: none; }
-}
+.brand { display: none; }
 
 /* The toolbar is a well cut into the panel, not more panel: the tools sit
    inside it, which is why the shadow runs inwards here and outwards on the
@@ -1075,8 +1124,8 @@ button.primary {
 
 .tool-icon {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 2.1em;
+  height: 2.1em;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
 
@@ -1384,15 +1433,17 @@ button.primary {
 /* 4 — anything modal, over everything including the title. */
 .modal-backdrop { z-index: 40; }
 
+/* 5 — the rotate hint, over everything, because nothing behind it is usable
+   while it shows. */
+.rotate-guard { z-index: 50; }
+
 /* The one place two same-layer pieces of chrome can reach each other: during
    a raid the skill buttons are pinned to the right of the top stack, and a
    banner in that stack is full width. The raid bar already reserves the gap;
    this extends it to whatever else the stack is holding. */
-@media (max-width: 760px) {
-  .topstack.raiding > * {
-    align-self: flex-start;
-    max-width: calc(100% - 124px);
-  }
+.topstack.raiding > * {
+  align-self: flex-start;
+  max-width: calc(100% - 124px);
 }
 
 /* Watching an ad for gold is an offer, not a control the game needs — marked
@@ -1480,16 +1531,17 @@ button.ad-gold {
 }
 
 .stats .icon-toggle {
-  width: 30px;
-  height: 30px;
+  /* em, so the five buttons grow and shrink with the type scale — which is
+     itself clamped against the stage width. A fixed 30px button next to
+     18px text on a 608px stage looks like it belongs to a different app. */
+  width: 2.1em;
+  height: 2.1em;
   font-size: var(--fs-base);
 }
 
 /* The panel no longer needs half the screen to hold what is in it. */
-@media (max-width: 760px) {
-  .hud { max-height: 34%; }
-  .toolbar { grid-template-columns: repeat(3, 1fr); }
-}
+.hud { max-height: 34%; }
+.toolbar { grid-template-columns: repeat(3, 1fr); }
 
 /* The panel's foot: the one action, always on screen, never scrolled. */
 .hud-foot {
@@ -1533,11 +1585,9 @@ button.ad-gold {
 /* Two rows of tools have to fit without the second one being sliced by the
    panel edge, so the cards lose the height they were not using. */
 .tool { padding: 5px 3px; gap: 2px; }
-.tool-icon { width: 24px; height: 24px; }
+.tool-icon { width: 2em; height: 2em; }
 
-@media (max-width: 760px) {
-  .hud { max-height: 38%; }
-}
+.hud { max-height: 38%; }
 
 /* ── Hierarchy inside the panel ───────────────────────────────────────────
  *
@@ -1740,18 +1790,60 @@ button.ad-gold {
   background: linear-gradient(180deg, var(--torch), #b97c2f);
 }
 
-/* A short window — a phone held sideways, or a small desktop one — gets a
-   narrow column rather than a panel deep enough to bury the board. */
-@media (max-height: 560px) {
-  .hud {
-    left: 8px;
-    right: auto;
-    top: 52px;
-    bottom: 8px;
-    width: 244px;
-    max-height: none;
+
+
+/* ---------------------------------------------------------------------------
+   Landscape.
+
+   The game is one 9:16 column. On a desktop that is a tall pane in the middle
+   of a wide screen and everything fits; on a handset turned sideways it is a
+   211px splinter, and five icon buttons and a purse do not go into 211px at a
+   legible size. Shrinking them until they do would make a game nobody can
+   read rather than a game nobody can hold.
+
+   So a phone in landscape is asked to turn back. The bar is height, not
+   orientation alone: a landscape tablet at 1024x600 still yields a 337px
+   stage, which the layout above handles, and a desktop is never caught by it.
+   --------------------------------------------------------------------------- */
+.rotate-guard { display: none; }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .rotate-guard {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: 14px;
+    justify-items: center;
+    text-align: center;
+    padding: 24px;
+    background: radial-gradient(ellipse at center, #1b1814 0%, #0c0b09 70%);
+    color: var(--text);
+    font-size: var(--fs-md);
+    letter-spacing: var(--ls-normal);
   }
 
-  .topstack { left: 264px; }
-  .skillbar { top: 52px; right: 8px; }
+  /* A phone drawn upright, tilting once so the instruction is the picture
+     rather than the sentence under it. */
+  .rotate-guard .phone {
+    width: 54px;
+    height: 88px;
+    border: 2px solid var(--accent);
+    border-radius: 9px;
+    box-shadow: 0 0 18px rgba(232, 164, 76, 0.25);
+    animation: rotate-nudge 2.4s ease-in-out infinite;
+  }
+
+  /* Everything the guard is covering keeps running underneath; hiding it
+     would tear down the WebGL context for a device tilt. */
+  .app { visibility: hidden; }
+}
+
+@keyframes rotate-nudge {
+  0%, 55%, 100% { transform: rotate(-90deg); }
+  75%, 95% { transform: rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-guard .phone { animation: none; }
 }

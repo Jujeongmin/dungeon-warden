@@ -571,22 +571,13 @@ export default function App() {
       const renderer = rendererRef.current;
       const panel = hudRef.current;
       if (!renderer || !panel) return;
-      const box = panel.getBoundingClientRect();
-
-      /*
-       * Which edge the panel is on decides which way to frame.
-       *
-       * A tall window puts it across the bottom; a wide one leaves it a column
-       * down the left. Treating it as a bottom strip either way is what left a
-       * phone held sideways showing 92 pixels of board under a panel taking
-       * three quarters of the screen — and it wastes the empty right half of a
-       * desktop window for the same reason.
-       */
-      const sideDocked = box.width < window.innerWidth * 0.6;
-      renderer.setInsets(
-        sideDocked ? 0 : Math.max(0, window.innerHeight - box.top),
-        sideDocked ? Math.max(0, box.right) : 0,
-      );
+      // Measured against the stage, not the window: on a wide screen the game
+      // is a letterboxed column and the window is mostly backdrop.
+      const stage = panel.offsetParent as HTMLElement | null;
+      const bottom = stage
+        ? stage.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
+        : 0;
+      renderer.setBottomInset(Math.max(0, bottom));
     };
 
     measure();
@@ -1290,6 +1281,15 @@ export default function App() {
       )}
 
       {introOpen && <IntroDialog onClose={() => setIntroOpen(false)} />}
+    </div>
+
+    {/* Outside .app on purpose: the guard hides the stage rather than
+        unmounting it, so a device tilt does not tear down the WebGL
+        context. Shown only by a media query — a phone held sideways gives a
+        211px column, too narrow for the top bar at any legible size. */}
+    <div className="rotate-guard">
+      <div className="phone" />
+      <span>{translate(settings.locale, "rotate_hint")}</span>
     </div>
     </LocaleProvider>
   );

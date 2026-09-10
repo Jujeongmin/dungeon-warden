@@ -352,8 +352,6 @@ export class DungeonRenderer {
 
   /** Pixels of canvas hidden behind the HUD, so the board can frame above it. */
   private bottomInset = 0;
-  /** Pixels of canvas hidden behind a side-docked HUD. */
-  private leftInset = 0;
 
   /** The see-through preview of what the next tap places. */
   private ghost: THREE.Object3D | null = null;
@@ -489,19 +487,17 @@ export class DungeonRenderer {
    * frames into the band that is actually visible instead.
    */
   /**
-   * How much of the canvas the HUD is covering, and from which edge.
+   * How much of the canvas the HUD is covering.
    *
-   * A tall window gets a panel across the bottom; a wide one gets a column
-   * down the left. Framing for only the first is what left a phone held
-   * sideways with 92 pixels of board under a panel that took three quarters
-   * of the screen.
+   * Always the bottom: the game is one 9:16 screen, so the panel is always a
+   * sheet across the foot of it. This briefly also handled a column down the
+   * left, for windows too short for a sheet — a shape that cannot happen any
+   * more, so the second edge went with it.
    */
-  setInsets(bottom: number, left: number): void {
-    const nextBottom = Math.max(0, Math.round(bottom));
-    const nextLeft = Math.max(0, Math.round(left));
-    if (nextBottom === this.bottomInset && nextLeft === this.leftInset) return;
-    this.bottomInset = nextBottom;
-    this.leftInset = nextLeft;
+  setBottomInset(pixels: number): void {
+    const next = Math.max(0, Math.round(pixels));
+    if (next === this.bottomInset) return;
+    this.bottomInset = next;
     this.applyViewOffset();
     this.fitToArena();
   }
@@ -511,33 +507,19 @@ export class DungeonRenderer {
     const height = this.canvas.clientHeight || 1;
     // Never hide so much that there is no room left to play in.
     const bottom = Math.min(this.bottomInset, Math.max(0, height - 80));
-    const left = Math.min(this.leftInset, Math.max(0, width - 120));
 
-    if (bottom <= 0 && left <= 0) {
+    if (bottom <= 0) {
       this.camera.clearViewOffset();
       return;
     }
 
     /*
-     * Frame as though the canvas were larger by the hidden strips, then show
-     * the part of it the player can actually see.
-     *
-     * The two offsets are not symmetric, and getting that wrong puts the board
-     * further from centre rather than nearer it. A point at the virtual centre
-     * lands at `full / 2 - offset`. The HUD sits at the bottom and at the left,
-     * so the board has to move up and to the right:
-     *
-     *   bottom strip — want (height - bottom) / 2, so offset = bottom
-     *   left column  — want (width + left) / 2,   so offset = 0
+     * Frame as though the canvas were taller by the hidden strip, then show
+     * the part of it the player can see. A point at the virtual centre lands
+     * at `full / 2 - offset`, and the board wants to sit at
+     * (height - bottom) / 2 — so the offset is the strip itself.
      */
-    this.camera.setViewOffset(
-      width + left,
-      height + bottom,
-      0,
-      bottom,
-      width,
-      height,
-    );
+    this.camera.setViewOffset(width, height + bottom, 0, bottom, width, height);
   }
 
   private fitToArena(): void {
@@ -557,13 +539,7 @@ export class DungeonRenderer {
     // strip hidden by the HUD, so only part of it is on screen. Back off by
     // that ratio or the board is framed to a height the player cannot see.
     const height = this.canvas.clientHeight || 1;
-    // Both insets shrink the window the board is framed into, so the camera
-    // has to back off by whichever costs more.
-    const width = this.canvas.clientWidth || 1;
-    const visibleShare = Math.max(
-      (height + this.bottomInset) / height,
-      (width + this.leftInset) / width,
-    );
+    const visibleShare = (height + this.bottomInset) / height;
 
     this.distance = THREE.MathUtils.clamp(
       Math.max(forHeight, forWidth) * 0.66 * visibleShare,

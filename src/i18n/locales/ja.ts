@@ -245,4 +245,5 @@ export const ja: Record<StringKey, string> = {
   adv_mage: "メイジ",
   adv_ranger: "レンジャー",
   banner_offline: "VITE_AGENT8_VERSE がありません — ローカルモード、未保存。",
+  rotate_hint: "端末を縦向きにしてください",
 };

@@ -239,4 +239,5 @@ export const en: Record<StringKey, string> = {
   adv_mage: "Mage",
   adv_ranger: "Ranger",
   banner_offline: "Missing VITE_AGENT8_VERSE — local mode, unsaved.",
+  rotate_hint: "Turn your device upright",
 };

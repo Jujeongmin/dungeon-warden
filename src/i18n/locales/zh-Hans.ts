@@ -240,4 +240,5 @@ export const zhHans: Record<StringKey, string> = {
   adv_mage: "法师",
   adv_ranger: "游侠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本地模式，不会保存。",
+  rotate_hint: "请将设备竖起",
 };

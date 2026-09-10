@@ -36,14 +36,31 @@
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
     sans-serif;
 
-  /* Type scale. A handful of steps, reused everywhere, instead of a
-     one-off size per element. */
-  --fs-2xs: 11px;   /* micro labels: table headers, tool/skill sub-labels */
-  --fs-xs: 12px;    /* small print: hint text, legends, panels */
-  --fs-sm: 13px;    /* secondary body: banners, buttons, list rows, top-bar numbers */
-  --fs-base: 14px;  /* body copy */
-  --fs-md: 16px;    /* sub-headings: HUD/modal titles, brand */
-  --fs-lg: 18px;    /* rare emphasis (icon glyphs, crit floaters) */
+  /*
+   * How wide the game is, whatever it is running on.
+   *
+   * The stage is portrait and never wider than 9:16, so on a phone this is the
+   * screen and on a desktop it is a column in the middle of one. Everything
+   * that should grow with the game rather than with the window is measured
+   * from here — the same number the stage itself is sized by.
+   */
+  --stage-w: min(100vw, calc(100dvh * 9 / 16));
+
+  /*
+   * Type scale, fluid between a small phone and a desktop column.
+   *
+   * These were fixed pixels, which was fine while the game was always about
+   * as wide as a phone. The stage now runs from roughly 360 to 610, so fixed
+   * sizes meant a 1080p monitor showing phone-sized text adrift in a column
+   * half again as wide. Each step is the old value at 375 and grows with the
+   * stage, capped so nothing turns into a poster.
+   */
+  --fs-2xs: clamp(10px, calc(var(--stage-w) * 0.0293), 14px);
+  --fs-xs: clamp(11px, calc(var(--stage-w) * 0.032), 15px);
+  --fs-sm: clamp(12px, calc(var(--stage-w) * 0.0347), 17px);
+  --fs-base: clamp(13px, calc(var(--stage-w) * 0.0373), 18px);
+  --fs-md: clamp(15px, calc(var(--stage-w) * 0.0427), 21px);
+  --fs-lg: clamp(17px, calc(var(--stage-w) * 0.048), 23px);
   --fs-xl: clamp(28px, 8vw, 48px); /* hero title */
 
   /* Only two weights are shipped (see @font-face above), so that's the whole
