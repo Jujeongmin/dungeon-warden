@@ -18,7 +18,7 @@ import {
 } from "./traps";
 import type { Point } from "./pathfinding";
 import { buildRaidPath, findPath } from "./pathfinding";
-import { blockedKey, blockedSet, type Arena } from "../arena";
+import { blockedKey, blockedSet, inArena, type Arena } from "../arena";
 import { decorBlocked } from "../decor";
 import { OBSTACLE_STATS, type SimObstacle } from "./obstacles";
 
@@ -598,11 +598,38 @@ export class RaidSim {
 
     if (skill === "rally") {
       if (!target) return true;
+
+      /*
+       * Minions occupy their tiles, so this is terrain surgery mid-raid.
+       *
+       * Two things follow. The tile has to be one a minion could stand on in
+       * the first place — rallying into the rubble or onto the core would put
+       * the garrison somewhere the player could never have built it. And every
+       * route in the room is computed against where the minions were, so
+       * moving them and not re-routing strands adventurers walking at walls
+       * that are no longer there and past ones that now are.
+       *
+       * The cooldown is spent before this point, so an illegal tile refunds it
+       * by returning early — a tap that does nothing must not cost the skill.
+       */
+      const key = blockedKey(target.x, target.y, this.arena.w);
+      const illegal =
+        !inArena(this.arena, target.x, target.y) ||
+        this.terrain.has(key) ||
+        (target.x === this.core.x && target.y === this.core.y) ||
+        this.obstacles.some((o) => o.alive && o.x === target.x && o.y === target.y);
+
+      if (illegal) {
+        this.skillCooldowns[skill] = 0;
+        return false;
+      }
+
       for (const minion of this.minions) {
         if (!minion.alive) continue;
         minion.x = target.x;
         minion.y = target.y;
       }
+      this.routeAll();
       return true;
     }
 

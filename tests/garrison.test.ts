@@ -157,3 +157,33 @@ describe("reach", () => {
     expect(MINION_STATS.mage.range).toBeGreaterThan(MINION_STATS.warrior.range);
   });
 });
+
+/**
+ * Rally moves the garrison mid-raid, which is terrain surgery now that minions
+ * occupy their tiles: every route in the room was computed against where they
+ * used to be.
+ */
+describe("rallying the garrison", () => {
+  it("re-routes everyone after moving them", () => {
+    // One gap, held by a minion, so the party is committed to breaking it.
+    const gap = entrance.x;
+    const sim = makeSim([minion("m1", gap, 5)], rowExcept(5, [gap]));
+    run(sim, 8);
+
+    // Pull it out of the doorway. The way through is now open, and nobody
+    // should still be swinging at an empty tile.
+    sim.useSkill("rally", { x: gap, y: 9 });
+    run(sim, 120);
+
+    expect(sim.state.status).not.toBe("running");
+  });
+
+  it("refuses a tile a minion could not stand on, and keeps the skill", () => {
+    const sim = makeSim([minion("m1", entrance.x + 2, 5)]);
+    run(sim, 4);
+
+    expect(sim.useSkill("rally", { x: core.x, y: core.y })).toBe(false);
+    // Refused, so it is still there to use.
+    expect(sim.useSkill("rally", { x: entrance.x, y: 7 })).toBe(true);
+  });
+});
