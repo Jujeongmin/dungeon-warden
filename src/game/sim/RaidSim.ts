@@ -316,11 +316,21 @@ export class RaidSim {
    * beside the corridor is simply not in the way. That is the whole shape of
    * the game: the player decides which of the two they are building.
    */
+  /**
+   * What a route may not pass through.
+   *
+   * Walls and scenery, and nothing else. Minions used to be in here and that
+   * was the wrong rule: it made a minion a piece of maze, so putting one in
+   * the road bent the road around it and the thing the player had just paid
+   * for was never fought at all. The route now ignores the garrison entirely,
+   * and a minion standing on it is walked into - see blockingTarget.
+   *
+   * Which leaves walls as the only thing that shapes the route, and that is
+   * the division the game was designed around: walls decide where they walk,
+   * minions decide what happens to them on the way.
+   */
   private blocked(): Set<number> {
-    const set = blockedSet(this.arena, [
-      ...this.obstacles.filter((o) => o.alive),
-      ...this.minions.filter((m) => m.alive),
-    ]);
+    const set = blockedSet(this.arena, this.obstacles.filter((o) => o.alive));
     for (const key of this.terrain) set.add(key);
     return set;
   }
@@ -461,15 +471,27 @@ export class RaidSim {
   private blockingTarget(
     adventurer: SimAdventurer,
   ): { obstacle: SimObstacle } | { minion: SimMinion } | null {
-    if (!adventurer.breaking) return null;
     const next = adventurer.path[adventurer.pathIndex + 1];
     if (!next) return null;
 
-    const obstacle = this.obstacleAt(next.x, next.y);
-    if (obstacle) return { obstacle };
-
+    /*
+     * A minion on the next tile is always a fight.
+     *
+     * Routes are built without the garrison in them, so a minion never has a
+     * way round to be compared against - if it is on the route, the route
+     * goes through it, and going through it means killing it.
+     */
     const minion = this.minionAt(next.x, next.y);
-    return minion ? { minion } : null;
+    if (minion) return { minion };
+
+    /*
+     * A wall is different, and the `breaking` test is why. Routes DO go round
+     * walls, so a wall on the route can only mean there was no route at all
+     * and this party is chewing its way through in a straight line.
+     */
+    if (!adventurer.breaking) return null;
+    const obstacle = this.obstacleAt(next.x, next.y);
+    return obstacle ? { obstacle } : null;
   }
 
   /**
@@ -485,9 +507,10 @@ export class RaidSim {
   /**
    * Kills one minion and re-routes.
    *
-   * The same rule as an obstacle, and for the same reason: a minion occupies
-   * its tile, so its death opens a way through that every adventurer has to be
-   * told about. This is the only place allowed to clear a minion's `alive`.
+   * Not because the route changes - it does not, the garrison is not in the
+   * blocked set - but because anyone who had turned aside to hunt this one
+   * needs pointing back at the core. This is the only place allowed to clear
+   * a minion's `alive`.
    */
   private killMinion(minion: SimMinion): void {
     minion.hp = 0;
@@ -603,14 +626,14 @@ export class RaidSim {
       if (!target) return true;
 
       /*
-       * Minions occupy their tiles, so this is terrain surgery mid-raid.
+       * The tile has to be one a minion could stand on in the first place —
+       * rallying into the rubble or onto the core would put the garrison
+       * somewhere the player could never have built it.
        *
-       * Two things follow. The tile has to be one a minion could stand on in
-       * the first place — rallying into the rubble or onto the core would put
-       * the garrison somewhere the player could never have built it. And every
-       * route in the room is computed against where the minions were, so
-       * moving them and not re-routing strands adventurers walking at walls
-       * that are no longer there and past ones that now are.
+       * Routes are no longer affected: the garrison is not in the blocked set,
+       * so moving it does not move anybody's path. The re-route below is for
+       * the hunts — an adventurer walking towards where a minion used to be
+       * has to be pointed at where it is now.
        *
        * The cooldown is spent before this point, so an illegal tile refunds it
        * by returning early — a tap that does nothing must not cost the skill.

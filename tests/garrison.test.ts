@@ -9,8 +9,9 @@ import type { PartyMember, PlacedMinion, PlacedObstacle } from "../src/game/type
  *
  * Three rules decide every fight in this game:
  *
- *   1. A minion standing in the road is fought, but only when there is no way
- *      round it — the same rule walls have always had.
+ *   1. A minion standing in the road is fought. Routes are built without the
+ *      garrison in them, so there is never a way round one to prefer - if it
+ *      is on the route, the route goes through it.
  *   2. A minion that shoots is fought if a way to reach it exists, however far
  *      round that way runs.
  *   3. A minion that shoots from somewhere unreachable is ignored.
@@ -70,6 +71,34 @@ function rowExcept(y: number, gaps: number[], type: "wall" | "barricade" = "wall
 }
 
 describe("a minion in the road", () => {
+  it("does not bend the route it is standing on", () => {
+    // The bug this rule replaced: dropping a minion on the drawn route made
+    // the route go round it, so the thing the player had just paid for was
+    // never fought and the line they were building against moved under them.
+    const empty = makeSim([]).state.adventurers[0].path;
+    const onRoute = empty[4];
+    const guarded = makeSim([minion("m1", onRoute.x, onRoute.y)]);
+    expect(guarded.state.adventurers[0].path).toEqual(empty);
+  });
+
+  it("is fought even with the whole room open to walk round it", () => {
+    const empty = makeSim([]).state.adventurers[0].path;
+    const onRoute = empty[4];
+    // No walls at all: under the old rule the party strolled round it.
+    const sim = makeSim([minion("m1", onRoute.x, onRoute.y)]);
+    run(sim, 6);
+
+    const after = sim.state.minions.find((m) => m.id === "m1")!;
+    expect(after.hp).toBeLessThan(after.maxHp);
+
+    // Stopped by it rather than walking past: its tile is still a step on
+    // the route they are walking, and they are not yet beyond it.
+    const adventurer = sim.state.adventurers[0];
+    expect(after.alive).toBe(true);
+    expect(adventurer.path.some((p) => p.x === onRoute.x && p.y === onRoute.y)).toBe(true);
+    expect(adventurer.y).toBeLessThan(onRoute.y + 1);
+  });
+
   it("is fought when it is the only way through", () => {
     const gap = entrance.x;
     const sim = makeSim([minion("m1", gap, 5)], rowExcept(5, [gap]));

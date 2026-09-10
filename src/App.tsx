@@ -783,17 +783,19 @@ export default function App() {
       return;
     }
     rendererRef.current?.setPathPreview(
-      // Minions block, so the preview has to count them or it draws a route
-      // the raid will not take. Same set the simulation builds.
+      // Walls and scenery only - the same set the simulation routes against.
+      // Dropping a minion on the route no longer bends it, which is the whole
+      // point: the line stays where it is and the minion is now standing on
+      // it, waiting to be walked into.
       buildRaidPath(
         arena,
         entrance,
         core,
         lureTiles(rooms),
-        new Set([...terrain, ...blockedSet(arena, [...obstacles, ...minions])]),
+        new Set([...terrain, ...blockedSet(arena, obstacles)]),
       ),
     );
-  }, [arena, entrance, core, terrain, obstacles, minions, meta, rooms, raid.raiding, showAftermath]);
+  }, [arena, entrance, core, terrain, obstacles, meta, rooms, raid.raiding, showAftermath]);
 
   /**
    * Paint the aftermath when the fighting stops; wipe it when it starts again.
