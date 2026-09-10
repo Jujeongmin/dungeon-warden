@@ -108,7 +108,13 @@ export async function bakeModelIcons(
     icons[modelKey] = canvas.toDataURL("image/png");
 
     scene.remove(holder);
-    disposeTree(holder);
+    // Deliberately not disposed. `instantiate` clones the node hierarchy but
+    // every clone still points at the *same* geometry and material objects as
+    // the model in ModelLibrary's cache — disposing them here destroyed the
+    // textures the dungeon itself draws with, which showed up as
+    // "Texture marked for update but no image data found" on every frame for
+    // the rest of the session. Dropping the reference is enough; the shared
+    // resources are meant to outlive this function.
   }
 
   renderer.dispose();
@@ -117,15 +123,4 @@ export async function bakeModelIcons(
   renderer.forceContextLoss();
 
   return icons;
-}
-
-function disposeTree(root: THREE.Object3D): void {
-  root.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.geometry?.dispose();
-    const material = mesh.material;
-    if (Array.isArray(material)) material.forEach((m) => m.dispose());
-    else material?.dispose();
-  });
 }

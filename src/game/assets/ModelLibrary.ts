@@ -17,11 +17,26 @@ export interface LoadedModel {
 
 const MANIFEST_URL = publicUrl("assets/kaykit/manifest.json");
 
-// Every KayKit .gltf in a pack points at the same texture and its own .bin, and
-// each load fetches them again on its own — one page load asked for
-// dungeon_texture.png thirteen times. three's loader cache is keyed by URL and
-// makes those duplicates free.
-THREE.Cache.enabled = true;
+/*
+ * three's loader cache stays OFF.
+ *
+ * Every KayKit .gltf in a pack points at the same texture, so turning
+ * `THREE.Cache` on to collapse those duplicate fetches looks like free money.
+ * It is not: with the cache enabled, every one of the nine textures in the
+ * scene came back with `image` undefined — the PNGs downloaded (200 OK) but
+ * never reached the materials. The dungeon drew untextured, and three warned
+ * "Texture marked for update but no image data found" once per texture per
+ * frame, which is where the ~90,000 console messages in a two-minute session
+ * were coming from.
+ *
+ * Measured both ways on the same page: cache on, 9 of 9 textures had no image;
+ * cache off, 9 of 9 carried a 1024px bitmap. The duplicate downloads are the
+ * cheaper problem, and `shareTextures` below takes most of that back anyway.
+ */
+THREE.Cache.enabled = false;
+
+/** Texture slots the KayKit materials actually use, in load order. */
+const TEXTURE_SLOTS = ["map", "normalMap", "emissiveMap", "roughnessMap", "metalnessMap"] as const;
 
 /**
  * Animation-only files.
@@ -116,6 +131,8 @@ export class ModelLibrary {
   private cache = new Map<string, LoadedModel | null>();
   private pending = new Map<string, Promise<LoadedModel | null>>();
   private sharedClips: THREE.AnimationClip[] | null = null;
+  /** One Texture per image file, shared by every model that references it. */
+  private textures = new Map<string, THREE.Texture>();
   private ready = false;
   private initTask: Promise<void> | null = null;
 
@@ -189,6 +206,7 @@ export class ModelLibrary {
     const task = this.loader
       .loadAsync(entry.url)
       .then((gltf) => {
+        this.shareTextures(gltf.scene, entry.url);
         const model: LoadedModel = { scene: gltf.scene, animations: gltf.animations };
         this.cache.set(key, model);
         return model;
@@ -202,6 +220,51 @@ export class ModelLibrary {
 
     this.pending.set(key, task);
     return task;
+  }
+
+  /**
+   * Points every material at one Texture per image file.
+   *
+   * A pack's models each parse their own copy of the shared palette PNG, so
+   * twenty-five dungeon props meant twenty-five 1024x1024 bitmaps uploaded to
+   * the GPU — the same pixels, over and over, for tens of megabytes of video
+   * memory on a phone. Keying by the image's own URL collapses them to one.
+   *
+   * The losing duplicate is disposed here rather than left to the collector,
+   * because it may already have been uploaded by the time this runs.
+   */
+  private shareTextures(scene: THREE.Group, modelUrl: string): void {
+    // The identity of an image, without an image URL to hand: GLTFLoader
+    // decodes through createImageBitmap where it can, and an ImageBitmap
+    // remembers nothing about where it came from. The glTF's own texture name
+    // plus the folder the model was loaded from names the same file just as
+    // exactly — every model in a KayKit pack sits beside the one palette PNG
+    // it references — and cannot collide across packs.
+    const folder = modelUrl.slice(0, modelUrl.lastIndexOf("/") + 1);
+
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        for (const slot of TEXTURE_SLOTS) {
+          const standard = material as unknown as Record<string, THREE.Texture | null>;
+          const texture = standard[slot];
+          if (!texture?.name) continue;
+
+          const id = `${folder}${texture.name}#${slot}`;
+          const shared = this.textures.get(id);
+          if (!shared) {
+            this.textures.set(id, texture);
+          } else if (shared !== texture) {
+            standard[slot] = shared;
+            material.needsUpdate = true;
+            texture.dispose();
+          }
+        }
+      }
+    });
   }
 
   /**
