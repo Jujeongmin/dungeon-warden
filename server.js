@@ -733,6 +733,40 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
  *    nothing while still eating a tile and an obstacle slot. It also confused
  *    finishRaid, where destroying that one id deleted every clone at once.
  */
+/**
+ * What taking something down pays back, as a share of what it cost.
+ * Mirrored in src/game/placements.ts (REFUND_RATE), which shows the player
+ * the number before they commit to it.
+ *
+ * Strictly below one. A refund worth more than the price would be an
+ * infinite supply of gold in a build-and-sell loop, and this is the side
+ * that mints.
+ */
+const REFUND_RATE = 0.5;
+
+/**
+ * Pays back for entries that were saved and are now gone, or whose id has
+ * been reused for a different type - the mirror of what the price* functions
+ * charge.
+ *
+ * Priced from the SAVED record, never from anything the client sent: the
+ * refund is for what the server already believes is standing there, so a
+ * client cannot claim to have removed a vault it never built.
+ */
+function refundFor(next, saved, prices) {
+  const byId = {};
+  for (const item of next || []) {
+    if (item && typeof item.id === "string") byId[item.id] = item;
+  }
+  let value = 0;
+  for (const item of saved || []) {
+    if (!item || typeof item.id !== "string") continue;
+    const current = byId[item.id];
+    if (!current || current.type !== item.type) value += prices[item.type] || 0;
+  }
+  return Math.floor(value * REFUND_RATE);
+}
+
 function priceObstacles(next, saved, arena, research, occupied, entitlements) {
   if (!Array.isArray(next)) throw new Error("BAD_OBSTACLES");
   const cap = maxObstaclesFor(research, entitlements);
@@ -1211,11 +1245,23 @@ class Server {
       owned,
     );
 
-    const cost = roomCost + trapCost + minionCost + obstacleCost;
+    // What the player cleared since the last save comes back at half. The
+    // two are settled against each other rather than paid separately, so a
+    // save that swaps one wall for another moves the difference and nothing
+    // more.
+    const refund =
+      refundFor(nextRooms, prev.rooms || [], ROOM_COST) +
+      refundFor(nextTraps, prev.traps || [], TRAP_COST) +
+      refundFor(nextMinions, prev.minions || [], MINION_COST) +
+      refundFor(nextObstacles, prev.obstacles || [], OBSTACLE_COST);
+
+    const cost = roomCost + trapCost + minionCost + obstacleCost - refund;
     if (cost > 0) {
       const affordable = await $asset.has("gold", cost);
       if (!affordable) throw new Error("INSUFFICIENT_GOLD");
       await $asset.burn("gold", cost);
+    } else if (cost < 0) {
+      await $asset.mint("gold", -cost);
     }
 
     const now = Date.now();

@@ -55,7 +55,7 @@ export const zhHans: Record<StringKey, string> = {
   saved_at: "已存",
   controls: "拖动平移 · 滚轮/双指缩放 · Q/E 旋转 90°",
 
-  hint_remove: "回收格子上的障碍物、手下、陷阱或房间。不会退款。",
+  hint_remove: "回收格子上的障碍物、手下、陷阱或房间。退回一半。",
   hint_minion: "放在通道格上。",
   hint_trap: "设置在通道格上。",
   hint_room: "需要 2×2 的通道。",

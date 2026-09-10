@@ -60,7 +60,7 @@ export const ja: Record<StringKey, string> = {
   saved_at: "保存",
   controls: "ドラッグで移動 · ホイール/ピンチで拡大 · Q/E で90°回転",
 
-  hint_remove: "タイルの障害物・手下・罠・部屋を撤去します。返金はありません。",
+  hint_remove: "タイルの障害物・手下・罠・部屋を撤去します。半額戻ります。",
   hint_minion: "通路のタイルに配置します。",
   hint_trap: "通路のタイルに設置します。",
   hint_room: "2×2 の通路が必要です。",

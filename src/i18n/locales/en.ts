@@ -54,7 +54,7 @@ export const en: Record<StringKey, string> = {
   saved_at: "saved",
   controls: "Drag to pan · wheel/pinch to zoom · Q/E to rotate",
 
-  hint_remove: "Removes the obstacle, minion, trap or room on a tile. No refund.",
+  hint_remove: "Removes the obstacle, minion, trap or room on a tile. Half comes back.",
   hint_minion: "Place on a corridor tile.",
   hint_trap: "Set on a corridor tile.",
   hint_room: "Needs a clear 2×2 of corridor.",

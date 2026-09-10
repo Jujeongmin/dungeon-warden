@@ -57,7 +57,7 @@ export const ko = {
   saved_at: "저장",
   controls: "드래그 팬 · 휠/핀치 줌 · Q/E 90° 회전",
 
-  hint_remove: "타일 위의 장애물 · 부하 · 함정 · 방을 회수합니다. 환불은 없습니다.",
+  hint_remove: "타일 위의 장애물 · 부하 · 함정 · 방을 회수합니다. 절반 돌려받습니다.",
   hint_minion: "통로 타일에 배치합니다.",
   hint_trap: "통로 타일에 설치합니다.",
   hint_room: "2×2 통로가 필요합니다.",

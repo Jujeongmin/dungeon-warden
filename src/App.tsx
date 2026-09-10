@@ -455,6 +455,14 @@ export default function App() {
     }
     if (raid.raiding) return; // no editing while a raid is running
 
+    // Taking things down stays free of the guide: a player who put the first
+    // wall somewhere they regret has to be able to undo it.
+    const guided = guidedTileRef.current;
+    if (guided && tool.kind !== "remove" && (x !== guided.x || y !== guided.y)) {
+      audio.play("error");
+      return;
+    }
+
     let ok = false;
     if (tool.kind === "obstacle") ok = save.placeObstacle(tool.type, x, y);
     else if (tool.kind === "remove") ok = save.removeAt(x, y);
@@ -963,6 +971,27 @@ export default function App() {
       ? null
       : teaching?.target ?? null;
   const spotlight = useSpotlight(pointer, locateTile);
+
+  /*
+   * While the opening is pointing at a tile, that tile is the only one that
+   * takes a placement.
+   *
+   * The ring was a suggestion and the board was still open, so the usual
+   * outcome was a first wall somewhere else entirely and a ring left pointing
+   * at a tile the player had already decided against - a tutorial arguing
+   * with the person following it. Refusing the other tiles makes the ring
+   * mean what it looks like it means.
+   *
+   * Only ever set when the step has got as far as asking for a tap: the tool
+   * steps point at a button, not a tile, and a suggestion the player has
+   * already built on is dropped upstream - so this can never lock the board
+   * to somewhere nothing can go.
+   *
+   * Through a ref because the tap handler is written above this point.
+   */
+  const guidedTileRef = useRef<{ x: number; y: number } | null>(null);
+  guidedTileRef.current =
+    pointer && pointer.kind === "tile" ? { x: pointer.x, y: pointer.y } : null;
 
   const toolHint = (() => {
     if (raid.pendingSkill)
@@ -1488,7 +1517,10 @@ export default function App() {
             {raid.starting
               ? t("preparing")
               : hasUnsaved
-                ? `${t("save_now")} −${pendingCost}`
+                  ? // Clearing more than you built makes this a payout, and a
+                    // save that hands you gold must not be labelled with a
+                    // minus sign.
+                    `${t("save_now")} ${pendingCost < 0 ? "+" : "−"}${Math.abs(pendingCost)}`
                 : t("start_raid")}
 
             {/*

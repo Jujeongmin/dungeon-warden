@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { arenaFor, coreOf, entranceOf, inArena, type Arena, blockedKey } from "./arena";
 import { decorBlocked } from "./decor";
-import { addCost, sameList } from "./placements";
+import { addCost, removedValue, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
 import { installServerProbe } from "./devtools";
@@ -246,13 +246,25 @@ export function useDungeonSave() {
     if (HAS_VERSE && connecting) setStatus("connecting");
   }, [connecting]);
 
+  /**
+   * What saving will cost, net of what taking things down pays back.
+   *
+   * Negative when the player has cleared more than they have built, which is
+   * a save that hands them gold. Mirrored in server.js, which is the side
+   * that actually moves it.
+   */
   const pendingCostOf = useCallback((): number => {
-    return (
+    const added =
       addCost(minionsRef.current, savedMinionsRef.current, MINION_COST) +
       addCost(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
       addCost(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
-      addCost(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST)
-    );
+      addCost(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST);
+    const back =
+      removedValue(minionsRef.current, savedMinionsRef.current, MINION_COST) +
+      removedValue(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
+      removedValue(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
+      removedValue(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST);
+    return added - back;
   }, []);
 
   const isDirty = useCallback((): boolean => {

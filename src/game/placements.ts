@@ -11,9 +11,24 @@ export interface Placed {
 }
 
 /**
+ * What the player gets back for taking something down, as a share of what it
+ * cost. Mirrored in server.js, which is where the gold actually moves.
+ *
+ * Half, not all. The aftermath map exists to tell a player their corridor is
+ * in the wrong place, and charging full price to act on that fights the thing
+ * it is for - but a free rebuild makes every placement provisional and there
+ * is no decision left in putting a wall down. Half is the cost of changing
+ * your mind.
+ *
+ * Below one, always: a refund worth more than the price would be an infinite
+ * supply of gold in a build-and-sell loop.
+ */
+export const REFUND_RATE = 0.5;
+
+/**
  * Charges only for entries that are new or changed type, matching server.js.
- * Removing something refunds nothing, and reusing an id with a different type
- * pays full price so a cheap unit cannot be swapped for an expensive one.
+ * Reusing an id with a different type pays full price, so a cheap unit cannot
+ * be swapped for an expensive one.
  */
 export function addCost<T extends Placed>(
   next: T[],
@@ -27,6 +42,26 @@ export function addCost<T extends Placed>(
     if (!previous || previous.type !== item.type) cost += prices[item.type] ?? 0;
   }
   return cost;
+}
+
+/**
+ * Pays back for entries that were saved and are now gone, or whose id has
+ * been reused for a different type - the exact mirror of what addCost
+ * charges, so a place-then-remove round trip settles at the refund rate
+ * rather than at some accident of the two functions disagreeing.
+ */
+export function removedValue<T extends Placed>(
+  next: T[],
+  saved: T[],
+  prices: Record<string, number>,
+): number {
+  const nextById = new Map(next.map((item) => [item.id, item]));
+  let value = 0;
+  for (const item of saved) {
+    const current = nextById.get(item.id);
+    if (!current || current.type !== item.type) value += prices[item.type] ?? 0;
+  }
+  return Math.floor(value * REFUND_RATE);
 }
 
 export function sameList<T extends Placed>(a: T[], b: T[]): boolean {
