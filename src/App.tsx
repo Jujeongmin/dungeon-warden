@@ -979,7 +979,24 @@ export default function App() {
 
   return (
     <LocaleProvider locale={settings.locale}>
-    <div className="app">
+    <div
+      className="app"
+      /*
+       * The browser menu is suppressed for the whole stage, not just the
+       * canvas.
+       *
+       * It was on the canvas alone, and that is one element too few: the
+       * order of a right click is pointerdown, pointerup, contextmenu, and
+       * the prompt opens on pointerup - behind a backdrop that covers the
+       * viewport. By the time contextmenu fires the element under the cursor
+       * is that backdrop, so the canvas listener never saw it and Chrome
+       * drew its own menu over the prompt we had just opened.
+       *
+       * Right click is a game gesture here, so it belongs to the game
+       * everywhere inside the stage.
+       */
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <canvas ref={canvasRef} className="viewport" />
 
       <div className="floaters">
