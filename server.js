@@ -81,11 +81,12 @@ function applyArena(dungeon) {
   return arena;
 }
 
-function maxObstaclesFor(research) {
+function maxObstaclesFor(research, entitlements) {
   const owned = Array.isArray(research) ? research : [];
   let cap = BASE_MAX_OBSTACLES;
   if (owned.includes("expand1")) cap = 28;
   if (owned.includes("expand2")) cap = 36;
+  if (entitlements && entitlements.extraObstacles) cap += ENTITLEMENT_OBSTACLES;
   return cap;
 }
 
@@ -257,11 +258,24 @@ const ADVENTURER_NAMES = [
 // (game management page -> VX Shop tab). Registering a product does not put it
 // on sale by itself; the game has to grant it, which is what $onItemPurchased
 // below does.
-// Nothing is on sale. remove_ads used to be, and there are no interstitials
-// left for it to remove — retiring it here means a stray purchase callback
-// for it is rejected rather than granting something meaningless. Unlisting it
-// in the dashboard is a separate step.
-const PRODUCTS = {};
+// What is on sale.
+//
+// Both sell room to build in rather than a win. That works here because the
+// difficulty is a dial the game turns itself: threat rises with every raid you
+// repel and falls when you lose, so a player who buys more wall does not make
+// the game easier — they settle at a higher threat, against bigger parties,
+// for a bigger payout. What money buys is a larger fight, not a won one.
+//
+//  is the entitlement key. Adding a row here is the whole server-side
+// change;  below reads this table and nothing else.
+const PRODUCTS = {
+  deeper_dungeon: { grants: "extraObstacles", repeatable: false },
+  larger_garrison: { grants: "extraMinions", repeatable: false },
+};
+
+/** How much each entitlement is worth, applied on top of the research caps. */
+const ENTITLEMENT_OBSTACLES = 8;
+const ENTITLEMENT_MINIONS = 4;
 
 // Accounts allowed to call devGrantPurchase, which exercises the grant path
 // without a real payment. Empty means the dev tool is off for everyone.
@@ -393,8 +407,9 @@ function roomTiles(room) {
 }
 
 /** Aggregated room bonuses, clamped. */
-function roomEffects(rooms) {
+function roomEffects(rooms, entitlements) {
   let minionCap = BASE_MAX_MINIONS;
+  if (entitlements && entitlements.extraMinions) minionCap += ENTITLEMENT_MINIONS;
   let trapCooldownScale = 1;
   let plunderScale = 1;
   let reviveScale = 1;
@@ -670,9 +685,9 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
  *    nothing while still eating a tile and an obstacle slot. It also confused
  *    finishRaid, where destroying that one id deleted every clone at once.
  */
-function priceObstacles(next, saved, arena, research, occupied) {
+function priceObstacles(next, saved, arena, research, occupied, entitlements) {
   if (!Array.isArray(next)) throw new Error("BAD_OBSTACLES");
-  const cap = maxObstaclesFor(research);
+  const cap = maxObstaclesFor(research, entitlements);
   if (next.length > cap) throw new Error("TOO_MANY_OBSTACLES");
 
   const savedById = new Map((saved || []).map((o) => [o.id, o]));
@@ -1128,7 +1143,8 @@ class Server {
 
     const roomCost = priceRooms(nextRooms, prev.rooms || [], arena, claimed);
     const trapCost = priceTraps(nextTraps, prev.traps || [], arena, claimed);
-    const effects = roomEffects(nextRooms);
+    const owned = (state && state.entitlements) || emptyEntitlements();
+    const effects = roomEffects(nextRooms, owned);
     const minionCost = priceMinions(
       nextMinions,
       prev.minions || [],
@@ -1142,6 +1158,7 @@ class Server {
       arena,
       research,
       claimed,
+      owned,
     );
 
     const cost = roomCost + trapCost + minionCost + obstacleCost;
@@ -1225,7 +1242,7 @@ class Server {
       .filter((m) => !m.revivesAt || m.revivesAt <= now)
       .map((m) => m.id);
 
-    const effects = roomEffects(dungeon.rooms || []);
+    const effects = roomEffects(dungeon.rooms || [], (state && state.entitlements) || emptyEntitlements());
     const jailFree = Math.max(
       0,
       effects.jailCapacity - (dungeon.prisoners || []).length,
@@ -1269,7 +1286,7 @@ class Server {
     if (outcome !== "repelled" && outcome !== "breached") throw new Error("BAD_OUTCOME");
 
     const dungeon = state.dungeon;
-    const effects = roomEffects(dungeon.rooms || []);
+    const effects = roomEffects(dungeon.rooms || [], (state && state.entitlements) || emptyEntitlements());
     const now = Date.now();
 
     // Only members of the party the server issued count, and nobody can be

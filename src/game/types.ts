@@ -104,10 +104,12 @@ export const BASE_MAX_OBSTACLES = 20;
  * bigger room with the same wall budget makes the maze thinner, not deeper, so
  * the two numbers have to move together.
  */
-export function maxObstaclesFor(research: string[]): number {
+export function maxObstaclesFor(research: string[], entitlements?: Entitlements): number {
   let cap = BASE_MAX_OBSTACLES;
   if (research.includes("expand1")) cap = 28;
   if (research.includes("expand2")) cap = 36;
+  // Mirrors ENTITLEMENT_OBSTACLES in server.js. The server's answer wins.
+  if (entitlements && entitlements.extraObstacles) cap += 8;
   return cap;
 }
 

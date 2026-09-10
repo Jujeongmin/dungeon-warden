@@ -144,7 +144,7 @@ export function useDungeonSave() {
   const metaRef = useRef<DungeonMeta | null>(null);
   metaRef.current = meta;
 
-  const effects = roomEffects(rooms);
+  const effects = roomEffects(rooms, entitlements);
   const unlocked = researchEffects(research);
   const arena = useMemo(() => arenaFor(research), [research]);
   arenaRef.current = arena;
@@ -379,7 +379,7 @@ export function useDungeonSave() {
       // The two tiles the whole game is measured between stay clear.
       if (isEntrance(x, y) || isCore(x, y)) return false;
       if (occupantAt(x, y)) return false;
-      if (obstaclesRef.current.length >= maxObstaclesFor(researchRef.current)) return false;
+      if (obstaclesRef.current.length >= maxObstaclesFor(researchRef.current, entitlementsRef.current)) return false;
       if (!canAfford(OBSTACLE_COST[type])) return false;
 
       seqRef.current += 1;

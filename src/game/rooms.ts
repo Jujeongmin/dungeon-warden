@@ -1,4 +1,4 @@
-import { ROOM_SIZE, type PlacedRoom, type RoomEffects, type RoomType } from "./types";
+import { ROOM_SIZE, type Entitlements, type PlacedRoom, type RoomEffects, type RoomType } from "./types";
 
 const BASE_MAX_MINIONS = 8;
 const BARRACKS_MINION_BONUS = 2;
@@ -22,8 +22,10 @@ export const EMPTY_ROOM_EFFECTS: RoomEffects = {
 };
 
 /** Mirrors roomEffects() in server.js. The server's answer always wins. */
-export function roomEffects(rooms: PlacedRoom[]): RoomEffects {
+export function roomEffects(rooms: PlacedRoom[], entitlements?: Entitlements): RoomEffects {
   let minionCap = BASE_MAX_MINIONS;
+  // Mirrors ENTITLEMENT_MINIONS in server.js.
+  if (entitlements && entitlements.extraMinions) minionCap += 4;
   let trapCooldownScale = 1;
   let plunderScale = 1;
   let reviveScale = 1;

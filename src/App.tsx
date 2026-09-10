@@ -700,7 +700,7 @@ export default function App() {
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
-    if (tool.kind === "obstacle") return `${t("hint_obstacle")} ${obstacles.length}/${maxObstaclesFor(research)}`;
+    if (tool.kind === "obstacle") return `${t("hint_obstacle")} ${obstacles.length}/${maxObstaclesFor(research, entitlements)}`;
     if (tool.kind === "remove") return t("hint_remove");
     if (tool.kind === "minion") return `${t("hint_minion")} ${minions.length}/${effects.minionCap}`;
     if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
@@ -923,7 +923,7 @@ export default function App() {
 
               <p className="hint">{toolHint}</p>
               <p className="hint small">
-                {t("count_obstacles")} {obstacles.length}/{maxObstaclesFor(research)} · {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
+                {t("count_obstacles")} {obstacles.length}/{maxObstaclesFor(research, entitlements)} · {t("count_minions")} {minions.length}/{effects.minionCap} · {t("count_traps")} {traps.length}/{MAX_TRAPS} · {t("count_rooms")} {rooms.length}/{MAX_ROOMS}
                 {effects.jailCapacity > 0 && ` · ${t("count_jail")} ${prisoners.length}/${effects.jailCapacity}`}
               </p>
               <p className="hint small">{t("obstacle_note")}</p>
