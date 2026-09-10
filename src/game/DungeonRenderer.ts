@@ -248,6 +248,8 @@ const MAX_TORCH_LIGHTS = 6;
 
 /** Stains on the two tiles that define the run: in, and what they came for. */
 const ENTRANCE_TINT = 0xff8a6a;
+/** The moving marker over the entrance, brighter than the floor stain. */
+const ENTRANCE_MARK = 0xff6a4a;
 const CORE_TINT = 0xffc766;
 
 /** The placement preview: legal here, and not. */
@@ -338,6 +340,8 @@ export class DungeonRenderer {
   private clutter: Clutter[] = [];
   /** Lights belonging to the torch props; cleared with them. */
   private torchLights: THREE.PointLight[] = [];
+  /** The arrow and ring that mark where the party walks in. */
+  private entranceMark: { arrow: THREE.Mesh; ring: THREE.Mesh } | null = null;
   /** The subset of those that are flames, and so flicker. */
   private flames: Array<{ light: THREE.PointLight; base: number; phase: number }> = [];
   /** Seconds since the renderer started, for anything that wobbles. */
@@ -1244,6 +1248,7 @@ export class DungeonRenderer {
   private buildLandmarks(): void {
     if (!this.arena) return;
 
+    this.disposeEntranceMark();
     for (const object of this.landmarks) this.disposeObject(this.scene, object);
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);
@@ -1283,6 +1288,74 @@ export class DungeonRenderer {
       this.scene.add(glow);
       this.torchLights.push(glow);
     }
+
+    if (this.entrance) this.buildEntranceMark(this.entrance);
+  }
+
+  /**
+   * Says where the raiders come in, in the only language that cannot be
+   * mistaken for decoration: movement.
+   *
+   * The entrance already had stairs, a stained floor and a red light, and all
+   * three say "this tile is special" rather than "things arrive here". Every
+   * game that has ever had a spawn point marks it the same way — something
+   * pointing down at it that will not hold still — so this is an arrow that
+   * bobs over a ring that keeps opening out of the tile and fading.
+   */
+  private buildEntranceMark(entrance: Point): void {
+    const colour = ENTRANCE_MARK;
+
+    // Four sides, point down: a chevron rather than a cone, so it reads as a
+    // marker instead of a piece of the dungeon.
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.26, 0.44, 4),
+      new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0.9 }),
+    );
+    arrow.rotation.x = Math.PI;
+    arrow.position.set(entrance.x, FLOOR_HEIGHT + 1.25, entrance.y);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.34, 0.46, 24),
+      new THREE.MeshBasicMaterial({
+        color: colour,
+        transparent: true,
+        opacity: 0.75,
+        // Flat on the floor and never fighting the tile underneath it.
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(entrance.x, FLOOR_HEIGHT + 0.03, entrance.y);
+
+    this.scene.add(arrow, ring);
+    this.entranceMark = { arrow, ring };
+  }
+
+  /** Bobs the arrow and opens the ring, on a loop. */
+  private updateEntranceMark(): void {
+    const mark = this.entranceMark;
+    if (!mark) return;
+
+    const t = this.elapsed;
+    mark.arrow.position.y = FLOOR_HEIGHT + 1.25 + Math.sin(t * 2.4) * 0.14;
+    mark.arrow.rotation.y = t * 0.9;
+
+    // One ring every 1.6s, growing and fading as it goes.
+    const phase = (t % 1.6) / 1.6;
+    mark.ring.scale.setScalar(1 + phase * 1.9);
+    (mark.ring.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - phase);
+  }
+
+  private disposeEntranceMark(): void {
+    const mark = this.entranceMark;
+    if (!mark) return;
+    for (const piece of [mark.arrow, mark.ring]) {
+      this.scene.remove(piece);
+      piece.geometry.dispose();
+      (piece.material as THREE.Material).dispose();
+    }
+    this.entranceMark = null;
   }
 
   /**
@@ -1837,6 +1910,7 @@ export class DungeonRenderer {
     this.updateEffects(delta);
     this.updateClutter(delta);
     this.updateFlames();
+    this.updateEntranceMark();
     this.updateShake(delta);
 
     this.updateCamera();
@@ -1928,6 +2002,7 @@ export class DungeonRenderer {
 
     this.setPathPreview(null);
     this.pathGeometry.dispose();
+    this.disposeEntranceMark();
     for (const object of this.landmarks) this.disposeObject(this.scene, object);
     this.landmarks = [];
     for (const object of this.decor) this.disposeObject(this.scene, object);

@@ -70,8 +70,10 @@ export const TUTORIAL: TutorialStep[] = [
     tool: "warrior",
     hint: "tut_minion_pick",
     placeHint: "tut_minion_place",
-    // Near the core, where the walk ends and the fight has to happen.
-    placeAt: ({ core }) => (core ? { x: core.x, y: core.y - 3 } : null),
+    // Beside the route rather than on it. A minion in the road is a wall that
+    // shoots, which is a real thing to build but not the first thing to teach:
+    // the lesson here is that it fires at what walks past.
+    placeAt: ({ core }) => (core ? { x: core.x + 1, y: core.y - 3 } : null),
     done: ({ minions }) => minions.length > 0,
   },
   {

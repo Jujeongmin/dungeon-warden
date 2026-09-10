@@ -177,8 +177,8 @@ const ko = {
   // Tutorial
   tut_obstacle_pick: "바리케이드를 고르세요",
   tut_obstacle_place: "빈 바닥을 탭해 길을 접으세요",
-  tut_minion_pick: "스켈레톤 워리어를 고르세요",
-  tut_minion_place: "길목에 세우세요",
+  tut_minion_pick: "스켈레톤 궁수를 고르세요",
+  tut_minion_place: "길 옆에 세우세요",
   tut_trap_pick: "가시 함정을 고르세요",
   tut_trap_place: "부하 앞에 놓으세요",
   tut_save_hint: "저장해야 침입이 시작됩니다",
@@ -414,8 +414,8 @@ const en: Record<StringKey, string> = {
 
   tut_obstacle_pick: "Pick the barricade",
   tut_obstacle_place: "Tap bare floor to fold the route",
-  tut_minion_pick: "Pick the skeleton warrior",
-  tut_minion_place: "Put it on their path",
+  tut_minion_pick: "Pick the skeleton archer",
+  tut_minion_place: "Stand it beside their path",
   tut_trap_pick: "Pick the spike trap",
   tut_trap_place: "Set it in front of your minion",
   tut_save_hint: "Save to start a raid",
