@@ -430,15 +430,16 @@ export class RaidSim {
   /**
    * A route to the tile a minion is standing on.
    *
-   * The minion's own tile is excluded from what blocks the way, or the goal
-   * would be unreachable by definition. Everything else still blocks: a wall
-   * in the way is a wall, and this is the check that decides whether an archer
-   * behind one is safe.
+   * Walls and scenery are the only things in the way - the garrison is not in
+   * the blocked set - so this is exactly the question "is there a wall around
+   * this archer", and it is what decides whether one is a tower or a target.
+   *
+   * It used to have to exclude the minion's own tile from the blocked set,
+   * because a minion blocked its own square and the goal was unreachable by
+   * definition. It no longer blocks anything, so there is nothing to exclude.
    */
   private pathToMinion(adventurer: SimAdventurer, minion: SimMinion): Point[] | null {
     const blocked = this.blocked();
-    blocked.delete(blockedKey(Math.round(minion.x), Math.round(minion.y), this.arena.w));
-
     const from = { x: Math.round(adventurer.x), y: Math.round(adventurer.y) };
     const goal = { x: Math.round(minion.x), y: Math.round(minion.y) };
     return findPath(this.arena, from, goal, blocked);

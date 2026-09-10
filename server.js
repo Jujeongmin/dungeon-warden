@@ -738,11 +738,11 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
  * Mirrored in src/game/placements.ts (REFUND_RATE), which shows the player
  * the number before they commit to it.
  *
- * Strictly below one. A refund worth more than the price would be an
- * infinite supply of gold in a build-and-sell loop, and this is the side
+ * Never above one. At exactly one a build-and-sell round trip nets zero;
+ * above it the same loop is an infinite supply of gold, and this is the side
  * that mints.
  */
-const REFUND_RATE = 0.5;
+const REFUND_RATE = 1;
 
 /**
  * Pays back for entries that were saved and are now gone, or whose id has
@@ -1245,7 +1245,7 @@ class Server {
       owned,
     );
 
-    // What the player cleared since the last save comes back at half. The
+    // What the player cleared since the last save comes back in full. The
     // two are settled against each other rather than paid separately, so a
     // save that swaps one wall for another moves the difference and nothing
     // more.

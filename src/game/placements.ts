@@ -14,16 +14,17 @@ export interface Placed {
  * What the player gets back for taking something down, as a share of what it
  * cost. Mirrored in server.js, which is where the gold actually moves.
  *
- * Half, not all. The aftermath map exists to tell a player their corridor is
- * in the wrong place, and charging full price to act on that fights the thing
- * it is for - but a free rebuild makes every placement provisional and there
- * is no decision left in putting a wall down. Half is the cost of changing
- * your mind.
+ * All of it. The whole loop is: watch a raid, read where the fighting
+ * actually happened, move the walls. Charging to move a wall taxes the one
+ * thing the game wants the player doing, and the raid they spent learning it
+ * was the price already. Gold stays scarce through what things cost and how
+ * many of them you may have, not through a fee on changing your mind.
  *
- * Below one, always: a refund worth more than the price would be an infinite
- * supply of gold in a build-and-sell loop.
+ * Never above one, which is the line that matters: at exactly one a
+ * build-and-sell round trip nets zero, and above it the same loop is an
+ * infinite supply of gold - and the server is the side that mints.
  */
-export const REFUND_RATE = 0.5;
+export const REFUND_RATE = 1;
 
 /**
  * Charges only for entries that are new or changed type, matching server.js.

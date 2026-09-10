@@ -15,15 +15,16 @@ describe("taking something down", () => {
 
   it("cannot pay back more than it cost, at any price", () => {
     // The whole reason the rate is pinned: a refund above cost is an infinite
-    // supply of gold in a build-and-sell loop, and the server mints.
-    expect(REFUND_RATE).toBeLessThan(1);
+    // supply of gold in a build-and-sell loop, and the server mints. At
+    // exactly one the loop nets zero, which is the line, not over it.
+    expect(REFUND_RATE).toBeLessThanOrEqual(1);
     for (const price of Object.values({ ...OBSTACLE_COST, ...MINION_COST })) {
       expect(removedValue([], [{ id: "x", type: "t", x: 0, y: 0 }], { t: price }))
         .toBeLessThanOrEqual(price);
     }
   });
 
-  it("gives back half of what was cleared", () => {
+  it("gives back what was paid for whatever was cleared", () => {
     const saved = [wall("o1"), barricade("o2")];
     expect(removedValue([], saved, OBSTACLE_COST)).toBe(
       Math.floor((OBSTACLE_COST.wall + OBSTACLE_COST.barricade) * REFUND_RATE),
@@ -54,11 +55,19 @@ describe("taking something down", () => {
     );
   });
 
-  it("loses money on a build-and-sell round trip, never makes it", () => {
+  it("settles a place-then-clear round trip at exactly nothing", () => {
+    // The design decision, not just the safety bound: putting a wall down and
+    // taking it up again leaves the player exactly where they started, so
+    // rearranging the maze after a raid is free and only new things cost.
     const built = addCost([wall("o1")], [], OBSTACLE_COST);
     const sold = removedValue([], [wall("o1")], OBSTACLE_COST);
-    expect(sold).toBeLessThan(built);
-    expect(built - sold).toBeGreaterThan(0);
+    expect(built - sold).toBe(0);
+  });
+
+  it("never makes money on a build-and-sell round trip", () => {
+    const built = addCost([wall("o1")], [], OBSTACLE_COST);
+    const sold = removedValue([], [wall("o1")], OBSTACLE_COST);
+    expect(sold).toBeLessThanOrEqual(built);
   });
 
   it("nets one save's charges against its refunds", () => {
