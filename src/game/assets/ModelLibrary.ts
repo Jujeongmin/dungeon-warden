@@ -87,7 +87,7 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
   // minion and a mage adventurer are different models.
-  m_warrior: [/^skeleton_warrior$/, /skeleton.*warrior/],
+  m_warrior: [/^skeleton_rogue$/, /^skeleton_warrior$/, /skeleton.*warrior/],
   m_mage: [/^skeleton_mage$/, /skeleton.*mage/],
 
   // Adventurers, also used for converts. Each class has its own model.

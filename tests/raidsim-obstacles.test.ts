@@ -54,7 +54,12 @@ describe("adventurers and obstacles", () => {
 
     const dead = sim.state.obstacles.filter((o) => !o.alive);
     expect(dead.length).toBeGreaterThan(0);
-    expect(sim.destroyedObstacleIds).toEqual(dead.map((o) => o.id));
+    // The report has to name exactly the walls that fell — the server deletes
+    // these from the save, so a missing id leaves a ghost wall and a spurious
+    // one deletes a wall still standing. Compared as sets: `destroyedObstacleIds`
+    // is in the order they were broken, which is not the order they were placed
+    // in, and which of two gaps a party picks is not something to pin.
+    expect([...sim.destroyedObstacleIds].sort()).toEqual(dead.map((o) => o.id).sort());
     expect(sim.state.status).toBe("breached");
   });
 

@@ -221,7 +221,7 @@ const ko = {
   res_expand2_n: "방 16 → 20, 장애물 28 → 36",
 
   // Content names
-  minion_warrior: "스켈레톤 워리어",
+  minion_warrior: "스켈레톤 궁수",
   minion_mage: "스켈레톤 메이지",
   minion_convert: "전향한 모험가",
   trap_spike: "가시 함정",
@@ -456,7 +456,7 @@ const en: Record<StringKey, string> = {
   res_expand2: "Dungeon Expansion II",
   res_expand2_n: "Room 16 → 20, obstacles 28 → 36",
 
-  minion_warrior: "Skeleton Warrior",
+  minion_warrior: "Skeleton Archer",
   minion_mage: "Skeleton Mage",
   minion_convert: "Converted adventurer",
   trap_spike: "Spike trap",

@@ -7,7 +7,8 @@ import { SKILL_STATS } from "./game/sim/traps";
 import { OBSTACLE_STATS } from "./game/sim/obstacles";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
-import { blockedSet, coreOf, entranceOf, inArena } from "./game/arena";
+import { blockedKey, blockedSet, coreOf, entranceOf, inArena } from "./game/arena";
+import { decorBlocked } from "./game/decor";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
 import { audio } from "./game/audio";
@@ -204,6 +205,12 @@ export default function App() {
    */
   const entrance = useMemo(() => entranceOf(arena), [arena]);
   const core = useMemo(() => coreOf(arena), [arena]);
+
+  /** The rubble the room came with — see src/game/decor.ts. */
+  const terrain = useMemo(
+    () => decorBlocked(arena, entrance, core),
+    [arena, entrance, core],
+  );
 
   /**
    * Floating damage numbers.
@@ -470,6 +477,9 @@ export default function App() {
       if (x === core.x && y === core.y) return false;
 
       const taken = (tx: number, ty: number) =>
+        // The rubble the room came with. It is terrain, so it is occupied by
+        // something the player never placed and cannot remove.
+        terrain.has(blockedKey(tx, ty, arena.w)) ||
         obstacles.some((o) => o.x === tx && o.y === ty) ||
         minions.some((m) => m.x === tx && m.y === ty) ||
         traps.some((tr) => tr.x === tx && tr.y === ty) ||
@@ -489,7 +499,7 @@ export default function App() {
 
       return !taken(x, y);
     },
-    [arena, entrance, core, meta, obstacles, minions, traps, rooms, tool],
+    [arena, entrance, core, terrain, meta, obstacles, minions, traps, rooms, tool],
   );
 
   useEffect(() => {
@@ -553,10 +563,10 @@ export default function App() {
         entrance,
         core,
         lureTiles(rooms),
-        blockedSet(arena, [...obstacles, ...minions]),
+        new Set([...terrain, ...blockedSet(arena, [...obstacles, ...minions])]),
       ),
     );
-  }, [arena, entrance, core, obstacles, minions, meta, rooms, raid.raiding]);
+  }, [arena, entrance, core, terrain, obstacles, minions, meta, rooms, raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.

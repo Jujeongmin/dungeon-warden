@@ -19,6 +19,7 @@ import {
 import type { Point } from "./pathfinding";
 import { buildRaidPath } from "./pathfinding";
 import { blockedSet, type Arena } from "../arena";
+import { decorBlocked } from "../decor";
 import { OBSTACLE_STATS, type SimObstacle } from "./obstacles";
 
 /** Simulation step. Everything advances in whole steps so runs are reproducible. */
@@ -176,6 +177,14 @@ export class RaidSim {
   private core: Point;
   private lures: Point[];
   /**
+   * Tiles the room came with rubble on.
+   *
+   * Terrain, not placements: nothing can be built there and nobody walks
+   * through, and unlike a wall the player put up it cannot be broken. Derived
+   * from the arena, so it needs no input and cannot disagree with the picture.
+   */
+  private terrain: Set<number>;
+  /**
    * Every mutation of this array's `alive`/`hp` must be followed by a call to
    * `routeAll()` in the same operation — a route computed against a stale
    * obstacle set can strand an adventurer mid-`breaking` while a walkable
@@ -247,6 +256,7 @@ export class RaidSim {
     this.arena = options.arena;
     this.core = options.core;
     this.lures = options.lures;
+    this.terrain = decorBlocked(options.arena, options.entrance, options.core);
     this.obstacles = options.obstacles.map((o) => ({
       id: o.id,
       type: o.type,
@@ -296,10 +306,12 @@ export class RaidSim {
    * the game: the player decides which of the two they are building.
    */
   private blocked(): Set<number> {
-    return blockedSet(this.arena, [
+    const set = blockedSet(this.arena, [
       ...this.obstacles.filter((o) => o.alive),
       ...this.minions.filter((m) => m.alive),
     ]);
+    for (const key of this.terrain) set.add(key);
+    return set;
   }
 
   /**
@@ -324,7 +336,11 @@ export class RaidSim {
       // resolveStatus() treats "already at path end" as a breach, so silently
       // falling back to a length-1 path here would hand the attacker a free,
       // unreported win instead of surfacing the broken input.
-      const fallback = buildRaidPath(this.arena, from, this.core, this.lures, new Set());
+      // The rubble the room came with is still there. Breaking through means
+      // going through what the player built, not through the walls of the
+      // dungeon itself — so the fallback drops the placements and keeps the
+      // terrain.
+      const fallback = buildRaidPath(this.arena, from, this.core, this.lures, this.terrain);
       if (!fallback) {
         throw new Error(
           `RaidSim: no route from (${from.x}, ${from.y}) to the core (${this.core.x}, ${this.core.y}) exists even with no obstacles — start or core must be outside the arena.`,

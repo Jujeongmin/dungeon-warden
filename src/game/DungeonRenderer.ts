@@ -3,6 +3,7 @@ import { TILE, type TileId, type ObstacleType } from "./types";
 import { ModelLibrary, MODEL_PATTERNS, fitToTile, type LoadedModel } from "./assets/ModelLibrary";
 import { bakeModelIcons } from "./assets/modelIcons";
 import { inArena, type Arena } from "./arena";
+import { decorFor, tileNoise } from "./decor";
 import type { Point } from "./sim/pathfinding";
 
 const TILE_SIZE = 1;
@@ -95,14 +96,6 @@ interface Clutter {
   restScale: number;
   present: number;
   wanted: number;
-  tilt: number;
-  tiltTarget: number;
-  /** Unit vector the topple leans along, in world XZ. */
-  leanX: number;
-  leanZ: number;
-  slideX: number;
-  slideZ: number;
-  shoved: boolean;
 }
 
 /** A flat tile decoration: a trap plate or a room floor. */
@@ -176,8 +169,6 @@ const ROOM_PROPS: Record<string, string[]> = {
 };
 
 /** Props scattered on empty room floor, and how often a tile gets one. */
-const CLUTTER = ["prop_barrel", "prop_box", "prop_rubble", "prop_bottle", "prop_pillar"];
-const CLUTTER_CHANCE = 0.14;
 
 /**
  * How the clutter behaves once the room is in use.
@@ -187,10 +178,6 @@ const CLUTTER_CHANCE = 0.14;
  * away to make room; or a raider walks through it, and it goes over.
  */
 const CLUTTER_CLEAR_RATE = 5.5; // presence gained or lost per second
-const SHOVE_RADIUS = 0.45; // tiles: how close a unit has to pass to knock it
-const SHOVE_TILT = 1.25; // radians it topples through
-const SHOVE_SLIDE = 0.34; // tiles it skids
-const SHOVE_RATE = 8; // how fast it falls over
 
 /** Torch flame wobble, as a fraction of the light's steady intensity. */
 const FLICKER_DEPTH = 0.16;
@@ -275,17 +262,6 @@ const GHOST_NO = 0xff7a6a;
  * player places or removes an obstacle. FNV-1a over the coordinates, folded
  * to [0, 1).
  */
-function tileNoise(x: number, y: number, salt: number): number {
-  let hash = 0x811c9dc5;
-  for (const value of [x + 1, y + 1, salt + 1]) {
-    hash ^= value & 0xff;
-    hash = Math.imul(hash, 0x01000193);
-    hash ^= (value >> 8) & 0xff;
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return ((hash >>> 0) % 100000) / 100000;
-}
-
 /**
  * Owns the three.js scene. The room's floor is one InstancedMesh, so a wide
  * arena still costs a handful of draw calls once the KayKit models replace
@@ -360,8 +336,6 @@ export class DungeonRenderer {
   private decor: THREE.Object3D[] = [];
   /** The floor clutter, with the state that lets it get out of the way. */
   private clutter: Clutter[] = [];
-  /** Whether a raid is on screen, so the clutter can be stood back up. */
-  private raidersPresent = false;
   /** Lights belonging to the torch props; cleared with them. */
   private torchLights: THREE.PointLight[] = [];
   /** The subset of those that are flames, and so flicker. */
@@ -570,12 +544,7 @@ export class DungeonRenderer {
      * player should be able to look at the floor after a fight and see that
      * one happened.
      */
-    const raiders = units.some((unit) => unit.kind.startsWith("a_"));
-    if (raiders && !this.raidersPresent) this.standClutterUp();
-    this.raidersPresent = raiders;
-
     this.syncClutter();
-    this.shoveClutter();
 
     const seen = new Set<string>();
 
@@ -1186,45 +1155,39 @@ export class DungeonRenderer {
         break;
       }
 
-      const roll = tileNoise(floor.x, floor.y, 11);
-      if (roll > CLUTTER_CHANCE) continue;
+    }
 
-      const key = CLUTTER[Math.floor(tileNoise(floor.x, floor.y, 13) * CLUTTER.length)];
-      const prop = this.spawnModel(key, 0.55);
+    /*
+     * The floor props come from src/game/decor.ts, not from here.
+     *
+     * They are terrain: they block placement and they block the walk, so where
+     * they stand is a rule of the game and the simulation has to agree with
+     * the picture exactly. One function decides, everything reads it.
+     */
+    if (!this.entrance || !this.core) return;
+    for (const spec of decorFor(arena, this.entrance, this.core)) {
+      const prop = this.spawnModel(spec.key, 0.55);
       if (!prop) continue;
       // Off-centre and turned, so a room of barrels does not look stamped.
       prop.position.set(
-        floor.x + (tileNoise(floor.x, floor.y, 17) - 0.5) * 0.4,
+        spec.x + spec.offsetX,
         FLOOR_HEIGHT + prop.position.y,
-        floor.y + (tileNoise(floor.x, floor.y, 19) - 0.5) * 0.4,
+        spec.y + spec.offsetZ,
       );
-      prop.rotation.y = tileNoise(floor.x, floor.y, 23) * Math.PI * 2;
+      prop.rotation.y = spec.spin;
       this.scene.add(prop);
       this.decor.push(prop);
       this.clutter.push({
         object: prop,
-        x: floor.x,
-        y: floor.y,
+        x: spec.x,
+        y: spec.y,
         restX: prop.position.x,
         restZ: prop.position.z,
         restScale: prop.scale.x || 1,
         present: 1,
         wanted: 1,
-        tilt: 0,
-        tiltTarget: 0,
-        leanX: 0,
-        leanZ: 1,
-        slideX: 0,
-        slideZ: 0,
-        shoved: false,
       });
     }
-
-    // The room being built into may already be full of placements. Snap rather
-    // than ease: those props were never on screen, so there is nothing to
-    // animate away from.
-    this.syncClutter();
-    for (const item of this.clutter) item.present = item.wanted;
   }
 
   /**
@@ -1257,70 +1220,17 @@ export class DungeonRenderer {
     for (const item of this.clutter) item.wanted = taken.has(key(item.x, item.y)) ? 0 : 1;
   }
 
-  /**
-   * Knocks a prop over when a unit walks through it, and stands the room's
-   * clutter back up when a new wave arrives.
-   *
-   * The wreckage is left on the floor once the wave is over. A room that looks
-   * the same after a fight as it did before is a room the fight did not happen
-   * in.
-   */
-  private shoveClutter(): void {
-    if (this.clutter.length === 0) return;
-
-    for (const unit of this.lastUnits) {
-      for (const item of this.clutter) {
-        if (item.shoved || item.present < 0.5) continue;
-        const dx = item.restX - unit.x;
-        const dz = item.restZ - unit.y;
-        const distance = Math.hypot(dx, dz);
-        if (distance > SHOVE_RADIUS) continue;
-
-        // Away from whoever walked into it. Two bodies exactly on top of each
-        // other have no direction between them, so fall back to the prop's
-        // own facing rather than dividing by zero.
-        const away = distance > 1e-4 ? { x: dx / distance, z: dz / distance } : { x: 0, z: 1 };
-        item.shoved = true;
-        item.tiltTarget = SHOVE_TILT;
-        item.leanX = away.x;
-        item.leanZ = away.z;
-        item.slideX = away.x * SHOVE_SLIDE;
-        item.slideZ = away.z * SHOVE_SLIDE;
-      }
-    }
-  }
-
-  /** Puts every toppled prop back on its feet, ready for the next wave. */
-  private standClutterUp(): void {
-    for (const item of this.clutter) {
-      item.shoved = false;
-      item.tiltTarget = 0;
-      item.slideX = 0;
-      item.slideZ = 0;
-    }
-  }
-
-  /** Advances the clearing, the returning and the toppling. */
+  /** Advances a prop clearing away or coming back. */
   private updateClutter(delta: number): void {
     for (const item of this.clutter) {
       const rate = CLUTTER_CLEAR_RATE * delta;
       if (item.present < item.wanted) item.present = Math.min(item.wanted, item.present + rate);
       else if (item.present > item.wanted) item.present = Math.max(item.wanted, item.present - rate);
 
-      item.tilt += (item.tiltTarget - item.tilt) * Math.min(1, SHOVE_RATE * delta);
-
       const object = item.object;
       object.visible = item.present > 0.01;
       if (!object.visible) continue;
-
-      const fallen = item.tilt / SHOVE_TILT;
       object.scale.setScalar(item.restScale * item.present);
-      object.position.x = item.restX + item.slideX * fallen;
-      object.position.z = item.restZ + item.slideZ * fallen;
-      // Lean about the axis perpendicular to the direction it is going, so it
-      // falls away from whatever hit it rather than spinning on the spot.
-      object.rotation.x = item.tilt * item.leanZ;
-      object.rotation.z = -item.tilt * item.leanX;
     }
   }
 
@@ -1582,7 +1492,6 @@ export class DungeonRenderer {
       decor: this.decor.length,
       clutter: this.clutter.length,
       clutterCleared: this.clutter.filter((c) => c.wanted === 0).length,
-      clutterShoved: this.clutter.filter((c) => c.shoved).length,
       flames: this.flames.length,
       pathMarkers: this.pathMarkers.length,
       units: this.unitMeshes.size,

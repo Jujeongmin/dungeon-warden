@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
-import { arenaFor, coreOf, entranceOf, inArena, type Arena } from "./arena";
+import { arenaFor, coreOf, entranceOf, inArena, type Arena, blockedKey } from "./arena";
+import { decorBlocked } from "./decor";
 import { addCost, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
@@ -317,7 +318,14 @@ export function useDungeonSave() {
 
   /** Anything already standing on this tile — one occupant per tile. */
   const occupantAt = useCallback(
-    (x: number, y: number): "minion" | "trap" | "room" | "obstacle" | null => {
+    (x: number, y: number): "minion" | "trap" | "room" | "obstacle" | "terrain" | null => {
+      // The rubble the room came with. Checked first and checked here, because
+      // this one function is the gate every placement goes through — putting it
+      // anywhere else means remembering it four times.
+      const arena = arenaRef.current;
+      if (decorBlocked(arena, entranceOf(arena), coreOf(arena)).has(blockedKey(x, y, arena.w))) {
+        return "terrain";
+      }
       if (minionsRef.current.some((m) => m.x === x && m.y === y)) return "minion";
       if (trapsRef.current.some((t) => t.x === x && t.y === y)) return "trap";
       if (roomsRef.current.some((r) => roomCovers(r, x, y))) return "room";
