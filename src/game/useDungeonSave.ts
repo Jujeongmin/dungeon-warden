@@ -602,6 +602,8 @@ export function useDungeonSave() {
     equipWeapon,
     buyResearch,
     applyRaidResult,
+    /** For anything that mints gold server-side and hands back the new total. */
+    setGoldFromServer: setGold,
     clearDestroyedObstacles,
     saveNow,
     resetGame,

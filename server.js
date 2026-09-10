@@ -273,6 +273,43 @@ const DEV_ACCOUNTS = [];
 
 // Remembering every purchase forever would grow the save without bound, and
 // only recent ids matter for replay protection.
+// ---------------------------------------------------------------------------
+// Rewarded gold.
+//
+// The sandbox has no fetch, so the documented server-side verification of a
+// rewarded ad cannot run here — there is no way for this file to learn whether
+// an ad was really watched. A player can call claimAdGold from the console.
+//
+// So the ad is not what limits the payout; these numbers are. A cheat skips
+// the ad, not the cap, and therefore earns exactly what an honest player earns
+// in a day. What that costs is ad revenue, not game balance, and balance is
+// the only one of the two this file can defend.
+const AD_GOLD_DAILY_LIMIT = 5;
+/** Stops a day's worth being claimed in one burst. */
+const AD_GOLD_COOLDOWN_MS = 3 * 60 * 1000;
+const AD_GOLD_BASE = 40;
+/** Scales with threat the same way raid rewards do, so it stays worth taking. */
+const AD_GOLD_THREAT_STEP = 0.08;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** What one ad is worth right now. Rounded so the HUD never shows a fraction. */
+function adGoldReward(threat) {
+  const bonus = 1 + (threat || 0) * AD_GOLD_THREAT_STEP;
+  return Math.round(AD_GOLD_BASE * bonus);
+}
+
+/** Claims used today, reset when the UTC day index moves. */
+function adClaimsToday(state, now) {
+  const today = Math.floor(now / DAY_MS);
+  const claims = (state && state.adClaims) || null;
+  if (!claims || claims.day !== today) return { day: today, count: 0, lastAt: 0 };
+  return {
+    day: today,
+    count: typeof claims.count === "number" ? claims.count : 0,
+    lastAt: typeof claims.lastAt === "number" ? claims.lastAt : 0,
+  };
+}
+
 const MAX_TRACKED_PURCHASES = 50;
 
 // ---------------------------------------------------------------------------
@@ -1485,6 +1522,60 @@ class Server {
 
     const mine = await $global.getCollectionItem(LEADERBOARD, account);
     return { top: top || [], mine: mine && mine.account ? mine : null };
+  }
+
+  /**
+   * How much rewarded gold is left today, and when the next claim is allowed.
+   *
+   * Read-only, so the button can say "3 left" and disable itself instead of
+   * letting a player watch an ad and only then be told it paid nothing.
+   */
+  async adGoldStatus() {
+    const now = Date.now();
+    const state = await $global.getMyState();
+    const claims = adClaimsToday(state, now);
+    const threat = (state && state.dungeon && state.dungeon.threat) || 0;
+
+    return {
+      remaining: Math.max(0, AD_GOLD_DAILY_LIMIT - claims.count),
+      limit: AD_GOLD_DAILY_LIMIT,
+      reward: adGoldReward(threat),
+      readyAt: claims.lastAt ? claims.lastAt + AD_GOLD_COOLDOWN_MS : 0,
+      now,
+    };
+  }
+
+  /**
+   * Pays out for a watched ad.
+   *
+   * Nothing here can tell whether the ad was watched — see the note on
+   * AD_GOLD_DAILY_LIMIT. The daily count and the cooldown are what make that
+   * not matter: this is the same money an honest player gets, and no more.
+   */
+  async claimAdGold() {
+    const now = Date.now();
+    const state = (await $global.getMyState()) || {};
+    const claims = adClaimsToday(state, now);
+
+    if (claims.count >= AD_GOLD_DAILY_LIMIT) throw new Error("AD_LIMIT_REACHED");
+    if (claims.lastAt && now - claims.lastAt < AD_GOLD_COOLDOWN_MS) {
+      throw new Error("AD_COOLDOWN");
+    }
+
+    const threat = (state.dungeon && state.dungeon.threat) || 0;
+    const reward = adGoldReward(threat);
+    await $asset.mint("gold", reward);
+
+    await $global.updateMyState({
+      adClaims: { day: claims.day, count: claims.count + 1, lastAt: now },
+    });
+
+    return {
+      reward,
+      gold: await $asset.get("gold"),
+      remaining: AD_GOLD_DAILY_LIMIT - (claims.count + 1),
+      readyAt: now + AD_GOLD_COOLDOWN_MS,
+    };
   }
 
   /** Connectivity probe used by the client before it trusts the save path. */

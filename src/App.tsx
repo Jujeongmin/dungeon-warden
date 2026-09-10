@@ -12,6 +12,7 @@ import { decorBlocked } from "./game/decor";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
 import { audio } from "./game/audio";
+import { useAdGold } from "./game/useAdGold";
 import type { SimEvent } from "./game/sim/RaidSim";
 import { installDevTools } from "./game/devtools";
 import { ShopDialog } from "./ui/ShopDialog";
@@ -616,6 +617,20 @@ export default function App() {
     window.setTimeout(() => setAdNotice(null), 4000);
   }, [raid, t]);
 
+  const adGold = useAdGold(save.setGoldFromServer);
+
+  const onGoldAd = useCallback(async () => {
+    const outcome = await adGold.claim();
+    if (outcome === "paid") {
+      audio.play("skill");
+      return;
+    }
+    // Anything else is worth saying out loud: the player just sat through
+    // something and needs to know why nothing arrived.
+    setAdNotice(outcome === "not-watched" ? t("ad_not_watched") : t("ad_failed"));
+    window.setTimeout(() => setAdNotice(null), 4000);
+  }, [adGold, t]);
+
   // Apply saved preferences once the renderer exists.
   useEffect(() => {
     audio.setMuted(settings.muted);
@@ -932,6 +947,22 @@ export default function App() {
                   {t("settings_reset")}
                 </button>
               </div>
+              {/* Only shown when the server says there is something to claim,
+                  so a player is never sent to watch an ad that pays nothing. */}
+              {adGold.status && adGold.status.remaining > 0 && (
+                <div className="actions">
+                  <button
+                    className="ad-gold"
+                    disabled={!adGold.ready || adGold.busy || raid.raiding}
+                    onClick={() => void onGoldAd()}
+                  >
+                    {adGold.busy
+                      ? t("ad_playing")
+                      : `🪙 +${adGold.status.reward} · ${t("ad_watch")} ${adGold.status.remaining}/${adGold.status.limit}`}
+                  </button>
+                </div>
+              )}
+
               {adNotice && <p className="hint small">{adNotice}</p>}
 
               <p className="hint small">

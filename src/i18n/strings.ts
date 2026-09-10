@@ -96,7 +96,8 @@ const ko = {
   ad_playing: "광고 재생 중…",
   ad_watch: "광고 시청",
   ad_revived: "부하 {n}기가 다시 일어섰습니다",
-  ad_not_watched: "광고를 끝까지 봐야 부활합니다",
+  ad_not_watched: "광고를 끝까지 봐야 보상이 지급됩니다",
+  ad_failed: "지금은 보상을 받을 수 없습니다",
 
   // Result
   result_repelled: "격퇴 성공",
@@ -339,7 +340,8 @@ const en: Record<StringKey, string> = {
   ad_playing: "Playing ad…",
   ad_watch: "Watch an ad",
   ad_revived: "{n} minion(s) got back up",
-  ad_not_watched: "Watch the ad through to revive them",
+  ad_not_watched: "Watch the ad through to be paid",
+  ad_failed: "No reward available right now",
 
   result_repelled: "Raid repelled",
   result_breached: "Core breached",

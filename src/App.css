@@ -1394,3 +1394,12 @@ button.primary {
     max-width: calc(100% - 124px);
   }
 }
+
+/* Watching an ad for gold is an offer, not a control the game needs — marked
+   in the gold it pays out rather than in the torch colour that means "this is
+   what you have selected". */
+button.ad-gold {
+  border-color: rgba(232, 164, 76, 0.45);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+}
