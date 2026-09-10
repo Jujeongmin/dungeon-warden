@@ -257,9 +257,11 @@ const ADVENTURER_NAMES = [
 // (game management page -> VX Shop tab). Registering a product does not put it
 // on sale by itself; the game has to grant it, which is what $onItemPurchased
 // below does.
-const PRODUCTS = {
-  remove_ads: { grants: "adsRemoved", repeatable: false },
-};
+// Nothing is on sale. remove_ads used to be, and there are no interstitials
+// left for it to remove — retiring it here means a stray purchase callback
+// for it is rejected rather than granting something meaningless. Unlisting it
+// in the dashboard is a separate step.
+const PRODUCTS = {};
 
 // Accounts allowed to call devGrantPurchase, which exercises the grant path
 // without a real payment. Empty means the dev tool is off for everyone.
@@ -286,7 +288,7 @@ const MAX_TRACKED_PURCHASES = 50;
 // reward reaches this file.
 
 function emptyEntitlements() {
-  return { adsRemoved: false };
+  return {};
 }
 
 function pushCapped(list, value, max) {
@@ -323,8 +325,10 @@ async function grantProduct(account, productId, purchaseId, quantity) {
     const entitlements = state.entitlements || emptyEntitlements();
     const count = quantity && quantity > 0 ? quantity : 1;
 
-    if (product.grants === "adsRemoved") {
-      entitlements.adsRemoved = true;
+    // Entitlements are keyed by what the product grants, so adding a product
+    // to PRODUCTS above is the whole change.
+    if (product.grants) {
+      entitlements[product.grants] = true;
     }
     // Consumable products (gold packs and the like) would be credited here.
     // $asset acts on the calling user, so a consumable needs a different

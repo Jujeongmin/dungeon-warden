@@ -126,7 +126,7 @@ M3는 함정 4종 · 방 6종 효과 · 워든 스킬 3종 · 정산 화면입�
 - [x] 굴착 (탭·클릭, 드래그와 구분)
 - [x] Global User State 저장/로드 왕복 + 서버측 검증
 - [x] PC / 모바일 동일 조작 (포인터 이벤트, 핀치 줌)
-- [x] VXShop — `remove_ads` 상품, `$onItemPurchased` 서버 지급
+- [x] VXShop — `$onItemPurchased` 서버 지급 (지급 1회 보장). 판매 상품은 현재 없음
 - [x] Verse8 Ads — 보상형(골드 +100) / 인터스티셜(광고 제거로 차단)
 - [ ] **배포 후 세이브 왕복 실측** — 아래 "배포" 참고
 - [ ] **VXShop 상품 등록 + 실구매 테스트** — 배포 후 가능 (CPP는 가입 완료)
@@ -139,7 +139,7 @@ M2부터는 부하 배치 · A* 경로탐색 · 자동 전투가 들어갑니다
 
 | Product ID | 종류 | 효과 | 대시보드 설정 |
 |---|---|---|---|
-| `remove_ads` | 영구 | 인터스티셜 광고 제거 | Lifetime 구매 제한 **1회** |
+| — | — | 현재 판매 중인 상품 없음. `server.js`의 `PRODUCTS`에 추가하면 지급까지 연결됨 | — |
 
 `server.js`의 `PRODUCTS`와 대시보드의 Product ID가 **문자열까지 일치**해야 합니다.
 
@@ -166,7 +166,7 @@ npx -y @agent8/deploy
 
 | 필드 | 값 |
 |---|---|
-| Product ID | `remove_ads` — `server.js`의 `PRODUCTS` 키와 **문자열까지 일치해야 함** |
+| Product ID | `server.js`의 `PRODUCTS` 키와 **문자열까지 일치해야 함** |
 | Product Name | 영어 권장 (예: Remove Ads) |
 | Product Image | 512×512 권장 |
 | Price (VX) | 100 VX ≈ $1 USD 기준으로 결정 |
@@ -193,7 +193,7 @@ const DEV_ACCOUNTS = ["0x여기에_본인_주소"];
 ```
 
 ```
-npx -y @agent8/cli call devGrantPurchase '[{"productId":"remove_ads"}]'
+npx -y @agent8/cli call devGrantPurchase '[{"productId":"<PRODUCTS의 키>"}]'
 npx -y @agent8/cli call devClearEntitlements '[]'
 ```
 

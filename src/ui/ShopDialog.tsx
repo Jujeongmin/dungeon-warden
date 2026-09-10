@@ -1,7 +1,7 @@
 ﻿import { useEffect } from "react";
 import { useVXShop } from "@verse8/platform";
 import { useT } from "../i18n";
-import { PRODUCT_ID, type Entitlements } from "../game/types";
+import type { Entitlements } from "../game/types";
 
 const VERSE_ID = import.meta.env.VITE_AGENT8_VERSE as string | undefined;
 
@@ -55,14 +55,16 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
         )}
         {VERSE_ID && !isLoading && !error && items.length === 0 && (
           <p className="modal-note">
-            {t("shop_empty")} <code>{PRODUCT_ID.removeAds}</code>
+            {t("shop_empty")}
           </p>
         )}
 
         <ul className="shop-list">
           {items.map((item) => {
-            const owned =
-              item.productId === PRODUCT_ID.removeAds && entitlements.adsRemoved;
+            // Entitlements are keyed by product id, so a product the player
+            // already owns marks itself without this file knowing what any of
+            // them are.
+            const owned = entitlements[item.productId] === true;
             const blocked = owned || !item.purchasable || item.purchaseLimitReached;
 
             return (
@@ -83,9 +85,6 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
           })}
         </ul>
 
-        {entitlements.adsRemoved && (
-          <p className="modal-note owned">{t("shop_ads_removed")}</p>
-        )}
       </div>
     </div>
   );

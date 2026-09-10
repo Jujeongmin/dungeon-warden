@@ -201,12 +201,17 @@ export interface RaidFinishResult {
 
 export type RaidOutcome = "repelled" | "breached";
 
-export interface Entitlements {
-  /** Granted only by the server's $onItemPurchased handler. */
-  adsRemoved: boolean;
-}
+/**
+ * Permanent things a purchase grants, keyed by name.
+ *
+ * Empty right now: the one product that existed removed interstitial ads, and
+ * there are no interstitials to remove any more. The plumbing stays because
+ * the hard part of it is the server's $onItemPurchased handler, which grants
+ * exactly once however many times Verse8 retries the callback.
+ */
+export type Entitlements = Record<string, boolean>;
 
-export const EMPTY_ENTITLEMENTS: Entitlements = { adsRemoved: false };
+export const EMPTY_ENTITLEMENTS: Entitlements = {};
 
 export interface LoadResult {
   dungeon: Dungeon;
@@ -216,10 +221,6 @@ export interface LoadResult {
   account?: string;
 }
 
-/** Product ids, mirrored from PRODUCTS in server.js and the Verse8 dashboard. */
-export const PRODUCT_ID = {
-  removeAds: "remove_ads",
-} as const;
 
 export interface SaveResult {
   ok: true;

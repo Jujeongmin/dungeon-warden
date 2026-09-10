@@ -160,7 +160,6 @@ const ko = {
   shop_no_host: "Verse8에서 실행할 때만 상점을 열 수 있습니다.",
   shop_empty: "등록된 상품이 없습니다.",
   shop_loading: "상품 불러오는 중…",
-  shop_ads_removed: "광고 제거가 적용되어 있습니다.",
 
   // Status
   status_connecting: "서버 연결 중",
@@ -399,7 +398,6 @@ const en: Record<StringKey, string> = {
   shop_no_host: "The shop is only available when the game runs on Verse8.",
   shop_empty: "No products registered.",
   shop_loading: "Loading products…",
-  shop_ads_removed: "Ad removal is active.",
 
   status_connecting: "Connecting",
   status_loading: "Loading save",
