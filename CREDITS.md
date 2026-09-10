@@ -71,6 +71,19 @@ Dropping more CC0 files into `public/assets/audio/` and re-running
 `npm run assets` is enough to extend or replace the set; the engine falls back
 to synthesised tones for any cue it cannot match.
 
+## Icons — Kenney "Board Game Icons"
+
+<https://kenney.nl/assets/board-game-icons> · CC0
+
+| File | Source |
+|---|---|
+| src/assets/icons/coin.svg | `Vector/Icons/token.svg` |
+
+One file. The interface draws its own icons (see src/ui/Icon.tsx) because they
+have to take the room's colour, but gold is a thing in the world rather than a
+control, so it is Kenney's coin with a viewBox added and the fill fixed to the
+game's amber. Geometry unchanged.
+
 ## Music — "Loopable Dungeon Ambience", by JaggedStone
 
 <https://opengameart.org/content/loopable-dungeon-ambience> · CC0

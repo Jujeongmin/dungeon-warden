@@ -24,6 +24,7 @@ import { IntroDialog } from "./ui/IntroDialog";
 import { ResultDialog } from "./ui/ResultDialog";
 import { useCountUp } from "./ui/useCountUp";
 import { Icon } from "./ui/Icon";
+import coinIcon from "./assets/icons/coin.svg";
 import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
@@ -109,13 +110,7 @@ const TOOL_MODEL: Record<string, string | null> = {
   jail: "jail",
 };
 
-/** Gold is not chrome — it is a thing in the room, so it gets photographed. */
-const COIN_MODEL = "prop_coin_large";
-
-const TOOL_MODEL_KEYS = [
-  ...Object.values(TOOL_MODEL).filter((k): k is string => k !== null),
-  COIN_MODEL,
-];
+const TOOL_MODEL_KEYS = Object.values(TOOL_MODEL).filter((k): k is string => k !== null);
 
 const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
   { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
@@ -576,8 +571,22 @@ export default function App() {
       const renderer = rendererRef.current;
       const panel = hudRef.current;
       if (!renderer || !panel) return;
-      const gap = window.innerHeight - panel.getBoundingClientRect().top;
-      renderer.setBottomInset(Math.max(0, gap));
+      const box = panel.getBoundingClientRect();
+
+      /*
+       * Which edge the panel is on decides which way to frame.
+       *
+       * A tall window puts it across the bottom; a wide one leaves it a column
+       * down the left. Treating it as a bottom strip either way is what left a
+       * phone held sideways showing 92 pixels of board under a panel taking
+       * three quarters of the screen — and it wastes the empty right half of a
+       * desktop window for the same reason.
+       */
+      const sideDocked = box.width < window.innerWidth * 0.6;
+      renderer.setInsets(
+        sideDocked ? 0 : Math.max(0, window.innerHeight - box.top),
+        sideDocked ? Math.max(0, box.right) : 0,
+      );
     };
 
     measure();
@@ -783,7 +792,7 @@ export default function App() {
           {/* Keyed on the beat so the pop replays on every change; a CSS
               animation on a stable element only ever plays once. */}
           <span key={purse.beat} className={`gold ${purse.dir ?? ""}`}>
-            {toolIcons[COIN_MODEL] && <img className="coin" src={toolIcons[COIN_MODEL]} alt="" />}
+            <img className="coin" src={coinIcon} alt="" />
             {purse.shown}
           </span>
           {/* The threat number with the name the dungeon has earned, which is
