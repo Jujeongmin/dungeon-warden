@@ -35,6 +35,11 @@ requires this notice to travel with the font — that's this entry.
 
 Extracted under `public/assets/kaykit/`. Indexed by `npm run assets`.
 
+Only the models the game actually draws are kept there — the packs ship 250+
+and about forty are resolved, so the rest were removed rather than shipped to
+every player. `node scripts/unused-assets.mjs` reports the difference; the
+full packs are the archives in `art-src/`.
+
 ## Sound — Kenney
 
 <https://kenney.nl/> · CC0
