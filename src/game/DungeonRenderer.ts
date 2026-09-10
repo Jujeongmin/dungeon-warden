@@ -195,6 +195,58 @@ const SHOVE_RATE = 8; // how fast it falls over
 /** Torch flame wobble, as a fraction of the light's steady intensity. */
 const FLICKER_DEPTH = 0.16;
 
+/**
+ * How wide one tile is in the KayKit dungeon pack's own units.
+ *
+ * Measured, not assumed: every piece in the pack that is meant to fill a tile
+ * runs from -2 to +2 on each axis it occupies — `wall`, `barrier`,
+ * `wall_crossing` and `barrier_corner` all do, and their origins sit at the
+ * tile centre rather than at a corner.
+ *
+ * This matters for anything that has to line up with its neighbours. Scaling
+ * each piece to a target width on its own, which is what `fitToTile` does,
+ * gives a corner (2.4 units across its bounding box) a different scale from
+ * the straight piece beside it (4 units), and the two no longer meet. One
+ * fixed divisor keeps a run of obstacles continuous.
+ */
+const PACK_TILE = 4;
+
+/** Neighbour bits, in the order the piece tables below are written. */
+const DIR_N = 1;
+const DIR_E = 2;
+const DIR_S = 4;
+const DIR_W = 8;
+
+const QUARTER = Math.PI / 2;
+
+/**
+ * The pieces each obstacle type is built from.
+ *
+ * The barricade set has no junction pieces — KayKit ships no barrier T or
+ * crossing — so it uses the columned barrier there instead, which reads as a
+ * post where two fence lines meet and happens to lie along the through axis
+ * the chooser picks anyway.
+ */
+const OBSTACLE_PIECES: Record<
+  ObstacleType,
+  { straight: string; end: string; corner: string; tee: string; cross: string }
+> = {
+  barricade: {
+    straight: "obstacle_barricade",
+    end: "obstacle_barricade_end",
+    corner: "obstacle_barricade_corner",
+    tee: "obstacle_barricade_post",
+    cross: "obstacle_barricade_post",
+  },
+  wall: {
+    straight: "obstacle_wall",
+    end: "obstacle_wall_end",
+    corner: "obstacle_wall_corner",
+    tee: "obstacle_wall_tee",
+    cross: "obstacle_wall_cross",
+  },
+};
+
 /** How many of the room's wall panels carry a torch. */
 const TORCH_CHANCE = 0.22;
 
@@ -888,23 +940,53 @@ export class DungeonRenderer {
     this.lastObstacles = obstacles;
     const seen = new Set<string>();
 
+    // Which tiles are built on at all — a barricade and a stone wall are one
+    // barrier as far as the player is concerned, so they join up.
+    const built = new Set<number>();
+    for (const obstacle of obstacles) {
+      built.add(Math.round(obstacle.y) * 1000 + Math.round(obstacle.x));
+    }
+    const has = (x: number, y: number) => built.has(Math.round(y) * 1000 + Math.round(x));
+
     for (const obstacle of obstacles) {
       seen.add(obstacle.id);
+
+      const mask =
+        (has(obstacle.x, obstacle.y - 1) ? DIR_N : 0) |
+        (has(obstacle.x + 1, obstacle.y) ? DIR_E : 0) |
+        (has(obstacle.x, obstacle.y + 1) ? DIR_S : 0) |
+        (has(obstacle.x - 1, obstacle.y) ? DIR_W : 0);
+      const piece = this.obstaclePiece(obstacle.type, mask);
+
       let object = this.obstacleMeshes.get(obstacle.id);
+      // Building next door changes what this one is, so the mesh is replaced
+      // when the chosen piece changes rather than only when the id is new.
+      if (object && object.userData.piece !== piece.key) {
+        this.disposeObject(this.obstacleGroup, object);
+        this.obstacleMeshes.delete(obstacle.id);
+        object = undefined;
+      }
 
       if (!object) {
         object =
-          this.spawnModel(`obstacle_${obstacle.type}`, 0.9) ??
+          this.spawnPiece(piece.key) ??
           new THREE.Mesh(
             this.obstacleGeometry,
             new THREE.MeshLambertMaterial({ color: 0x6b5f4e }),
           );
+        object.userData.piece = piece.key;
+        // The placeholder box is a unit cube; a pack piece carries the tile
+        // scale from spawnPiece. Either way the squash below multiplies the
+        // resting scale rather than replacing it, so it has to be remembered.
+        object.userData.baseScaleY = object.scale.y;
         this.obstacleMeshes.set(obstacle.id, object);
         this.obstacleGroup.add(object);
       }
 
       const health = obstacle.maxHp > 0 ? obstacle.hp / obstacle.maxHp : 1;
-      object.scale.y = 0.25 + 0.75 * health;
+      const baseY = (object.userData.baseScaleY as number | undefined) ?? 1;
+      object.scale.y = baseY * (0.25 + 0.75 * health);
+      object.rotation.y = piece.spin;
       object.position.set(obstacle.x, FLOOR_HEIGHT, obstacle.y);
     }
 
@@ -915,6 +997,79 @@ export class DungeonRenderer {
     }
 
     this.syncClutter();
+  }
+
+  /**
+   * Which piece an obstacle is, and which way it faces.
+   *
+   * Every obstacle used to be the same model at the same angle, so a line of
+   * six barricades was six separate fences standing parallel instead of one
+   * fence. The piece is chosen from which of the four neighbouring tiles are
+   * also built on — an obstacle with one neighbour is an end, with two facing
+   * neighbours a straight, with two adjacent ones a corner, and so on.
+   *
+   * Type is deliberately not part of the neighbour test: a barricade running
+   * into a stone wall should turn to meet it, because to the player that is
+   * one barrier.
+   *
+   * The angles come from how the pack draws its pieces. A straight runs along
+   * X; an end's stub points +X; a corner's arms are -X and +Z; a T's arms are
+   * -X, +X and +Z. Rotating by y maps +X toward -Z, so a quarter turn moves
+   * the +X arm from east to north.
+   */
+  private obstaclePiece(type: ObstacleType, mask: number): { key: string; spin: number } {
+    const pieces = OBSTACLE_PIECES[type];
+    const n = (mask & DIR_N) !== 0;
+    const e = (mask & DIR_E) !== 0;
+    const s = (mask & DIR_S) !== 0;
+    const w = (mask & DIR_W) !== 0;
+    const count = Number(n) + Number(e) + Number(s) + Number(w);
+
+    // Alone: nothing to line up with, so it keeps the pack's own orientation.
+    if (count === 0) return { key: pieces.straight, spin: 0 };
+
+    if (count === 1) {
+      const spin = n ? QUARTER : e ? 0 : s ? -QUARTER : Math.PI;
+      return { key: pieces.end, spin };
+    }
+
+    if (count === 2) {
+      if (e && w) return { key: pieces.straight, spin: 0 };
+      if (n && s) return { key: pieces.straight, spin: QUARTER };
+      const spin = w && s ? 0 : s && e ? QUARTER : e && n ? Math.PI : -QUARTER;
+      return { key: pieces.corner, spin };
+    }
+
+    if (count === 3) {
+      // Named by the arm it is missing, which is the one the T has no leg for.
+      const spin = !n ? 0 : !w ? QUARTER : !s ? Math.PI : -QUARTER;
+      return { key: pieces.tee, spin };
+    }
+
+    return { key: pieces.cross, spin: 0 };
+  }
+
+  /**
+   * A piece scaled to the tile grid rather than to itself.
+   *
+   * See PACK_TILE: pieces that have to meet each other cannot each be fitted
+   * to their own bounding box, or a corner ends up a different size from the
+   * straight next to it.
+   */
+  private spawnPiece(key: string): THREE.Object3D | null {
+    const model = this.loaded.get(key);
+    if (!model) return null;
+
+    const object = this.models.instantiate(model);
+    object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map((m) => m.clone())
+        : mesh.material.clone();
+    });
+    object.scale.setScalar(TILE_SIZE / PACK_TILE);
+    return object;
   }
 
   private clearObstacles(): void {
@@ -1603,7 +1758,11 @@ export class DungeonRenderer {
         this.ghost = null;
       }
       if (modelKey) {
-        const object = this.spawnModel(modelKey, 0.9);
+        // Obstacles are scaled to the tile grid so they join up, so the
+        // preview has to be too or the piece grows the moment it is placed.
+        const object = modelKey.startsWith("obstacle_")
+          ? this.spawnPiece(modelKey)
+          : this.spawnModel(modelKey, 0.9);
         if (object) {
           object.traverse((child) => {
             const mesh = child as THREE.Mesh;

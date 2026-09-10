@@ -65,9 +65,24 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   entrance: [/^stairs_/, /^stairs$/, /^door_/, /^doorway/],
   core: [/^chest_gold$/, /^chest$/, /^banner_red$/],
 
-  // Obstacles — walls the player places to block a raiding party's route.
-  obstacle_barricade: [/^barrier_half$/, /^barrier$/, /^fence/],
-  obstacle_wall: [/^wall$/, /^wall_arched$/, /^pillar$/],
+  /*
+   * Obstacles — walls the player places to block a raiding party's route.
+   *
+   * Five pieces each, because a row of obstacles is a fence and a fence has
+   * ends, corners and junctions. The renderer picks between them from which
+   * neighbouring tiles are also built on; every set falls back to its own
+   * straight piece so a pack missing the fancier parts still draws a wall.
+   */
+  obstacle_barricade: [/^barrier$/, /^barrier_half$/, /^fence/],
+  obstacle_barricade_end: [/^barrier_half$/, /^barrier$/],
+  obstacle_barricade_corner: [/^barrier_corner$/, /^barrier$/],
+  obstacle_barricade_post: [/^barrier_column$/, /^barrier$/],
+
+  obstacle_wall: [/^wall$/, /^wall_arched$/],
+  obstacle_wall_end: [/^wall_endcap$/, /^wall$/],
+  obstacle_wall_corner: [/^wall_corner$/, /^wall$/],
+  obstacle_wall_tee: [/^wall_tsplit$/, /^wall$/],
+  obstacle_wall_cross: [/^wall_crossing$/, /^wall$/],
 
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
