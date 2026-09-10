@@ -49,6 +49,16 @@ const COLORS: Record<TileId, number> = {
 
 export interface RendererCallbacks {
   onTileTap: (x: number, y: number) => void;
+  /**
+   * A secondary click on a tile - right mouse button only, so it exists on a
+   * desktop and simply never fires on a phone, where the toolbar's remove
+   * tool is the way to do this.
+   *
+   * Carries the pointer position as well as the tile, because whatever this
+   * opens has to open where the player clicked rather than somewhere the
+   * board knows nothing about.
+   */
+  onTileAlt?: (x: number, y: number, clientX: number, clientY: number) => void;
   onHoverChange: (tile: { x: number; y: number } | null) => void;
 }
 
@@ -2045,9 +2055,13 @@ export class DungeonRenderer {
       this.canvas.releasePointerCapture(e.pointerId);
     }
 
-    if (wasSingle && !this.dragMoved && e.button !== 2) {
+    if (wasSingle && !this.dragMoved) {
       const tile = this.pointerToTile(e.clientX, e.clientY);
-      if (tile) this.callbacks.onTileTap(tile.x, tile.y);
+      if (tile && e.button === 2) {
+        this.callbacks.onTileAlt?.(tile.x, tile.y, e.clientX, e.clientY);
+      } else if (tile) {
+        this.callbacks.onTileTap(tile.x, tile.y);
+      }
     }
 
     if (this.activePointers.size === 0) {

@@ -242,4 +242,6 @@ export const en: Record<StringKey, string> = {
   rotate_hint: "Turn your device upright",
   result_champion: "Champion stopped",
   party_summary: "Lv{level} · {count} raiders",
+  manage_equip_best: "Equip best",
+  hint_remove_alt: "or right-click",
 };

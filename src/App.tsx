@@ -123,6 +123,18 @@ const TOOL_MODEL: Record<string, string | null> = {
 const TOOL_MODEL_KEYS = Object.values(TOOL_MODEL).filter((k): k is string => k !== null);
 
 /**
+ * Whether this machine has a pointer that can right-click.
+ *
+ * Read once: it is a property of the device, and a player does not grow a
+ * mouse mid-session. Guarded for the server-side and test cases where there
+ * is no matchMedia at all.
+ */
+const HAS_MOUSE =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+/**
  * The five adventurer models, photographed for the party row.
  *
  * Baked from the same pack the raid draws, so the face above the raid button
@@ -414,6 +426,25 @@ export default function App() {
     audio.duckMusic(raid.raiding);
   }, [raid.raiding]);
 
+  /**
+   * The right-click prompt: what is on this tile, and a button to clear it.
+   *
+   * Desktop only, and it exists because taking something down was a two-step
+   * detour on a mouse - go to the toolbar, pick the remove tool, come back,
+   * click, and now the remove tool is still armed for the next click. Right
+   * click is what every builder in the genre uses.
+   *
+   * It asks rather than acting. A right click that silently deleted a 70g
+   * mage because the cursor drifted one tile is worse than the detour, and
+   * the prompt is also the only thing that teaches the gesture exists.
+   *
+   * Nothing here fires on a phone: no touch generates button 2, so the
+   * toolbar remove tool stays the way it is done there.
+   */
+  const [removePrompt, setRemovePrompt] = useState<
+    { x: number; y: number; sx: number; sy: number; label: string } | null
+  >(null);
+
   // The renderer is built once; handlers that change every render are reached
   // through a ref so the scene is never torn down mid-session.
   const tapRef = useRef<(x: number, y: number) => void>(() => {});
@@ -443,10 +474,51 @@ export default function App() {
     }
   };
 
+  const altRef = useRef<(x: number, y: number, sx: number, sy: number) => void>(() => {});
+  altRef.current = (x, y, sx, sy) => {
+    if (raid.raiding) return;
+
+    // Only what the player put there. Scenery is not theirs to clear, and
+    // offering to clear it would be a button that does nothing.
+    const minion = minions.find((m) => m.x === x && m.y === y);
+    const trap = traps.find((entry) => entry.x === x && entry.y === y);
+    const room = rooms.find((r) => roomCovers(r, x, y));
+    const obstacle = obstacles.find((o) => o.x === x && o.y === y);
+
+    const label = minion
+      ? t(MINION_LABEL[minion.type] as StringKey)
+      : trap
+        ? t(TRAP_LABEL[trap.type] as StringKey)
+        : room
+          ? t(ROOM_LABEL[room.type] as StringKey)
+          : obstacle
+            ? t(OBSTACLE_LABEL[obstacle.type] as StringKey)
+            : null;
+
+    if (!label) {
+      setRemovePrompt(null);
+      return;
+    }
+
+    // Clamped to the canvas, so a click near an edge does not put the prompt
+    // out in the letterbox. Half-widths rather than a measurement: the
+    // element does not exist yet at this point, and it has a fixed size.
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+    setRemovePrompt({
+      x,
+      y,
+      sx: rect ? clamp(sx, rect.left + 76, rect.right - 76) : sx,
+      sy: rect ? clamp(sy, rect.top + 8, rect.bottom - 64) : sy,
+      label,
+    });
+  };
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const renderer = new DungeonRenderer(canvasRef.current, {
       onTileTap: (x, y) => tapRef.current(x, y),
+      onTileAlt: (x, y, sx, sy) => altRef.current(x, y, sx, sy),
       onHoverChange: setHover,
     });
     rendererRef.current = renderer;
@@ -486,6 +558,19 @@ export default function App() {
     const id = window.setInterval(() => setPartyClock(Date.now()), 5000);
     return () => window.clearInterval(id);
   }, [raid.raiding]);
+
+  // Anything that moves the board out from under the prompt closes it: a
+   // raid starting, or the player changing their mind with Escape.
+  useEffect(() => {
+    if (!removePrompt) return;
+    if (raid.raiding) {
+      setRemovePrompt(null);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setRemovePrompt(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [removePrompt, raid.raiding]);
 
   const nextParty = useMemo(
     () => (meta ? previewParty(adventurers, meta.threat, partyClock) : []),
@@ -881,7 +966,12 @@ export default function App() {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
     if (tool.kind === "obstacle") return `${t("hint_obstacle")} ${obstacles.length}/${maxObstaclesFor(research, entitlements)}`;
-    if (tool.kind === "remove") return t("hint_remove");
+    // The right-click shortcut is mentioned exactly where it applies, and
+    // only on a machine that has a right button to click. A phone is told
+    // about a gesture it cannot make otherwise.
+    if (tool.kind === "remove") {
+      return HAS_MOUSE ? `${t("hint_remove")} · ${t("hint_remove_alt")}` : t("hint_remove");
+    }
     if (tool.kind === "minion") return `${t("hint_minion")} ${minions.length}/${effects.minionCap}`;
     if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
     return `${t(ROOM_DESCRIPTION[tool.type] as StringKey)} ${t("hint_room")} ${rooms.length}/${MAX_ROOMS}`;
@@ -1212,6 +1302,19 @@ export default function App() {
               {loot.length > 0 && (
                 <>
                   <h3 className="section">{t("manage_loot")} {loot.length}</h3>
+                  {/* The dropdowns stay for anyone who wants to argue with
+                      it, but the answer is not in dispute, so it is one tap
+                      above them rather than eight below. */}
+                  {minions.length > 0 && (
+                    <div className="actions">
+                      <button
+                        disabled={raid.raiding}
+                        onClick={() => { audio.play("click"); save.equipBest(); }}
+                      >
+                        {t("manage_equip_best")}
+                      </button>
+                    </div>
+                  )}
                   {minions.map((minion) => (
                     <label key={minion.id} className="equip-row">
                       <span>
@@ -1382,6 +1485,30 @@ export default function App() {
           </button>
         </div>
       </aside>
+
+      {/* Anchored where the click landed, and clamped so it cannot hang off
+          the stage. A backdrop takes the next click anywhere else, which is
+          how a context menu is dismissed everywhere. */}
+      {removePrompt && (
+        <div className="prompt-catch" onPointerDown={() => setRemovePrompt(null)}>
+          <div
+            className="tile-prompt"
+            style={{ left: removePrompt.sx, top: removePrompt.sy }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <b>{removePrompt.label}</b>
+            <button
+              onClick={() => {
+                const ok = save.removeAt(removePrompt.x, removePrompt.y);
+                audio.play(ok ? "place" : "error");
+                setRemovePrompt(null);
+              }}
+            >
+              {t("tool_remove")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/*
         * Sits above the running scene, so the dungeon is already rendered and

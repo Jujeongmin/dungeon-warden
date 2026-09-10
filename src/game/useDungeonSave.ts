@@ -7,6 +7,7 @@ import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms"
 import { RESEARCH_BY_ID, researchEffects } from "./research";
 import { installServerProbe } from "./devtools";
 import { maxIdSuffix } from "./idSeq";
+import { minionStatsFor } from "./sim/units";
 import {
   EMPTY_ENTITLEMENTS,
   MAX_ROOMS,
@@ -128,10 +129,12 @@ export function useDungeonSave() {
   const savedObstaclesRef = useRef<PlacedObstacle[]>([]);
 
   const minionsRef = useRef<PlacedMinion[]>([]);
+  const lootRef = useRef<LootItem[]>([]);
   const trapsRef = useRef<PlacedTrap[]>([]);
   const roomsRef = useRef<PlacedRoom[]>([]);
   const obstaclesRef = useRef<PlacedObstacle[]>([]);
   minionsRef.current = minions;
+  lootRef.current = loot;
   trapsRef.current = traps;
   roomsRef.current = rooms;
   obstaclesRef.current = obstacles;
@@ -448,8 +451,12 @@ export function useDungeonSave() {
 
   /** Removes whatever occupies the tile. No refund, matching the server. */
   const removeAt = useCallback((x: number, y: number): boolean => {
-    const hit = occupantAt(x, y) !== null;
-    if (!hit) return false;
+    // Scenery is not the player's to clear. It read as null-or-something and
+    // so reported success on a barrel: nothing was filtered out, true came
+    // back, and the caller played the place sound for a tile that had not
+    // changed.
+    const occupant = occupantAt(x, y);
+    if (occupant === null || occupant === "terrain") return false;
 
     setMinions((current) => current.filter((m) => !(m.x === x && m.y === y)));
     setTraps((current) => current.filter((t) => !(t.x === x && t.y === y)));
@@ -468,6 +475,35 @@ export function useDungeonSave() {
         return minion;
       }),
     );
+  }, []);
+
+  /**
+   * Hands every looted weapon to the minion it is worth the most on.
+   *
+   * Eight minions and eight dropdowns is a spreadsheet, and on a phone it is
+   * a spreadsheet you scroll. It is also a puzzle with one answer: the bonus
+   * is a percentage of the holder's own damage, so the best tier belongs on
+   * the hardest hitter, the next on the next, and so on. Nothing is being
+   * decided by hand that the player would decide differently.
+   *
+   * Ranked by unarmed damage on purpose - ranking by current damage would
+   * let whatever each minion happens to be holding decide where it lands.
+   *
+   * Written in one pass rather than by repeated equipWeapon calls: every
+   * minion is reassigned, including the ones that end up with nothing, so a
+   * weapon that used to be held by a minion outside the new pairing is not
+   * left behind as a second copy.
+   */
+  const equipBest = useCallback((): void => {
+    setMinions((current) => {
+      const ranked = [...current].sort(
+        (a, b) => minionStatsFor(b, 0).damage - minionStatsFor(a, 0).damage,
+      );
+      const best = [...lootRef.current].sort((a, b) => b.tier - a.tier);
+      const assigned = new Map<string, string | null>();
+      ranked.forEach((minion, i) => assigned.set(minion.id, best[i]?.id ?? null));
+      return current.map((minion) => ({ ...minion, weaponId: assigned.get(minion.id) ?? null }));
+    });
   }, []);
 
   const applyRaidResult = useCallback(
@@ -600,6 +636,7 @@ export function useDungeonSave() {
     placeObstacle,
     removeAt,
     equipWeapon,
+    equipBest,
     buyResearch,
     applyRaidResult,
     /** For anything that mints gold server-side and hands back the new total. */

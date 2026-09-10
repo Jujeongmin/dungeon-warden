@@ -255,4 +255,6 @@ export const ko = {
   rotate_hint: "세로로 돌려주세요",
   result_champion: "우두머리 격파",
   party_summary: "Lv{level} · {count}명",
+  manage_equip_best: "최적 장착",
+  hint_remove_alt: "우클릭 회수",
 };

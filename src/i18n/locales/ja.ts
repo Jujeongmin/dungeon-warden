@@ -248,4 +248,6 @@ export const ja: Record<StringKey, string> = {
   rotate_hint: "端末を縦向きにしてください",
   result_champion: "頭目を倒した",
   party_summary: "Lv{level} · {count}人",
+  manage_equip_best: "最適装備",
+  hint_remove_alt: "右クリックも可",
 };

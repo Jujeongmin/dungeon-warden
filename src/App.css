@@ -1458,6 +1458,11 @@ button.primary {
    screen. */
 .title { z-index: 30; }
 
+/* 3.5 — the right-click prompt. Over the board and the chrome it was
+   opened on top of, under anything modal: a dialog opening while it is up
+   should cover it, and its own backdrop closes it before that can matter. */
+.prompt-catch { z-index: 35; }
+
 /* 4 — anything modal, over everything including the title. */
 .modal-backdrop { z-index: 40; }
 
@@ -1901,3 +1906,44 @@ button.ad-gold {
 }
 
 
+
+
+/* ---------------------------------------------------------------------------
+   The right-click prompt.
+
+   Fixed, not absolute: the position it is given is a pointer position, which
+   is viewport coordinates, and the stage is a centred column - an absolute
+   offset inside it would land the prompt short by the width of the letterbox.
+   (The tutorial ring got this wrong once already.)
+   --------------------------------------------------------------------------- */
+.prompt-catch {
+  position: fixed;
+  inset: 0;
+}
+
+.tile-prompt {
+  position: fixed;
+  transform: translate(-50%, 10px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #2b241c, #1b1610);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--edge-lit);
+  white-space: nowrap;
+  animation: panel-fade 120ms ease-out;
+}
+
+.tile-prompt b {
+  font-size: var(--fs-2xs);
+  color: var(--ink);
+}
+
+.tile-prompt button {
+  padding: 4px 10px;
+  font-size: var(--fs-2xs);
+  border-color: rgba(216, 106, 76, 0.5);
+  color: var(--danger);
+}

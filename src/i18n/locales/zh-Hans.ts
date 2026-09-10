@@ -243,4 +243,6 @@ export const zhHans: Record<StringKey, string> = {
   rotate_hint: "请将设备竖起",
   result_champion: "击溃首领",
   party_summary: "Lv{level} · {count}人",
+  manage_equip_best: "最佳装备",
+  hint_remove_alt: "右键亦可",
 };
