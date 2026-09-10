@@ -56,7 +56,6 @@ export function ResultDialog({ result, onClose }: Props) {
             <b>
               <i>+</i>
               {reward.shown}
-              <em>🪙</em>
             </b>
             {result.plundered > 0 && (
               <span className="taken">

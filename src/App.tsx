@@ -23,6 +23,7 @@ import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
 import { ResultDialog } from "./ui/ResultDialog";
 import { useCountUp } from "./ui/useCountUp";
+import { Icon } from "./ui/Icon";
 import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
@@ -108,7 +109,13 @@ const TOOL_MODEL: Record<string, string | null> = {
   jail: "jail",
 };
 
-const TOOL_MODEL_KEYS = Object.values(TOOL_MODEL).filter((k): k is string => k !== null);
+/** Gold is not chrome — it is a thing in the room, so it gets photographed. */
+const COIN_MODEL = "prop_coin_large";
+
+const TOOL_MODEL_KEYS = [
+  ...Object.values(TOOL_MODEL).filter((k): k is string => k !== null),
+  COIN_MODEL,
+];
 
 const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
   { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
@@ -162,6 +169,8 @@ export default function App() {
   const [adNotice, setAdNotice] = useState<string | null>(null);
   const [toolId, setToolId] = useState("barricade");
   const [group, setGroup] = useState<ToolGroup>("obstacle");
+  /** The level to come back to when the quick mute is switched off again. */
+  const lastVolume = useRef(1);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("build");
   const [hudOpen, setHudOpen] = useState(true);
@@ -179,7 +188,7 @@ export default function App() {
     setSettings((current) => {
       const next = { ...current, ...patch };
       saveSettings(next);
-      if (patch.muted !== undefined) audio.setMuted(patch.muted);
+      if (patch.volume !== undefined) audio.setVolume(patch.volume);
       if (patch.quality !== undefined) {
         rendererRef.current?.setPixelRatio(pixelRatioFor(patch.quality));
       }
@@ -279,10 +288,15 @@ export default function App() {
       } else if (event.kind === "minionDown") {
         renderer.spawnRing(event.x, event.y, 0x9d8bd8);
         renderer.knockbackUnit(`m:${event.targetId}`);
+        audio.play("minionDown", 120);
       } else if (event.kind === "obstacleDown") {
         renderer.shake(0.45); // a wall coming down is the biggest thump here
+        audio.play("wallDown", 0);
       } else if (event.kind === "captured" || event.kind === "killed") {
         renderer.spawnRing(event.x, event.y, event.kind === "captured" ? 0x7fc98a : 0xd86a4c);
+        // The two ways an adventurer leaves the board sound different, because
+        // one of them is the one the player was building a jail for.
+        audio.play(event.kind === "captured" ? "captured" : "hit", 0);
         // A fresh jolt right as they actually leave the board, so the
         // renderer's brief corpse-linger has a live knockback to play out.
         renderer.knockbackUnit(`a:${event.targetId}`);
@@ -344,12 +358,13 @@ export default function App() {
    * touched something — and entering the game is exactly that touch.
    */
   useEffect(() => {
-    if (screen !== "game" || !settings.music) {
+    if (screen !== "game" || settings.musicVolume <= 0) {
       audio.stopMusic();
       return;
     }
+    audio.setMusicLevel(settings.musicVolume);
     void audio.startMusic();
-  }, [screen, settings.music]);
+  }, [screen, settings.musicVolume]);
 
   // A raid has its own noise — hits, traps, the result. The loop steps back
   // rather than everything else being pushed forward.
@@ -666,7 +681,7 @@ export default function App() {
 
   // Apply saved preferences once the renderer exists.
   useEffect(() => {
-    audio.setMuted(settings.muted);
+    audio.setVolume(settings.volume);
     rendererRef.current?.setPixelRatio(pixelRatioFor(settings.quality));
     // Only on mount: later changes go through patchSettings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -767,7 +782,10 @@ export default function App() {
         <div className="stats">
           {/* Keyed on the beat so the pop replays on every change; a CSS
               animation on a stable element only ever plays once. */}
-          <span key={purse.beat} className={`gold ${purse.dir ?? ""}`}>🪙 {purse.shown}</span>
+          <span key={purse.beat} className={`gold ${purse.dir ?? ""}`}>
+            {toolIcons[COIN_MODEL] && <img className="coin" src={toolIcons[COIN_MODEL]} alt="" />}
+            {purse.shown}
+          </span>
           {/* The threat number with the name the dungeon has earned, which is
               the only measure of progress this game has. */}
           {meta && (
@@ -780,13 +798,18 @@ export default function App() {
           <span className={`status status-${status}`}>
             {STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status}
           </span>
+          {/* A quick mute that remembers the level it was set to, so silencing
+              the game on a bus does not cost the player their mix. */}
           <button
             className="icon-toggle"
-            onClick={() => patchSettings({ muted: !settings.muted })}
-            title={settings.muted ? t("menu_sound_on") : t("menu_sound_off")}
-            aria-label={settings.muted ? t("menu_sound_on") : t("menu_sound_off")}
+            onClick={() => {
+              if (settings.volume > 0) lastVolume.current = settings.volume;
+              patchSettings({ volume: settings.volume > 0 ? 0 : lastVolume.current });
+            }}
+            title={settings.volume > 0 ? t("menu_sound_off") : t("menu_sound_on")}
+            aria-label={settings.volume > 0 ? t("menu_sound_off") : t("menu_sound_on")}
           >
-            {settings.muted ? "🔇" : "🔊"}
+            <Icon name={settings.volume > 0 ? "sound" : "mute"} />
           </button>
           {/* Icons, not labels. These are somewhere to go once in a while;
               the gold beside them is the thing being played for. */}
@@ -796,7 +819,7 @@ export default function App() {
             title={t("menu_leaderboard")}
             aria-label={t("menu_leaderboard")}
           >
-            🏆
+            <Icon name="trophy" />
           </button>
           <button
             className="icon-toggle"
@@ -804,7 +827,7 @@ export default function App() {
             title={t("menu_shop")}
             aria-label={t("menu_shop")}
           >
-            🛒
+            <Icon name="shop" />
           </button>
           <button
             className="icon-toggle"
@@ -812,7 +835,7 @@ export default function App() {
             title={t("menu_settings")}
             aria-label={t("menu_settings")}
           >
-            ⚙
+            <Icon name="settings" />
           </button>
           <button
             className="icon-toggle"
@@ -821,7 +844,7 @@ export default function App() {
             aria-label={t("menu_home")}
             disabled={raid.raiding}
           >
-            ⌂
+            <Icon name="home" />
           </button>
         </div>
       </header>
@@ -955,7 +978,7 @@ export default function App() {
             {t("tab_research")} {research.length}/{RESEARCH.length}
           </button>
           <button className="hud-toggle" onClick={() => setHudOpen(!hudOpen)} aria-label="toggle">
-            {hudOpen ? "▾" : "▴"}
+            <Icon name={hudOpen ? "chevronDown" : "chevronUp"} size={16} />
           </button>
         </div>
 
@@ -1013,7 +1036,7 @@ export default function App() {
                         return icon ? <img className="tool-icon" src={icon} alt="" /> : null;
                       })()}
                       <span className="tool-text">
-                        <b>{locked ? `🔒 ${label}` : label}</b>
+                        <b>{locked && <Icon name="lock" size={11} />}{label}</b>
                         <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
                       </span>
                     </button>
@@ -1043,7 +1066,7 @@ export default function App() {
                   >
                     {adGold.busy
                       ? t("ad_playing")
-                      : `🪙 +${adGold.status.reward} · ${t("ad_watch")} ${adGold.status.remaining}/${adGold.status.limit}`}
+                      : `+${adGold.status.reward} · ${t("ad_watch")} ${adGold.status.remaining}/${adGold.status.limit}`}
                   </button>
                 </div>
               )}

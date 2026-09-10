@@ -1,0 +1,68 @@
+/**
+ * The interface's own icons.
+ *
+ * These were emoji. Emoji are somebody else's art: they change shape between
+ * iOS, Android and Windows, they arrive in colours that fight the room, and a
+ * 🛒 next to a dungeon reads as a web page rather than a game. Drawn here
+ * instead — one flat path each, inheriting `currentColor`, so they take the
+ * torchlight the rest of the interface is lit by.
+ *
+ * The one exception is gold, which is not chrome: it is an object in the game,
+ * so it is photographed from the same coin model the dungeon draws. See
+ * `bakeModelIcons`.
+ */
+
+export type IconName =
+  | "sound"
+  | "mute"
+  | "trophy"
+  | "shop"
+  | "settings"
+  | "home"
+  | "lock"
+  | "chevronDown"
+  | "chevronUp";
+
+const PATHS: Record<IconName, string> = {
+  // Speaker cone plus two arcs of sound.
+  sound: "M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zm-2.5-8v2a6.5 6.5 0 0 1 0 12v2a8.5 8.5 0 0 0 0-16z",
+  // The same cone, struck through.
+  mute: "M4 9v6h4l5 4V5L8 9H4zm18.3-1.3-1.4-1.4L17 10.2l-3.9-3.9-1.4 1.4L15.6 12l-3.9 3.9 1.4 1.4 3.9-3.9 3.9 3.9 1.4-1.4-3.9-3.9 3.9-3.9z",
+  // Two-handled cup on a foot.
+  trophy: "M18 4h3v3a4 4 0 0 1-3.2 3.9A6 6 0 0 1 13 14.9V18h3v2H8v-2h3v-3.1a6 6 0 0 1-4.8-4A4 4 0 0 1 3 7V4h3V2h12v2zM6 6H5v1a2 2 0 0 0 1 1.7V6zm13 0h-1v2.7A2 2 0 0 0 19 7V6z",
+  // Basket with a handle.
+  shop: "M7 8V6a5 5 0 0 1 10 0v2h3l-1.2 12.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 8h3zm2 0h6V6a3 3 0 0 0-6 0v2z",
+  // Cog: a ring with six teeth.
+  settings: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm9 3.5a9 9 0 0 1-.1 1.3l2 1.6-2 3.5-2.4-1a9 9 0 0 1-2.2 1.3L16 21h-4l-.3-2.3a9 9 0 0 1-2.2-1.3l-2.4 1-2-3.5 2-1.6a9 9 0 0 1 0-2.6l-2-1.6 2-3.5 2.4 1a9 9 0 0 1 2.2-1.3L12 3h4l.3 2.3a9 9 0 0 1 2.2 1.3l2.4-1 2 3.5-2 1.6A9 9 0 0 1 21 12z",
+  // Roof over a doorway.
+  home: "M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3z",
+  // Shackle over a closed body.
+  lock: "M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7z",
+  chevronDown: "M6 9l6 6 6-6H6z",
+  chevronUp: "M6 15l6-6 6 6H6z",
+};
+
+interface Props {
+  name: IconName;
+  /** Square edge in px. Defaults to the size of the surrounding text. */
+  size?: number;
+  className?: string;
+}
+
+export function Icon({ name, size = 18, className }: Props) {
+  return (
+    <svg
+      className={className ? `icon ${className}` : "icon"}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      // Decorative: every one of these sits inside a control that already has
+      // a label or a title, so announcing it twice helps nobody.
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={PATHS[name]} />
+    </svg>
+  );
+}

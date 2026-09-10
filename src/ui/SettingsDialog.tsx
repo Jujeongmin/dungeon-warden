@@ -14,6 +14,23 @@ interface Props {
 /** Derived from the table, so adding a language cannot forget the picker. */
 const LOCALES = Object.keys(LOCALE_LABEL) as Locale[];
 
+/** A slider with the level beside it, so the position has a number. */
+function Fader({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <span className="fader">
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={Math.round(value * 100)}
+        onChange={(e) => onChange(Number(e.target.value) / 100)}
+      />
+      <b>{Math.round(value * 100)}</b>
+    </span>
+  );
+}
+
 export function SettingsDialog({
   settings,
   onChange,
@@ -44,20 +61,25 @@ export function SettingsDialog({
           </select>
         </div>
 
+        {/*
+          * Faders, not switches.
+          *
+          * Off was the only way down, so a player who wanted the game quieter
+          * had to choose between full volume and silence. They are separate
+          * because the loop is the first thing turned down and turning it down
+          * should not cost the hits.
+          */}
         <div className="setting-row">
           <span>{t("settings_sound")}</span>
-          <button onClick={() => onChange({ muted: !settings.muted })}>
-            {settings.muted ? t("settings_off") : t("settings_on")}
-          </button>
+          <Fader value={settings.volume} onChange={(volume) => onChange({ volume })} />
         </div>
 
-        {/* Separate from the sound switch above: the loop is the first thing a
-            player turns off, and turning it off should not cost them the hits. */}
         <div className="setting-row">
           <span>{t("settings_music")}</span>
-          <button onClick={() => onChange({ music: !settings.music })}>
-            {settings.music ? t("settings_on") : t("settings_off")}
-          </button>
+          <Fader
+            value={settings.musicVolume}
+            onChange={(musicVolume) => onChange({ musicVolume })}
+          />
         </div>
 
         <div className="setting-row">

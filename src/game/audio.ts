@@ -13,7 +13,9 @@ import { publicUrl } from "./assets/publicUrl";
 export type Cue =
   | "click"
   | "place"
-  | "dig"
+  | "wallDown"
+  | "minionDown"
+  | "captured"
   | "error"
   | "raidStart"
   | "hit"
@@ -39,7 +41,18 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 180, to: 260, seconds: 0.09, type: "triangle", gain: 0.09 },
     { from: 90, seconds: 0.14, type: "sine", gain: 0.07 },
   ],
-  dig: [{ from: 130, to: 70, seconds: 0.12, type: "sawtooth", gain: 0.06 }],
+  // A wall coming down: the lowest, longest thing in the mix.
+  wallDown: [
+    { from: 150, to: 45, seconds: 0.34, type: "sawtooth", gain: 0.1 },
+    { from: 70, to: 40, seconds: 0.5, type: "sine", gain: 0.08 },
+  ],
+  // Bone giving out — short, dry, and clearly not an adventurer dying.
+  minionDown: [{ from: 260, to: 110, seconds: 0.2, type: "triangle", gain: 0.07 }],
+  // Taking one alive is the good outcome, so it rises where a kill falls.
+  captured: [
+    { from: 300, seconds: 0.1, type: "triangle", gain: 0.07 },
+    { from: 480, seconds: 0.18, type: "triangle", gain: 0.07 },
+  ],
   error: [{ from: 200, to: 120, seconds: 0.18, type: "square", gain: 0.06 }],
   raidStart: [
     { from: 110, to: 220, seconds: 0.35, type: "sawtooth", gain: 0.08 },
@@ -66,7 +79,12 @@ const TONES: Record<Cue, ToneSpec[]> = {
 const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   click: [/click_00[12]/, /^click/, /select/, /^tick/],
   place: [/^drop_00/, /^switch/, /^bong/, /place/],
-  dig: [/^footstep/, /impact.*soft/, /^scrape/, /rock/],
+  wallDown: [/^footstep/, /rubble/, /^rock/, /impact.*heavy/],
+  // No file matches these on purpose: the packs have nothing that reads as
+  // bone breaking or a body being dragged away, and a wrong sound is worse
+  // than the synthesised one the engine falls back to.
+  minionDown: [],
+  captured: [],
   error: [/error/, /^back_00/, /^close/, /wrong/],
   raidStart: [/^jingles_steel/, /^jingles_pizzi/, /horn/, /alarm/],
   hit: [/impact.*generic/, /^impact/, /^hit/, /punch/],
@@ -97,7 +115,7 @@ const MUSIC_DUCKED = 0.15;
 const MUSIC_FADE = 1.8;
 
 const MANIFEST_URL = publicUrl("assets/audio/manifest.json");
-const STORAGE_KEY = "dw.muted";
+const STORAGE_KEY = "dw.volume";
 
 interface ManifestEntry {
   url: string;
@@ -111,7 +129,8 @@ class AudioEngine {
   private buffers = new Map<Cue, AudioBuffer | null>();
   private loading = new Set<Cue>();
   private initialised = false;
-  private muted = false;
+  /** 0 to 1. Zero is muted; there is no separate flag. */
+  private volume = 1;
   /** Cues fired within this window collapse into one, so a wave of hits does not roar. */
   private lastPlayed = new Map<Cue, number>();
 
@@ -121,32 +140,39 @@ class AudioEngine {
   private musicGain: GainNode | null = null;
   private musicWanted = false;
   private musicTarget = MUSIC_LEVEL;
+  /** The player's music fader, multiplied into every ramp below. */
+  private musicScale = 1;
 
   constructor() {
     try {
-      this.muted = localStorage.getItem(STORAGE_KEY) === "1";
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored !== null) this.volume = clamp01(Number(stored));
+      // Carried over from when this was a switch, so a player who muted the
+      // game before it had a slider does not get a faceful of sound.
+      else if (localStorage.getItem("dw.muted") === "1") this.volume = 0;
     } catch {
       // Private browsing or blocked storage: default to audible.
-      this.muted = false;
+      this.volume = 1;
     }
   }
 
-  get isMuted(): boolean {
-    return this.muted;
+  get level(): number {
+    return this.volume;
   }
 
   get usingFiles(): boolean {
     return this.entries.length > 0;
   }
 
-  setMuted(muted: boolean): void {
-    this.muted = muted;
+  /** Master level, 0 to 1. Everything — cues and music — rides on this. */
+  setVolume(level: number): void {
+    this.volume = clamp01(level);
     try {
-      localStorage.setItem(STORAGE_KEY, muted ? "1" : "0");
+      localStorage.setItem(STORAGE_KEY, String(this.volume));
     } catch {
       /* preference is per-session then */
     }
-    if (this.master) this.master.gain.value = muted ? 0 : 1;
+    if (this.master) this.master.gain.value = this.volume;
   }
 
   /**
@@ -164,7 +190,7 @@ class AudioEngine {
     try {
       this.context = new AudioContext();
       this.master = this.context.createGain();
-      this.master.gain.value = this.muted ? 0 : 1;
+      this.master.gain.value = this.volume;
       this.master.connect(this.context.destination);
     } catch {
       this.context = null;
@@ -224,7 +250,7 @@ class AudioEngine {
   }
 
   play(cue: Cue, throttleMs = 60): void {
-    if (this.muted || !this.context || !this.master) return;
+    if (this.volume <= 0 || !this.context || !this.master) return;
 
     const now = performance.now();
     const previous = this.lastPlayed.get(cue) ?? -Infinity;
@@ -304,6 +330,12 @@ class AudioEngine {
    * through, and they do it by the music getting out of the way rather than by
    * everything else getting louder.
    */
+  /** The music fader, kept apart from the master so it can sit under the cues. */
+  setMusicLevel(level: number): void {
+    this.musicScale = Math.min(1, Math.max(0, level));
+    this.rampMusic(this.musicTarget, 0.5);
+  }
+
   duckMusic(ducked: boolean): void {
     this.musicTarget = ducked ? MUSIC_DUCKED : MUSIC_LEVEL;
     this.rampMusic(this.musicTarget, 0.9);
@@ -314,7 +346,8 @@ class AudioEngine {
     const now = this.context.currentTime;
     this.musicGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.setValueAtTime(Math.max(this.musicGain.gain.value, 0.0001), now);
-    this.musicGain.gain.exponentialRampToValueAtTime(Math.max(level, 0.0001), now + seconds);
+    const scaled = level * this.musicScale;
+    this.musicGain.gain.exponentialRampToValueAtTime(Math.max(scaled, 0.0001), now + seconds);
   }
 
   private async loadMusic(): Promise<AudioBuffer | null> {
@@ -375,6 +408,10 @@ class AudioEngine {
       offset += spec.seconds * 0.85;
     }
   }
+}
+
+function clamp01(value: number): number {
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
 }
 
 export const audio = new AudioEngine();

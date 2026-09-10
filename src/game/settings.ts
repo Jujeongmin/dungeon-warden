@@ -17,10 +17,16 @@ export type Quality = "low" | "high";
 export type RaidSpeed = 1 | 2 | 4;
 
 export interface Settings {
-  muted: boolean;
+  /**
+   * Master volume, 0 to 1. Replaces an on/off switch: turning a game down is
+   * a different wish from turning it off, and only one of them was available.
+   */
+  volume: number;
   /** The background loop, separately from the cues: it is the first thing a
    *  player turns off, and turning it off should not cost them the hits. */
-  music: boolean;
+  /** The loop, on its own fader: it is the first thing a player turns down,
+   *  and turning it down should not cost them the hits. */
+  musicVolume: number;
   quality: Quality;
   /**
    * How fast raids run.
@@ -40,8 +46,8 @@ export interface Settings {
 const KEY = "dw.settings";
 
 export const DEFAULT_SETTINGS: Settings = {
-  muted: false,
-  music: true,
+  volume: 1,
+  musicVolume: 1,
   quality: "high",
   raidSpeed: 1,
   locale: "en",
