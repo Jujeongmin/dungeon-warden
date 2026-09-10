@@ -61,11 +61,36 @@ export function useAdGold(onGold: (gold: number) => void) {
     void refresh();
   }, [refresh]);
 
-  /** True when a claim would be accepted right now. */
-  const ready =
-    status !== null &&
-    status.remaining > 0 &&
-    Date.now() + skewRef.current >= status.readyAt;
+  /*
+   * True when a claim would be accepted right now.
+   *
+   * State, not a value read off the clock during render. Computing it inline
+   * meant the button unlocked only when something unrelated happened to
+   * re-render the tree — a player who claimed and then waited out the cooldown
+   * sat looking at a disabled button until they touched something else.
+   */
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!status || status.remaining <= 0) {
+      setReady(false);
+      return;
+    }
+
+    const check = () => {
+      // The server's clock, not the device's: a phone an hour fast would
+      // otherwise call a claim ready before the server will accept it.
+      const waited = Date.now() + skewRef.current - status.readyAt;
+      setReady(waited >= 0);
+      return waited >= 0;
+    };
+
+    if (check()) return;
+    const timer = window.setInterval(() => {
+      if (check()) window.clearInterval(timer);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [status]);
 
   const claim = useCallback(async (): Promise<AdGoldOutcome> => {
     if (busy || !ready) return "unavailable";
