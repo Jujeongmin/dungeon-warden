@@ -1045,3 +1045,112 @@ button.primary {
   display: block;
   line-height: 1.25;
 }
+
+/* ── Motion ──────────────────────────────────────────────────────────────
+ *
+ * Every panel in this game used to exist or not exist, with nothing in
+ * between. That is what makes an interface feel like a debug overlay: things
+ * teleport, and the player's eye has to re-find the screen after every tap.
+ *
+ * The rule here is that motion carries meaning and nothing else. Panels come
+ * from the direction they belong to — the HUD and modals rise from below the
+ * thumb, banners drop from the top edge they hang off. Nothing travels far,
+ * nothing takes long, and nothing that the player is waiting on is delayed by
+ * an animation: these all run in under a quarter of a second.
+ */
+
+@keyframes veil-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Rises into place and settles, like a slab being set down. */
+@keyframes slab-rise {
+  from { opacity: 0; transform: translateY(16px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The mirror image, for things anchored to the top edge. */
+@keyframes slab-drop {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes panel-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Out of the light, into the dark: 260ms is long enough to register the
+   dungeon still turning behind it. */
+.title { animation: veil-in 260ms ease-out; }
+
+.modal-backdrop { animation: veil-in 140ms ease-out; }
+
+.modal {
+  animation: slab-rise 220ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.hud,
+.skillbar {
+  animation: slab-rise 240ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.banner,
+.tutorial,
+.raid-bar {
+  animation: slab-drop 200ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+/* Keyed on the active tab, so switching tabs reads as a new page of controls
+   rather than as the same panel with different words in it. */
+.hud-body { animation: panel-fade 160ms ease-out; }
+
+/* Gold is the score. Earning it swells, spending it flinches — the shape of
+ * the pop says which happened before a single digit has been read, which
+ * matters most in the one place both can occur within a second of each other:
+ * the end of a raid, where a reward lands and plunder is taken.
+ *
+ * The colour returns to --accent at 100% so the animation can be removed at
+ * any point without leaving the number stuck in a flash tint. */
+.gold {
+  display: inline-block;
+  /* transform on an inline box does nothing; this also keeps the pop from
+     nudging the rest of the top bar. */
+  transform-origin: center;
+}
+
+.gold.up { animation: coin-gain 400ms cubic-bezier(0.2, 0.9, 0.25, 1); }
+.gold.down { animation: coin-spend 320ms cubic-bezier(0.2, 0.9, 0.25, 1); }
+
+@keyframes coin-gain {
+  0% { transform: scale(1); color: var(--accent); }
+  28% { transform: scale(1.26); color: #ffe6ab; }
+  100% { transform: scale(1); color: var(--accent); }
+}
+
+@keyframes coin-spend {
+  0% { transform: scale(1); color: var(--accent); }
+  28% { transform: scale(0.88); color: #ffb4a8; }
+  100% { transform: scale(1); color: var(--accent); }
+}
+
+/* Same bargain as the buttons above: keep the state change, drop the travel.
+   The damage floaters are deliberately not in this list — their movement is
+   how one number is told apart from the four others landing on the same
+   monster, so removing it would remove information rather than decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .modal,
+  .modal-backdrop,
+  .hud,
+  .skillbar,
+  .banner,
+  .tutorial,
+  .raid-bar,
+  .hud-body,
+  .gold.up,
+  .gold.down {
+    animation: none;
+  }
+}

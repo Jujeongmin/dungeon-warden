@@ -18,6 +18,7 @@ import { LeaderboardDialog } from "./ui/LeaderboardDialog";
 import { TitleScreen } from "./ui/TitleScreen";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
+import { useCountUp } from "./ui/useCountUp";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
 import { translate, type StringKey } from "./i18n/strings";
@@ -583,6 +584,10 @@ export default function App() {
     }
   }, [settings.introSeen, patchSettings]);
 
+  // The purse counts to its new total rather than jumping to it, and the shape
+  // of the pop says whether the change was earned or spent.
+  const purse = useCountUp(gold);
+
   const stepIndex = currentStep({
     obstacles,
     entrance: meta?.entrance ?? null,
@@ -622,7 +627,9 @@ export default function App() {
       <header className="topbar">
         <div className="brand">DUNGEON WARDEN</div>
         <div className="stats">
-          <span className="gold">🪙 {gold}</span>
+          {/* Keyed on the beat so the pop replays on every change; a CSS
+              animation on a stable element only ever plays once. */}
+          <span key={purse.beat} className={`gold ${purse.dir ?? ""}`}>🪙 {purse.shown}</span>
           {meta && <span className="pending">{t("stat_threat")} {meta.threat}</span>}
           {pendingCost > 0 && <span className="pending">{t("stat_unsaved")} -{pendingCost}</span>}
           <span className={`status status-${status}`}>
@@ -682,7 +689,7 @@ export default function App() {
         )}
 
         {step && !raid.raiding && (
-          <div className="tutorial">
+          <div key={step.id} className="tutorial">
             <div className="tutorial-head">
               <b>{stepIndex + 1}/{TUTORIAL.length} · {t(step.title as StringKey)}</b>
               <button
@@ -802,7 +809,8 @@ export default function App() {
           </button>
         </div>
 
-        <div className="hud-body">
+        {/* Keyed on the tab so each one fades in as its own page of controls. */}
+        <div key={tab} className="hud-body">
           {tab === "build" && (
             <>
               <div className="toolbar">
