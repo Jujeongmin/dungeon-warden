@@ -6,7 +6,6 @@ export interface TutorialContext {
   core: { x: number; y: number } | null;
   minions: PlacedMinion[];
   traps: PlacedTrap[];
-  hasUnsaved: boolean;
   wavesRepelled: number;
   coreBreaches: number;
   /** Which tool is in hand, so a step can tell "pick it up" from "put it down". */
@@ -100,12 +99,9 @@ export const TUTORIAL: TutorialStep[] = [
     placeAt: ({ core }) => (core ? { x: core.x, y: core.y - 2 } : null),
     done: ({ traps }) => traps.length > 0,
   },
-  {
-    id: "save",
-    action: "save",
-    hint: "tut_save_hint",
-    done: ({ hasUnsaved }) => !hasUnsaved,
-  },
+  // There used to be a save step here. There is no save any more: placing
+  // charges, clearing pays back, and the dungeon keeps itself - so the step
+  // was teaching a button that no longer exists.
   {
     id: "raid",
     action: "raid",

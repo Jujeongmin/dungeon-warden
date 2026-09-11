@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { arenaFor, coreOf, entranceOf, inArena, type Arena, blockedKey } from "./arena";
 import { decorBlocked } from "./decor";
-import { addCost, removedValue, sameList } from "./placements";
+import { REFUND_RATE, addCost, removedValue, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
 import { installServerProbe } from "./devtools";
@@ -247,11 +247,12 @@ export function useDungeonSave() {
   }, [connecting]);
 
   /**
-   * What saving will cost, net of what taking things down pays back.
+   * What the server will charge for the state as it stands, against what it
+   * last saw.
    *
-   * Negative when the player has cleared more than they have built, which is
-   * a save that hands them gold. Mirrored in server.js, which is the side
-   * that actually moves it.
+   * Not shown to anyone any more - the player is charged the moment they
+   * place and paid the moment they clear, and this is only here so the
+   * autosave below knows whether it has anything to say.
    */
   const pendingCostOf = useCallback((): number => {
     const added =
@@ -276,6 +277,15 @@ export function useDungeonSave() {
     );
   }, []);
 
+  /**
+   * Pushes the dungeon to the server.
+   *
+   * No longer something the player does. Gold has already moved on the client
+   * by the time this runs - charged on placing, paid back on clearing - so
+   * this is the server catching up, and the number it hands back is the one
+   * the purse ends on. The two agree because they price the same way; the
+   * server is simply the one that is allowed to be right.
+   */
   const saveNow = useCallback(async (): Promise<void> => {
     if (savingRef.current || !isDirty()) return;
 
@@ -285,13 +295,12 @@ export function useDungeonSave() {
     const nextObstacles = obstaclesRef.current;
 
     if (!HAS_VERSE) {
-      // Offline preview: commit locally and charge what the server would have.
-      const cost = pendingCostOf();
+      // Offline preview. No charge here: the purse was already emptied when
+      // the thing was placed, and taking it again would bill twice.
       savedMinionsRef.current = nextMinions;
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
       savedObstaclesRef.current = nextObstacles;
-      setGold((current) => Math.max(0, current - cost));
       setLastSavedAt(Date.now());
       return;
     }
@@ -350,10 +359,9 @@ export function useDungeonSave() {
     [],
   );
 
-  const canAfford = useCallback(
-    (extra: number): boolean => pendingCostOf() + extra <= gold,
-    [gold, pendingCostOf],
-  );
+  // Gold is charged at the moment of placing, so what is in the purse is
+   // already net of everything built so far.
+  const canAfford = useCallback((extra: number): boolean => extra <= gold, [gold]);
 
   const placeMinion = useCallback(
     (type: MinionType, x: number, y: number): boolean => {
@@ -366,6 +374,7 @@ export function useDungeonSave() {
 
       seqRef.current += 1;
       setMinions([...minionsRef.current, { id: `m${seqRef.current}`, type, x, y }]);
+      setGold((current) => current - MINION_COST[type]);
       return true;
     },
     [canAfford, occupantAt, isEntrance, isCore, effects.minionCap, unlocked.unlockedMinions],
@@ -382,6 +391,7 @@ export function useDungeonSave() {
 
       seqRef.current += 1;
       setTraps([...trapsRef.current, { id: `t${seqRef.current}`, type, x, y }]);
+      setGold((current) => current - TRAP_COST[type]);
       return true;
     },
     [canAfford, occupantAt, isEntrance, isCore, unlocked.unlockedTraps],
@@ -399,6 +409,7 @@ export function useDungeonSave() {
 
       seqRef.current += 1;
       setObstacles([...obstaclesRef.current, { id: `o${seqRef.current}`, type, x, y }]);
+      setGold((current) => current - OBSTACLE_COST[type]);
       return true;
     },
     [canAfford, occupantAt, isEntrance, isCore],
@@ -419,6 +430,7 @@ export function useDungeonSave() {
 
       seqRef.current += 1;
       setRooms([...roomsRef.current, { id: `r${seqRef.current}`, type, x, y }]);
+      setGold((current) => current - ROOM_COST[type]);
       return true;
     },
     [canAfford, occupantAt, isEntrance, isCore, unlocked.unlockedRooms],
@@ -470,10 +482,28 @@ export function useDungeonSave() {
     const occupant = occupantAt(x, y);
     if (occupant === null || occupant === "terrain") return false;
 
+    /*
+     * Paid back on the tap, not on a save.
+     *
+     * Priced from what is actually standing there rather than from the tool
+     * in hand, because the remove tool clears whatever it lands on and the
+     * four things it can land on do not cost the same.
+     */
+    const minion = minionsRef.current.find((m) => m.x === x && m.y === y);
+    const trap = trapsRef.current.find((t) => t.x === x && t.y === y);
+    const room = roomsRef.current.find((r) => roomCovers(r, x, y));
+    const obstacle = obstaclesRef.current.find((o) => o.x === x && o.y === y);
+    const back =
+      (minion ? Math.floor(MINION_COST[minion.type] * REFUND_RATE) : 0) +
+      (trap ? Math.floor(TRAP_COST[trap.type] * REFUND_RATE) : 0) +
+      (room ? Math.floor(ROOM_COST[room.type] * REFUND_RATE) : 0) +
+      (obstacle ? Math.floor(OBSTACLE_COST[obstacle.type] * REFUND_RATE) : 0);
+
     setMinions((current) => current.filter((m) => !(m.x === x && m.y === y)));
     setTraps((current) => current.filter((t) => !(t.x === x && t.y === y)));
     setRooms((current) => current.filter((r) => !roomCovers(r, x, y)));
     setObstacles((current) => current.filter((o) => !(o.x === x && o.y === y)));
+    if (back > 0) setGold((current) => current + back);
     return true;
   }, [occupantAt]);
 
@@ -596,6 +626,21 @@ export function useDungeonSave() {
       setStatus("error");
     }
   }, [server, applyLoad]);
+
+  /*
+   * Push shortly after the player stops changing things.
+   *
+   * There is no save button any more, so the only thing standing between a
+   * placement and the server is this. Debounced rather than immediate because
+   * laying a row of crates is five taps in two seconds and that is one save,
+   * not five - and the interval below is the backstop for anything this
+   * misses.
+   */
+  useEffect(() => {
+    if (!HAS_VERSE) return;
+    const timer = window.setTimeout(() => void saveNow(), 700);
+    return () => window.clearTimeout(timer);
+  }, [minions, traps, rooms, obstacles, saveNow]);
 
   // Autosave, and save when the tab goes away.
   useEffect(() => {

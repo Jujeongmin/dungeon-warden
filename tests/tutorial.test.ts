@@ -34,7 +34,7 @@ function followTheTutorial() {
 
   const context = (toolId: string): TutorialContext => ({
     obstacles, minions, traps, entrance, core,
-    hasUnsaved: false, wavesRepelled: 0, coreBreaches: 0, toolId,
+    wavesRepelled: 0, coreBreaches: 0, toolId,
   });
 
   // Generous bound: every step places at most a handful of things, and a

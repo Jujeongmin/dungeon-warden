@@ -28,7 +28,15 @@ export interface DecorProp {
   offsetZ: number;
 }
 
-const CLUTTER = ["prop_barrel", "prop_box", "prop_rubble", "prop_bottle", "prop_pillar"];
+/*
+ * Only things that obviously stop a person.
+ *
+ * A bottle and a heap of rubble used to be in here, and they block a tile the
+ * same as a pillar does - so the route bent around a bottle and the player
+ * saw a corner with nothing in it. Whatever blocks has to look like it
+ * blocks; the rest is not worth the confusion it buys.
+ */
+const CLUTTER = ["prop_barrel", "prop_box", "prop_pillar"];
 const CLUTTER_CHANCE = 0.14;
 
 /**

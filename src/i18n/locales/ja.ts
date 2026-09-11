@@ -210,7 +210,7 @@ export const ja: Record<StringKey, string> = {
   trap_arrow: "アロートラップ",
   trap_rockfall: "落石トラップ",
   trap_flame: "火炎トラップ",
-  obstacle_barricade: "木のバリケード",
+  obstacle_barricade: "木箱",
   obstacle_wall: "石壁",
   obstacle_barricade_desc: "安くてもろい。道を折るのに使います。",
   obstacle_wall_desc: "高くて頑丈。塞いだ線を長く保ちます。",

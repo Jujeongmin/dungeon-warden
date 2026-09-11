@@ -8,7 +8,6 @@ import {
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
-import { SKILL_STATS } from "./game/sim/traps";
 import { OBSTACLE_STATS } from "./game/sim/obstacles";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
@@ -240,8 +239,7 @@ export default function App() {
     jailFree,
     weaponTiers,
     meta,
-    pendingCost,
-    hasUnsaved,
+
     status,
     error,
     lastSavedAt,
@@ -425,7 +423,7 @@ export default function App() {
   // rather than everything else being pushed forward.
   useEffect(() => {
     audio.duckMusic(raid.raiding);
-  }, [raid.raiding]);
+  }, [raid.raiding, raid.raidOpen]);
 
   /**
    * The right-click prompt: what is on this tile, and a button to clear it.
@@ -627,6 +625,8 @@ export default function App() {
         live.push({
           id: `a:${a.id}`, x: a.x, y: a.y, kind: `a_${a.cls}`, hp: a.hp, maxHp: a.maxHp,
           action: a.action, facing: a.facing,
+          // The party carries health bars; the garrison does not. See UnitView.
+          showHealth: true,
           // The champion is announced by being bigger than everyone else on
           // the board. No label, no crown model to source - a head taller is
           // a thing every player reads without being taught it.
@@ -813,6 +813,49 @@ export default function App() {
     );
   }, [arena, entrance, core, terrain, obstacles, meta, rooms, raid.raiding, showAftermath]);
 
+  /*
+   * What the route becomes if the wall under the cursor goes up.
+   *
+   * Only for walls: they are the only thing that shapes the route now, so a
+   * minion or a trap under the cursor has nothing to preview. Only when the
+   * tile would actually take the placement, or it would be answering a
+   * question the player cannot ask.
+   */
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    if (!meta || raid.raiding || !hover || tool.kind !== "obstacle" || !ghostLegal(hover.x, hover.y)) {
+      renderer.setPathGhost(null);
+      return;
+    }
+
+    const lures = lureTiles(rooms);
+    const now = buildRaidPath(
+      arena, entrance, core, lures,
+      new Set([...terrain, ...blockedSet(arena, obstacles)]),
+    );
+    const after = buildRaidPath(
+      arena, entrance, core, lures,
+      new Set([...terrain, ...blockedSet(arena, [...obstacles, { x: hover.x, y: hover.y }])]),
+    );
+
+    /*
+     * Only when it would actually change something.
+     *
+     * Most tiles are nowhere near the route and building on them moves
+     * nothing - drawing the same line twice there just made the route look
+     * brighter under the cursor and taught the player that hovering does
+     * something when it does not. A second line means a second answer.
+     */
+    const same =
+      now !== null && after !== null &&
+      now.length === after.length &&
+      now.every((step, i) => step.x === after[i].x && step.y === after[i].y);
+
+    renderer.setPathGhost(same ? null : after);
+  }, [hover, tool, meta, raid.raiding, arena, entrance, core, terrain, obstacles, rooms, ghostLegal]);
+
   /**
    * Paint the aftermath when the fighting stops; wipe it when it starts again.
    *
@@ -832,6 +875,20 @@ export default function App() {
 
     if (raid.raiding) {
       aftermathRef.current = emptyTally();
+      renderer.setAftermath(null);
+      setShowAftermath(false);
+      return;
+    }
+
+    /*
+     * Not during a build window.
+     *
+     * The window is for deciding where the next wave walks, and the question
+     * it asks is answered by the route - so the route gets the floor. The
+     * record of the wave just fought would be painted over the same tiles and
+     * the two together read as neither.
+     */
+    if (raid.raidOpen) {
       renderer.setAftermath(null);
       setShowAftermath(false);
       return;
@@ -869,7 +926,7 @@ export default function App() {
       removeAt: save.removeAt,
       equipWeapon: save.equipWeapon,
       buyResearch: save.buyResearch,
-      saveNow: save.saveNow,
+
       startRaid: raid.startRaid,
       useSkill: raid.useSkill,
       stepRaid: raid.stepRaid,
@@ -946,7 +1003,6 @@ export default function App() {
     core,
     minions,
     traps,
-    hasUnsaved,
     wavesRepelled: meta?.wavesRepelled ?? 0,
     coreBreaches: meta?.coreBreaches ?? 0,
     toolId,
@@ -1107,7 +1163,6 @@ export default function App() {
               {tier && <b className="tier"> {t(tier.label as StringKey)}</b>}
             </span>
           )}
-          {pendingCost > 0 && <span className="pending">{t("stat_unsaved")} -{pendingCost}</span>}
           <span className={`status status-${status}`}>
             {STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status}
           </span>
@@ -1563,26 +1618,14 @@ export default function App() {
             */}
           <button
             className="primary go"
-            data-tut={hasUnsaved ? "action:save" : "action:raid"}
+            data-tut="action:raid"
             onClick={() => {
-              if (hasUnsaved) {
-                audio.play("click");
-                void save.saveNow();
-                return;
-              }
               audio.play("raidStart");
               void raid.startRaid();
             }}
-            disabled={raid.raidOpen || raid.starting || status === "saving"}
+            disabled={raid.raidOpen || raid.starting}
           >
-            {raid.starting
-              ? t("preparing")
-              : hasUnsaved
-                  ? // Clearing more than you built makes this a payout, and a
-                    // save that hands you gold must not be labelled with a
-                    // minus sign.
-                    `${t("save_now")} ${pendingCost < 0 ? "+" : "−"}${Math.abs(pendingCost)}`
-                : t("start_raid")}
+            {raid.starting ? t("preparing") : t("start_raid")}
 
             {/*
               * Who is about to walk in, on the button that lets them in.
@@ -1599,7 +1642,7 @@ export default function App() {
               * Numbers survive being small. The crown is a flat glyph rather
               * than a render, for the same reason.
               */}
-            {!hasUnsaved && !raid.starting && nextParty.length > 0 && (
+            {!raid.starting && nextParty.length > 0 && (
               <span className="go-sub">
                 {nextParty.some((m) => m.champion) && <Icon name="crown" size={13} />}
                 {t("party_summary", {

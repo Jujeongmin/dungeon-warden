@@ -205,7 +205,7 @@ export const zhHant: Record<StringKey, string> = {
   trap_arrow: "弓箭陷阱",
   trap_rockfall: "落石陷阱",
   trap_flame: "火焰陷阱",
-  obstacle_barricade: "木柵欄",
+  obstacle_barricade: "木箱",
   obstacle_wall: "石牆",
   obstacle_barricade_desc: "便宜脆弱，用來折疊路線。",
   obstacle_wall_desc: "昂貴堅固，能讓封死的一線撐得更久。",

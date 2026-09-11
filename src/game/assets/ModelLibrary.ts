@@ -72,11 +72,19 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
    * ends, corners and junctions. The renderer picks between them from which
    * neighbouring tiles are also built on; every set falls back to its own
    * straight piece so a pack missing the fancier parts still draws a wall.
+   *
+   * The barricade is the exception, and deliberately: it is the same crate on
+   * every piece. It used to be the pack's fence, and a fence is a thing you
+   * put ALONGSIDE a road - which is the opposite of what this does. The game
+   * is about folding the route ninety degrees, so the cheap obstacle has to
+   * read as a block sitting IN the way. A crate also needs no corner or
+   * junction piece: stack two side by side and they simply touch, where two
+   * fence sections leave a gap and look like scenery that failed to line up.
    */
-  obstacle_barricade: [/^barrier$/, /^barrier_half$/, /^fence/],
-  obstacle_barricade_end: [/^barrier_half$/, /^barrier$/],
-  obstacle_barricade_corner: [/^barrier_corner$/, /^barrier$/],
-  obstacle_barricade_post: [/^barrier_column$/, /^barrier$/],
+  obstacle_barricade: [/^box_stacked$/, /^barrel_large$/, /^barrier$/],
+  obstacle_barricade_end: [/^box_stacked$/, /^barrier$/],
+  obstacle_barricade_corner: [/^box_stacked$/, /^barrier$/],
+  obstacle_barricade_post: [/^box_stacked$/, /^barrier$/],
 
   obstacle_wall: [/^wall$/, /^wall_arched$/],
   obstacle_wall_end: [/^wall_endcap$/, /^wall$/],

@@ -217,7 +217,7 @@ export const ko = {
   trap_arrow: "화살 함정",
   trap_rockfall: "낙석 함정",
   trap_flame: "화염 함정",
-  obstacle_barricade: "나무 바리케이드",
+  obstacle_barricade: "나무 상자",
   obstacle_wall: "석벽",
   obstacle_barricade_desc: "싸고 약합니다. 길을 접는 데 씁니다.",
   obstacle_wall_desc: "비싸고 튼튼합니다. 봉쇄한 줄을 오래 버팁니다.",

@@ -204,7 +204,7 @@ export const en: Record<StringKey, string> = {
   trap_arrow: "Arrow trap",
   trap_rockfall: "Rockfall trap",
   trap_flame: "Flame trap",
-  obstacle_barricade: "Wooden barricade",
+  obstacle_barricade: "Crate",
   obstacle_wall: "Stone wall",
   obstacle_barricade_desc: "Cheap and weak. For folding the route.",
   obstacle_wall_desc: "Costly and tough. Holds a sealed line for a long time.",

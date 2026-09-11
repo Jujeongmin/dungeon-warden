@@ -79,6 +79,15 @@ export interface UnitView {
    * figure that is visibly bigger than the four behind it.
    */
   scale?: number;
+  /**
+   * Carries a health bar over its head.
+   *
+   * Only the party. A wounded minion darkening says "this one is in trouble"
+   * about something the player already owns, but an adventurer's health is
+   * the question the whole raid is about - whether the garrison is getting
+   * there - and a shade of brown is not a number.
+   */
+  showHealth?: boolean;
 }
 
 /** One tile of the map left behind by a raid. */
@@ -396,6 +405,17 @@ export class DungeonRenderer {
   private aftermathGroup = new THREE.Group();
   private aftermathRing = new THREE.RingGeometry(0.22, 0.4, 20);
   private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
+  /**
+   * The arrows that run along the route, each with the place in the queue it
+   * holds - that index is what turns a row of arrows into something moving.
+   */
+  private pathArrows: Array<{ mesh: THREE.Mesh; step: number }> = [];
+  private ghostPathMarkers: THREE.Object3D[] = [];
+  /** Health bars, by unit id, so they can be turned to the camera each frame. */
+  private healthBars = new Map<string, THREE.Object3D>();
+  private barGeometry = new THREE.PlaneGeometry(1, 1);
+  private pathLength = 0;
+  private arrowGeometry = DungeonRenderer.makeArrowGeometry();
 
   private hovered: { x: number; y: number } | null = null;
   private frameId = 0;
@@ -653,9 +673,10 @@ export class DungeonRenderer {
       if (unit.facing !== undefined) object.rotation.y = unit.facing;
       if (unit.action) this.playClip(unit.id, unit.action);
 
-      // Wounded units darken rather than carrying a health bar, which would
-      // need screen-space UI for something the player only glances at.
+      // Wounded units darken as well as carrying a bar: the darkening reads
+      // across the whole room at a glance, the bar answers "how much left".
       const health = unit.maxHp > 0 ? Math.max(0, unit.hp / unit.maxHp) : 0;
+      if (unit.showHealth) this.syncHealthBar(unit.id, object, health);
       const flash = this.flashes.get(unit.id) ?? 0;
       DungeonRenderer.tint(
         object,
@@ -671,6 +692,9 @@ export class DungeonRenderer {
       this.unitMeshes.delete(id);
       this.mixers.delete(id);
       this.flashes.delete(id);
+      // The bar is a child of the model, so it goes with it either way - this
+      // is just the bookkeeping that stops updateHealthBars walking corpses.
+      this.healthBars.delete(id);
 
       const impact = this.impacts.get(id);
       if (impact && (impact.kLife > 0 || impact.punch > 0)) {
@@ -788,9 +812,73 @@ export class DungeonRenderer {
     });
   }
 
+  /**
+   * A two-plane bar over one unit's head.
+   *
+   * A child of the model rather than a screen-space element, so it inherits
+   * the knockback, the hit punch and the death shrink for free and can never
+   * be left floating where a unit used to be. It is turned to face the camera
+   * in the frame loop, because the camera rotates.
+   */
+  private syncHealthBar(id: string, host: THREE.Object3D, health: number): void {
+    let bar = this.healthBars.get(id);
+
+    if (!bar) {
+      bar = new THREE.Group();
+      const back = new THREE.Mesh(
+        this.barGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0x140f0b, transparent: true, opacity: 0.75,
+          depthWrite: false, depthTest: false,
+        }),
+      );
+      back.scale.set(0.68, 0.12, 1);
+      const fill = new THREE.Mesh(
+        this.barGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0xd86a4c, transparent: true,
+          depthWrite: false, depthTest: false,
+        }),
+      );
+      fill.name = "fill";
+      // Drawn over the room rather than into it: a bar hidden behind the wall
+      // its owner is standing next to is a bar that is not there.
+      back.renderOrder = 10;
+      fill.renderOrder = 11;
+      bar.add(back, fill);
+      host.add(bar);
+      this.healthBars.set(id, bar);
+    }
+
+    /*
+     * Placed in the host's own space, which is scaled to the tile - so the
+     * offset has to be divided back out, or a champion's bar floats higher
+     * than everyone else's by exactly its own extra size.
+     */
+    const scale = host.scale.x || 1;
+    bar.position.set(0, 1.45 / scale, 0);
+    bar.scale.setScalar(1 / scale);
+
+    const fill = bar.getObjectByName("fill") as THREE.Mesh | undefined;
+    if (!fill) return;
+    const width = 0.64 * Math.max(0, Math.min(1, health));
+    fill.scale.set(Math.max(width, 0.0001), 0.08, 1);
+    // Anchored at the left edge, so it empties from the right the way every
+    // health bar has since the first one.
+    fill.position.set(-(0.64 - width) / 2, 0, 0.001);
+  }
+
+  /** Turns every bar to face the camera. Cheap: a handful of quaternion copies. */
+  private updateHealthBars(): void {
+    for (const bar of this.healthBars.values()) {
+      bar.quaternion.copy(this.camera.quaternion);
+    }
+  }
+
   private clearUnits(): void {
     for (const [, object] of this.unitMeshes) this.disposeObject(this.unitGroup, object);
     this.unitMeshes.clear();
+    this.healthBars.clear();
   }
 
   private clearMarkers(): void {
@@ -1084,6 +1172,21 @@ export class DungeonRenderer {
    * to their own bounding box, or a corner ends up a different size from the
    * straight next to it.
    */
+  /**
+   * One piece of a built obstacle, sized to fill its tile.
+   *
+   * The pack's own wall sections are cut to the pack tile, so dividing by
+   * PACK_TILE lands them exactly edge to edge and a run of them reads as one
+   * wall. A crate is not one of those - it is a prop, and at the same scale
+   * it sits as a small box in the middle of a big empty tile with a visible
+   * gap to its neighbour, which is the one thing an obstacle must never look
+   * like. So anything that does not already fill its tile is grown until it
+   * does.
+   *
+   * Measured rather than listed: a second prop pressed into service as an
+   * obstacle later gets the same treatment without anyone remembering to add
+   * it to a table.
+   */
   private spawnPiece(key: string): THREE.Object3D | null {
     const model = this.loaded.get(key);
     if (!model) return null;
@@ -1096,7 +1199,25 @@ export class DungeonRenderer {
         ? mesh.material.map((m) => m.clone())
         : mesh.material.clone();
     });
+
     object.scale.setScalar(TILE_SIZE / PACK_TILE);
+    object.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3());
+    const widest = Math.max(size.x, size.z);
+
+    // A hair over the tile, so two neighbours overlap rather than meet on a
+    // seam that the camera can find a line of floor through.
+    const want = TILE_SIZE * 1.02;
+    if (widest > 0.01 && widest < want) {
+      object.scale.multiplyScalar(want / widest);
+      object.updateMatrixWorld(true);
+      // Grown about its own origin, which for a prop is its foot - so it can
+      // come out sunk into the floor or hovering over it. Put it back down.
+      const grown = new THREE.Box3().setFromObject(object);
+      object.position.y -= grown.min.y;
+    }
+
     return object;
   }
 
@@ -1413,6 +1534,25 @@ export class DungeonRenderer {
     this.entranceMark = null;
   }
 
+  /**
+   * A flat chevron lying in the XY plane, pointing at +Y.
+   *
+   * Drawn rather than taken from the model pack: this is read from a long way
+   * up at about twenty pixels across, and every arrow the pack has is a prop
+   * with a shaft and fletching that turns to mush at that size.
+   */
+  private static makeArrowGeometry(): THREE.ShapeGeometry {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0.26);
+    shape.lineTo(-0.2, -0.1);
+    shape.lineTo(-0.07, -0.04);
+    shape.lineTo(0, -0.16);
+    shape.lineTo(0.07, -0.04);
+    shape.lineTo(0.2, -0.1);
+    shape.closePath();
+    return new THREE.ShapeGeometry(shape);
+  }
+
   private clearAftermath(): void {
     for (const child of this.aftermathGroup.children.slice()) {
       this.disposeObject(this.aftermathGroup, child);
@@ -1495,6 +1635,8 @@ export class DungeonRenderer {
   setPathPreview(path: Array<{ x: number; y: number }> | null): void {
     for (const marker of this.pathMarkers) this.disposeObject(this.scene, marker);
     this.pathMarkers = [];
+    this.pathArrows = [];
+    this.pathLength = path?.length ?? 0;
 
     if (!path || path.length === 0) return;
 
@@ -1505,8 +1647,7 @@ export class DungeonRenderer {
         new THREE.MeshBasicMaterial({
           color: 0xe8a44c,
           transparent: true,
-          // Fades along the route so the direction of travel is readable.
-          opacity: 0.1 + 0.22 * (1 - i / path.length),
+          opacity: 0.13,
           depthWrite: false,
         }),
       );
@@ -1514,6 +1655,105 @@ export class DungeonRenderer {
       mesh.position.set(step.x, FLOOR_HEIGHT + 0.03, step.y);
       this.scene.add(mesh);
       this.pathMarkers.push(mesh);
+
+      /*
+       * An arrow on every step but the last, pointing at the one after it.
+       *
+       * The route used to say where they walk by fading along its length, and
+       * a gradient is not a direction - it reads as "this end matters more",
+       * which is not the question being asked. An arrow says which way, and a
+       * row of them lighting up in sequence says which way they are going
+       * without anyone having to work out which end is darker.
+       */
+      const next = path[i + 1];
+      if (!next) continue;
+
+      const dx = next.x - step.x;
+      const dz = next.y - step.y;
+      const arrow = new THREE.Mesh(
+        this.arrowGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0xffd9a0,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      /*
+       * Laid flat, then spun to face the next tile.
+       *
+       * With rotation.x at -90 degrees the shape's own +Y points at world -Z,
+       * so the spin that aims it down (dx, dz) is atan2(-dx, -dz). Worked out
+       * rather than guessed: an arrow pointing the wrong way is worse than no
+       * arrow, because it is confidently wrong.
+       */
+      arrow.rotation.set(-Math.PI / 2, 0, Math.atan2(-dx, -dz));
+      arrow.position.set(
+        step.x + dx * 0.5,
+        FLOOR_HEIGHT + 0.05,
+        step.y + dz * 0.5,
+      );
+      this.scene.add(arrow);
+      this.pathMarkers.push(arrow);
+      this.pathArrows.push({ mesh: arrow, step: i });
+    }
+  }
+
+  /**
+   * The route the party would take if the wall under the cursor went up.
+   *
+   * Drawn beside the real one rather than replacing it, and in a colour that
+   * is not the route's: the player is comparing two things, and swapping one
+   * for the other would only show them the answer without the question.
+   *
+   * A cursor is a mouse idea, so this is desktop-only in practice. On a phone
+   * the answer arrives the moment the wall goes down, and taking it back
+   * costs nothing.
+   */
+  setPathGhost(path: Array<{ x: number; y: number }> | null): void {
+    for (const marker of this.ghostPathMarkers) this.disposeObject(this.scene, marker);
+    this.ghostPathMarkers = [];
+    if (!path || path.length === 0) return;
+
+    for (const step of path) {
+      const mesh = new THREE.Mesh(
+        this.pathGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0x86c5e0,
+          transparent: true,
+          opacity: 0.24,
+          depthWrite: false,
+        }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      // Just under the live route, so where the two agree the live one wins.
+      mesh.position.set(step.x, FLOOR_HEIGHT + 0.02, step.y);
+      this.scene.add(mesh);
+      this.ghostPathMarkers.push(mesh);
+    }
+  }
+
+  /**
+   * Runs the light down the route, entrance to core.
+   *
+   * One travelling band rather than every arrow blinking together: a band has
+   * a direction and a blink does not. The band is a fixed number of tiles
+   * wide however long the route is, so a short corridor and a folded one read
+   * at the same speed.
+   */
+  private updatePathFlow(): void {
+    if (this.pathArrows.length === 0) return;
+
+    const BAND = 3.2;
+    const SPEED = 4.5; // tiles a second
+    const head = (this.elapsed * SPEED) % (this.pathLength + BAND * 2);
+
+    for (const { mesh, step } of this.pathArrows) {
+      const behind = head - step;
+      // Outside the band entirely: a dim arrow that still says which way.
+      const lit = behind >= 0 && behind <= BAND ? 1 - behind / BAND : 0;
+      (mesh.material as THREE.MeshBasicMaterial).opacity = 0.16 + 0.62 * lit;
     }
   }
 
@@ -2101,6 +2341,8 @@ export class DungeonRenderer {
     this.updateClutter(delta);
     this.updateFlames();
     this.updateEntranceMark();
+    this.updatePathFlow();
+    this.updateHealthBars();
     this.updateShake(delta);
 
     this.updateCamera();
@@ -2192,6 +2434,8 @@ export class DungeonRenderer {
 
     this.setPathPreview(null);
     this.pathGeometry.dispose();
+    this.arrowGeometry.dispose();
+    this.barGeometry.dispose();
     this.aftermathRing.dispose();
     this.clearAftermath();
     this.disposeEntranceMark();
