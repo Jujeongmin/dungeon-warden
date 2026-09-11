@@ -250,4 +250,7 @@ export const ja: Record<StringKey, string> = {
   party_summary: "Lv{level} · {count}人",
   manage_equip_best: "最適装備",
   hint_remove_alt: "右クリックも可",
+  skill_blessing_note: "手下全体を回復40%・3秒無敵",
+  skill_rally_note: "手下全体を一タイルへ",
+  skill_detonate_note: "罠を一斉発動",
 };

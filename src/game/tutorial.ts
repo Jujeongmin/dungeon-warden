@@ -70,11 +70,25 @@ export const TUTORIAL: TutorialStep[] = [
     tool: "warrior",
     hint: "tut_minion_pick",
     placeHint: "tut_minion_place",
-    // Beside the route rather than on it. A minion in the road is a wall that
-    // shoots, which is a real thing to build but not the first thing to teach:
-    // the lesson here is that it fires at what walks past.
-    placeAt: ({ core }) => (core ? { x: core.x + 1, y: core.y - 3 } : null),
-    done: ({ minions }) => minions.length > 0,
+    /*
+     * Two of them, and that is not padding - it is the first raid's arithmetic.
+     *
+     * Measured against a threat-0 party (one level-1 knight, 130hp): one
+     * archer and a spike loses, and loses badly - the knight turns on the
+     * archer, kills it in the seven seconds it takes, and walks into the core
+     * with 31hp left. Two archers repel it in 16 seconds with both still
+     * standing, for 142 of the 200 gold a new dungeon starts with.
+     *
+     * A tutorial whose own build loses teaches that the things it just sold
+     * you do not work. See tests/tutorial.test.ts, which runs exactly this.
+     *
+     * Beside the route rather than on it. A minion in the road is a wall that
+     * shoots, which is a real thing to build but not the first thing to teach:
+     * the lesson here is that it fires at what walks past.
+     */
+    placeAt: ({ core, minions }) =>
+      core ? { x: core.x + (minions.length === 0 ? 1 : -1), y: core.y - 3 } : null,
+    done: ({ minions }) => minions.length >= 2,
   },
   {
     id: "trap",

@@ -50,6 +50,7 @@ import {
   ROOM_DESCRIPTION,
   ROOM_LABEL,
   SKILL_LABEL,
+  SKILL_NOTE,
   TRAP_COST,
   TRAP_LABEL,
   maxObstaclesFor,
@@ -970,6 +971,26 @@ export default function App() {
     teaching?.target?.kind === "tile" && !ghostLegal(teaching.target.x, teaching.target.y)
       ? null
       : teaching?.target ?? null;
+  /*
+   * Open the drawer the step is pointing into.
+   *
+   * The toolbar only renders the tools of the group that is selected, so a
+   * step saying "pick the skeleton archer" pointed at a button that was not
+   * on screen: no element, no ring, and a player reading an instruction about
+   * a thing they cannot find. The tabs above it are not a secret to be
+   * discovered halfway through a tutorial.
+   *
+   * Only ever moves to the group the current step names, and only while the
+   * tutorial is running - after that the tabs are the player's.
+   */
+  useEffect(() => {
+    const wanted = teaching?.step.tool;
+    if (!wanted) return;
+    const owner = TOOLS.find((entry) => entry.id === wanted);
+    if (!owner || owner.tool.kind === "remove") return;
+    setGroup(owner.tool.kind);
+  }, [teaching?.step.tool]);
+
   const spotlight = useSpotlight(pointer, locateTile);
 
   /*
@@ -1203,12 +1224,14 @@ export default function App() {
                 onClick={() => { audio.play("skill"); raid.useSkill(skill); }}
               >
                 <b>{t(SKILL_LABEL[skill] as StringKey)}</b>
+                {/* What it does, not whether it is available - "사용 가능" was
+                    the button restating that it was not greyed out. The state
+                    that is worth words is the countdown, and that replaces
+                    this line while it runs. */}
                 <i>
                   {cd > 0
                     ? `${cd.toFixed(0)}${t("seconds")}`
-                    : SKILL_STATS[skill].targeted
-                      ? t("skill_target")
-                      : t("skill_ready")}
+                    : t(SKILL_NOTE[skill] as StringKey)}
                 </i>
               </button>
             );

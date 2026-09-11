@@ -244,4 +244,7 @@ export const en: Record<StringKey, string> = {
   party_summary: "Lv{level} · {count} raiders",
   manage_equip_best: "Equip best",
   hint_remove_alt: "or right-click",
+  skill_blessing_note: "Heal 40%, 3s shield",
+  skill_rally_note: "Move the garrison to a tile",
+  skill_detonate_note: "Fire every trap now",
 };

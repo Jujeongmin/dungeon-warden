@@ -761,7 +761,17 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
 }
 
 .skill b { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
-.skill i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); }
+/* The effect line wraps rather than being clipped: it is a short sentence in
+   five languages and the column is 116px on a phone, so one of them is going
+   to need two lines and the button can afford to be that tall. */
+.skill i {
+  font-style: normal;
+  font-size: var(--fs-2xs);
+  line-height: 1.35;
+  color: var(--muted);
+  text-align: left;
+  white-space: normal;
+}
 
 /* The one ad in the raid, marked apart from the free warden skills. */
 .skill.ad {

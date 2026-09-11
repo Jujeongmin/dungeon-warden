@@ -245,4 +245,7 @@ export const zhHant: Record<StringKey, string> = {
   party_summary: "Lv{level} · {count}人",
   manage_equip_best: "最佳裝備",
   hint_remove_alt: "右鍵亦可",
+  skill_blessing_note: "所有手下回復40%、3秒無敵",
+  skill_rally_note: "所有手下移到一格",
+  skill_detonate_note: "所有陷阱立即發動",
 };

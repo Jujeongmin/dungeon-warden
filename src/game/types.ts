@@ -333,6 +333,19 @@ export const ROOM_DESCRIPTION: Record<RoomType, StringKey> = {
 
 export const MAX_ROOMS = 6;
 
+/**
+ * What each one does, in the fewest words it can be said in.
+ *
+ * The buttons carried a name and a readiness state and nothing else, so three
+ * pieces of flavour sat in the corner of a raid the player had no way to read.
+ * A name tells you which button; this tells you why you would press it.
+ */
+export const SKILL_NOTE: Record<WardenSkill, StringKey> = {
+  blessing: "skill_blessing_note",
+  rally: "skill_rally_note",
+  detonate: "skill_detonate_note",
+};
+
 export const SKILL_LABEL: Record<WardenSkill, StringKey> = {
   blessing: "skill_blessing",
   rally: "skill_rally",

@@ -257,4 +257,7 @@ export const ko = {
   party_summary: "Lv{level} · {count}명",
   manage_equip_best: "최적 장착",
   hint_remove_alt: "우클릭 회수",
+  skill_blessing_note: "부하 전체 체력 40% · 3초 무적",
+  skill_rally_note: "부하 전체를 한 타일로",
+  skill_detonate_note: "함정 전체 즉시 발동",
 };
