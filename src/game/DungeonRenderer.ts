@@ -342,7 +342,6 @@ export class DungeonRenderer {
   private rockMesh: THREE.InstancedMesh | null = null;
   /** Loaded once and shared; disposed with the renderer. */
   private stone = new Map<string, { color: THREE.Texture; normal: THREE.Texture }>();
-  private wallMesh: THREE.InstancedMesh | null = null;
   private highlight: THREE.Mesh;
 
   private unitGroup = new THREE.Group();
@@ -449,6 +448,8 @@ export class DungeonRenderer {
   private dragMoved = false;
   /** The last tile a drag painted, so crossing one tile twice does nothing. */
   private paintedTile: string | null = null;
+  /** Where the last painted tile was, so a fast drag can be joined up. */
+  private paintedAt: { x: number; y: number } | null = null;
   /** Whether the current drag paints tiles rather than moving the camera. */
   private painting = false;
   private pinchStartDistance = 0;
@@ -1186,9 +1187,19 @@ export class DungeonRenderer {
      * something.
      */
     const rockPositions: Array<{ x: number; y: number; tile: TileId }> = [];
-    for (let y = 0; y < arena.h; y++) {
-      for (let x = 0; x < arena.w; x++) {
-        if (this.dug.has(x + y * arena.w)) continue;
+    /*
+     * One tile past the edge on every side, as the same rock.
+     *
+     * The border used to be panels from the model pack standing on the
+     * outer rim - a built wall, from a different quarry than the stone
+     * everything else is cut from, so the room ended in a change of
+     * material. There is nothing built here: the room is a hole, and what
+     * is outside it is more of what is inside the undug part of it.
+     */
+    for (let y = -1; y <= arena.h; y++) {
+      for (let x = -1; x <= arena.w; x++) {
+        const outside = x < 0 || y < 0 || x >= arena.w || y >= arena.h;
+        if (!outside && this.dug.has(x + y * arena.w)) continue;
         rockPositions.push({ x, y, tile: TILE.FLOOR });
       }
     }
@@ -1206,7 +1217,6 @@ export class DungeonRenderer {
       this.scene.add(this.rockMesh);
     }
 
-    this.buildWalls(floorPositions);
     this.buildLandmarks();
     this.buildDecor(floorPositions);
   }
@@ -1728,63 +1738,6 @@ export class DungeonRenderer {
   }
 
   /**
-   * Stands a wall panel on every edge of the room where the floor meets
-   * open air.
-   *
-   * There is no rock any more, so "solid" now means "outside the arena" —
-   * panels land only on the room's outer border, which is exactly the wall
-   * of a room. This is how the kit is meant to be used, and it is what makes
-   * the room read as built from stone rather than as a stripe painted on a
-   * field of cubes.
-   */
-  private buildWalls(floors: Array<{ x: number; y: number }>): void {
-    const arena = this.arena;
-    const proto = this.tileProto("wall", WALL_HEIGHT);
-    if (!arena || !proto) return;
-
-    const steps: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    const transforms: Array<{ x: number; z: number; rot: number }> = [];
-
-    for (const floor of floors) {
-      for (const [dx, dy] of steps) {
-        const nx = floor.x + dx;
-        const ny = floor.y + dy;
-        if (inArena(arena, nx, ny)) continue;
-
-        transforms.push({
-          x: floor.x + dx * 0.5,
-          z: floor.y + dy * 0.5,
-          // The panel is widest on X, so turning it by the edge direction makes
-          // that width run along the edge.
-          rot: Math.atan2(dx, dy),
-        });
-      }
-    }
-
-    if (transforms.length === 0) return;
-
-    const mesh = new THREE.InstancedMesh(proto.geometry, proto.material.clone(), transforms.length);
-    mesh.userData.sharedGeometry = true;
-
-    const matrix = new THREE.Matrix4();
-    const scale = new THREE.Vector3(proto.scale, proto.scale, proto.scale);
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-    const euler = new THREE.Euler();
-
-    transforms.forEach((t, i) => {
-      position.set(t.x, proto.lift, t.z);
-      quaternion.setFromEuler(euler.set(0, t.rot, 0));
-      matrix.compose(position, quaternion, scale);
-      mesh.setMatrixAt(i, matrix);
-    });
-
-    mesh.instanceMatrix.needsUpdate = true;
-    this.wallMesh = mesh;
-    this.scene.add(mesh);
-  }
-
-  /**
    * Geometry for one tile, taken from a KayKit model when available.
    *
    * The packs share a single atlas texture, so every tile can still be drawn
@@ -1878,7 +1831,7 @@ export class DungeonRenderer {
   }
 
   private disposeInstanced(): void {
-    for (const mesh of [this.floorMesh, this.wallMesh, this.rockMesh]) {
+    for (const mesh of [this.floorMesh, this.rockMesh]) {
       if (!mesh) continue;
       this.scene.remove(mesh);
       // Model geometry belongs to the cached glTF and is reused by the next
@@ -1888,7 +1841,6 @@ export class DungeonRenderer {
       mesh.dispose();
     }
     this.floorMesh = null;
-    this.wallMesh = null;
     this.rockMesh = null;
   }
 
@@ -1899,7 +1851,6 @@ export class DungeonRenderer {
       modelsLoaded: [...this.loaded.entries()].filter(([, m]) => m).map(([k]) => k),
       sharedClips: this.sharedClips.length,
       floorInstances: this.floorMesh?.count ?? 0,
-      wallInstances: this.wallMesh?.count ?? 0,
       landmarks: this.landmarks.length,
       decor: this.decor.length,
       clutter: this.clutter.length,
@@ -2307,14 +2258,46 @@ export class DungeonRenderer {
     c.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
-  /** Reports one tile under the pointer, once per tile per gesture. */
+  /**
+   * Reports every tile the drag crossed, once each, in the order crossed.
+   *
+   * Joined up rather than sampled. A browser coalesces pointer moves, so a
+   * quick swipe down the room arrives as two or three events several tiles
+   * apart - and digging only where the events landed cut a corridor with
+   * holes in it, which is not what the hand did. The tiles between the last
+   * one and this one are walked here, so the gesture means what it looked
+   * like.
+   *
+   * A straight walk (the long axis first, then the short one) rather than a
+   * true line: what matters is that consecutive tiles touch, so whatever is
+   * being painted can see its own neighbour.
+   */
   private paintAt(clientX: number, clientY: number): void {
     const tile = this.pointerToTile(clientX, clientY);
     if (!tile) return;
 
     const key = `${tile.x},${tile.y}`;
     if (key === this.paintedTile) return;
+
+    const from = this.paintedAt;
     this.paintedTile = key;
+    this.paintedAt = { x: tile.x, y: tile.y };
+
+    if (from) {
+      const stepX = Math.sign(tile.x - from.x);
+      const stepY = Math.sign(tile.y - from.y);
+      let x = from.x;
+      let y = from.y;
+      // Bounded: a pointer that jumped clear across the room still only
+      // walks the room, and a bad reading cannot spin here.
+      for (let guard = 0; guard < 64 && (x !== tile.x || y !== tile.y); guard += 1) {
+        if (x !== tile.x) x += stepX;
+        else y += stepY;
+        if (x === tile.x && y === tile.y) break;
+        this.callbacks.onTileDrag?.(x, y);
+      }
+    }
+
     this.callbacks.onTileDrag?.(tile.x, tile.y);
   }
 
@@ -2334,6 +2317,7 @@ export class DungeonRenderer {
        */
       this.painting = !this.walk && this.callbacks.isPaintable?.() === true;
       this.paintedTile = null;
+      this.paintedAt = null;
       if (this.painting) this.paintAt(e.clientX, e.clientY);
     } else if (this.activePointers.size === 2) {
       const [a, b] = [...this.activePointers.values()];
@@ -2432,6 +2416,7 @@ export class DungeonRenderer {
       this.dragMoved = false;
       this.painting = false;
       this.paintedTile = null;
+      this.paintedAt = null;
       this.pinchStartDistance = 0;
     }
   };

@@ -13,6 +13,7 @@ import {
   type DugTile,
 } from "./dig";
 import { REFUND_RATE, addCost, removedValue, sameList } from "./placements";
+import { planRebuild } from "./rebuild";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
 import { installServerProbe } from "./devtools";
@@ -564,42 +565,25 @@ export function useDungeonSave() {
 
   /**
    * Takes the whole dungeon back down to bare rock, paying for all of it.
-   *
-   * Clearing one tile at a time already gives everything back, so this is
-   * not a new rule - it is the same rule applied to the room at once. A
-   * player who wants to try a different shape was otherwise tapping the
-   * remove tool forty times to get back to where they started, which is
-   * the kind of work a game should do for you.
-   *
-   * The door and the core survive, because they are not the player's to
-   * fill in - everything else goes, including minions taken from prisoners,
-   * which cost nothing and so pay back nothing.
+   * The arithmetic lives in planRebuild, which is where it can be tested.
    */
   const rebuild = useCallback((): boolean => {
-    const arena = arenaRef.current;
-    const base = startingDig(arena);
-    const kept = new Set(base.map((tile) => tile.id));
+    const plan = planRebuild({
+      arena: arenaRef.current,
+      dug: dugRef.current,
+      minions: minionsRef.current,
+      traps: trapsRef.current,
+      rooms: roomsRef.current,
+    });
+    // Nothing to undo: refuse, so the caller can say so rather than play the
+    // sound of something happening.
+    if (!plan.changed) return false;
 
-    const back =
-      removedValue(base, dugRef.current, { dig: DIG_COST }) +
-      removedValue([], minionsRef.current, MINION_COST) +
-      removedValue([], trapsRef.current, TRAP_COST) +
-      removedValue([], roomsRef.current, ROOM_COST);
-
-    const wasBare =
-      minionsRef.current.length === 0 &&
-      trapsRef.current.length === 0 &&
-      roomsRef.current.length === 0 &&
-      dugRef.current.every((tile) => kept.has(tile.id));
-    // Nothing to undo: refuse, so the caller can say so rather than play
-    // the sound of something happening.
-    if (wasBare) return false;
-
-    setDug(base);
-    setMinions([]);
+    setDug(plan.dug);
+    setMinions(plan.minions);
     setTraps([]);
     setRooms([]);
-    if (back > 0) setGold((current) => current + back);
+    if (plan.refund > 0) setGold((current) => current + plan.refund);
     return true;
   }, []);
 
