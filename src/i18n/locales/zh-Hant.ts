@@ -261,6 +261,7 @@ export const zhHant: Record<StringKey, string> = {
   walk_attack: "攻擊",
   possess_pick: "點擊手下附身",
   strike_hint: "空白鍵或點擊畫面攻擊",
+  body_lost: "你失去了那具身體",
   connect_first: "先挖通入口與核心",
   tut_nook_place: "挖出通道旁的小空間",
 };

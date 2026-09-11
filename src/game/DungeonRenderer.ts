@@ -371,7 +371,18 @@ const ROCK_HEIGHT = 0.85;
  * darkened instead, so the stone reads as stone and the torches are the only
  * warm thing in the room.
  */
-const ROCK_TINT = 0xd8d2c6;
+const ROCK_TINT = 0xc3c8cd;
+
+/**
+ * And the tint on the floor, which is the other half of that sentence.
+ *
+ * Neither is darkened much - the room has little light to spare and a dark
+ * tint over a photograph of stone buries it. They are separated by hue
+ * instead: the rock is cooled towards the grey-blue of something nobody has
+ * touched, the floor warmed towards the sand of something that has been cut,
+ * walked on and lit. Value stays where it was, so nothing gets harder to see.
+ */
+const FLOOR_TINT = 0xd9c4a0;
 
 /** How many of the room's wall panels carry a torch. */
 const TORCH_CHANCE = 0.22;
@@ -1332,12 +1343,18 @@ export class DungeonRenderer {
     // a bevel round it, and the scan already says what the floor is made of.
     this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, null);
     if (this.floorMesh) {
-      // Real stone over the pack's flat flagstone. The per-instance tint that
-      // marks the door and the core rides on top of it unchanged.
-      // The same rock as the walls, lying flat: this is a dug corridor, and
-      // what is under your feet is what you dug it out of. The paving scan
-      // read as floorboards from eye height.
-      this.dress(this.floorMesh, STONE.rock, { roughness: 0.95, tint: 0xbfb6a8, repeat: 1.6 });
+      /*
+       * Paving, not rock. This is the one thing the board has to say.
+       *
+       * The floor wore the same scan as the walls at the same brightness, so
+       * a cut corridor and the rock it was cut out of were the same surface
+       * at two heights - and from this camera, in a room lit only by the
+       * torches standing in that corridor, the unlit half of the board was
+       * unreadable. Worked stone underfoot and raw rock either side is the
+       * difference the whole game is played on, so it is drawn as one:
+       * different grain, and warm against cool.
+       */
+      this.dress(this.floorMesh, STONE.floor, { roughness: 0.9, tint: FLOOR_TINT, repeat: 1.4 });
       this.scene.add(this.floorMesh);
     }
 
@@ -1376,7 +1393,7 @@ export class DungeonRenderer {
        * surfaces are most of what the player is looking at. Everything else
        * in the room is a small lit model where the extra cost buys nothing.
        */
-      this.dress(this.rockMesh, STONE.rock, { roughness: 0.92, tint: ROCK_TINT });
+      this.dress(this.rockMesh, STONE.rock, { roughness: 0.92, tint: ROCK_TINT, repeat: 1 });
       this.rockMesh.position.y = 0;
       this.applyRockHeight();
       this.scene.add(this.rockMesh);

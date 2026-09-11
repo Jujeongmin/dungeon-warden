@@ -2190,9 +2190,7 @@ button.ad-gold {
    and out of the way: it is an offer, not an instruction, and the player who
    has taken it up once never needs to read it again. */
 .possess-hint {
-  /* Fixed rather than absolute: the board is drawn inside a dock that does
-     not reach the foot of the screen, and this belongs at the foot. */
-  position: fixed;
+  position: absolute;
   left: 50%;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
   transform: translateX(-50%);
@@ -2204,6 +2202,39 @@ button.ad-gold {
   border: 1px solid rgba(232, 164, 76, 0.22);
   background: rgba(20, 15, 11, 0.55);
   pointer-events: none;
+}
+
+/* The frame the warden sees when the body under it dies.
+
+   Held rather than flashed: a single frame of red is a rendering glitch, and
+   what this has to say is that something was lost. It takes no clicks and
+   clears itself - the board is already back underneath it. */
+.body-lost {
+  /* The stage, not the browser window: on a screen wider than 16:9 the
+     game is a centred column and this belongs over that, not over the bars
+     either side of it. */
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(120, 18, 14, 0) 35%, rgba(120, 18, 14, 0.62) 100%);
+  animation: body-lost 1.8s ease-out forwards;
+}
+
+.body-lost span {
+  font-size: var(--fs-lg);
+  letter-spacing: 0.06em;
+  color: #f3d9d2;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes body-lost {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* Said down in the corridor instead, where the skills are not drawn and the

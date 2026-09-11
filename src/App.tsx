@@ -76,6 +76,9 @@ const RESEARCH_ERROR: Record<string, StringKey> = {
 
 const MS_PER_MINUTE = 60_000;
 
+/** How long the red frame holds after the ridden body dies. */
+const BODY_LOST_MS = 1800;
+
 function remaining(at: number, t: Translate): string {
   const minutes = Math.max(0, Math.ceil((at - Date.now()) / MS_PER_MINUTE));
   return minutes <= 0 ? t("soon") : t("minutes", { n: minutes });
@@ -306,6 +309,9 @@ export default function App() {
    */
   const [showAftermath, setShowAftermath] = useState(false);
 
+  /** Set for a moment when the body the warden was riding is the one that died. */
+  const [bodyLost, setBodyLost] = useState(false);
+
   const onSimEvents = useCallback((events: SimEvent[]) => {
     const renderer = rendererRef.current;
     if (!renderer) return;
@@ -478,12 +484,32 @@ export default function App() {
    * its own - so this watches for the ride ending rather than being told, and
    * the same path serves a death and a tap on the map button.
    */
-  const wasRiding = useRef(false);
+  const wasRiding = useRef<string | null>(null);
   useEffect(() => {
-    if (possessedId) setWalking(true);
-    else if (wasRiding.current) setWalking(false);
-    wasRiding.current = possessedId !== null;
-  }, [possessedId]);
+    if (possessedId) {
+      wasRiding.current = possessedId;
+      setWalking(true);
+      return;
+    }
+
+    const left = wasRiding.current;
+    if (!left) return;
+    wasRiding.current = null;
+    setWalking(false);
+
+    /*
+     * Told apart by what became of the body, not by what raised the event.
+     *
+     * The simulation lets go of a body the moment it dies, so by the time the
+     * event reaches anyone the ride is already over and which render noticed
+     * first is a race. What the body is now is not: found and dead means the
+     * warden was killed out of it, and anything else means they walked.
+     */
+    const body = raid.raidState?.minions.find((m) => m.id === left);
+    if (!body || body.alive) return;
+    rendererRef.current?.shake(0.5);
+    setBodyLost(true);
+  }, [possessedId, raid.raidState]);
 
   /*
    * Whose arms the player sees, and where those arms are standing.
@@ -502,6 +528,16 @@ export default function App() {
     if (!walking || !possessed) return;
     rendererRef.current?.setPossessedAt(possessed.x, possessed.y);
   }, [walking, possessed, possessed?.x, possessed?.y]);
+
+  useEffect(() => {
+    if (!bodyLost) return;
+    const id = window.setTimeout(() => setBodyLost(false), BODY_LOST_MS);
+    return () => window.clearTimeout(id);
+  }, [bodyLost]);
+
+  useEffect(() => {
+    if (possessedId) setBodyLost(false);
+  }, [possessedId]);
 
   /**
    * One swing, however it was asked for.
@@ -1974,6 +2010,12 @@ export default function App() {
         * build from in here, and a panel covering a third of the view would
         * undo the only thing this mode is for.
         */}
+      {bodyLost && (
+        <div className="body-lost">
+          <span>{t("body_lost")}</span>
+        </div>
+      )}
+
       {possessed && !settings.strikeSeen && (
         <div className="possess-hint strike-hint">{t("strike_hint")}</div>
       )}
