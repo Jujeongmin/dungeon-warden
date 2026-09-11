@@ -10,7 +10,25 @@ const TILE_SIZE = 1;
 const WALL_HEIGHT = 0.9;
 const FLOOR_HEIGHT = 0.12;
 
-const PITCH = THREE.MathUtils.degToRad(52);
+/*
+ * Looking down the room rather than across its corner.
+ *
+ * The camera used to sit at 45 degrees of yaw, so a 12x20 room presented its
+ * diagonal to the screen - a footprint of about 22.6 by 13.9, which is a
+ * landscape shape being fitted into a portrait window. The four corners of
+ * the viewport were empty and every tile was about 17px across.
+ *
+ * Square on, the room presents 12 across instead of 22.6, so the same screen
+ * gives about 32px a tile. Nearly double, for nothing. Most of what this
+ * session fought - portraits that were smudges, health that needed a bar,
+ * a route that needed arrows drawn on it - was the same problem wearing
+ * different clothes.
+ *
+ * 68 degrees rather than straight down: the models are drawn for a
+ * three-quarter view and lose their silhouette entirely from directly above,
+ * and a steeper angle also hides less of the corridor behind the rock.
+ */
+const PITCH = THREE.MathUtils.degToRad(68);
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -634,9 +652,15 @@ export class DungeonRenderer {
     if (!arena) return;
 
     const aspect = this.camera.aspect || 1;
-    // The room is viewed at 45 degrees of yaw, so its screen footprint is the
-    // diagonal rather than the side length.
-    const span = Math.max(arena.w, arena.h) * Math.SQRT2 * 0.62;
+    /*
+     * Square on, so the footprint is the room itself rather than its diagonal:
+     * as wide as it is, and as deep as it is times the cosine of the pitch.
+     * A quarter turn swaps which is which.
+     */
+    const turned = this.yawStep % 2 === 1;
+    const across = turned ? arena.h : arena.w;
+    const along = (turned ? arena.w : arena.h) * Math.cos(PITCH - Math.PI / 2);
+    const span = Math.max(across, along) * 0.62;
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
 
     const forHeight = span / Math.tan(halfFov);
@@ -2100,7 +2124,8 @@ export class DungeonRenderer {
   }
 
   private get yaw(): number {
-    return (this.yawStep * Math.PI) / 2 + Math.PI / 4;
+    // No quarter-turn offset: square on to the room, not across its corner.
+    return (this.yawStep * Math.PI) / 2;
   }
 
   /**
