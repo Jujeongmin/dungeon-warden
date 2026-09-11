@@ -391,7 +391,15 @@ export default function App() {
     weaponTiers,
     research: unlocked,
     onFinished: save.applyRaidResult,
+    // Read on the animation frame rather than on render: the stick moves far
+    // more often than React does.
+    readControl: () => rendererRef.current?.moveRequest() ?? null,
   });
+
+  /** The minion the warden is riding this frame, if any. */
+  const possessed = raid.possessed;
+  const possessedId = possessed?.id ?? null;
+  const possessedType = possessed?.type ?? null;
 
   const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "remove" as const };
 
@@ -461,6 +469,53 @@ export default function App() {
     rendererRef.current?.setWalking(walking);
   }, [walking]);
 
+  /*
+   * Riding a body puts the player in the corridor, and losing it takes them
+   * out again.
+   *
+   * The second half is the one that matters: the body can die while the
+   * player is inside it, and when it does the simulation drops the ride on
+   * its own - so this watches for the ride ending rather than being told, and
+   * the same path serves a death and a tap on the map button.
+   */
+  const wasRiding = useRef(false);
+  useEffect(() => {
+    if (possessedId) setWalking(true);
+    else if (wasRiding.current) setWalking(false);
+    wasRiding.current = possessedId !== null;
+  }, [possessedId]);
+
+  /*
+   * Whose arms the player sees, and where those arms are standing.
+   *
+   * Declared after the effect that opens the walking view, so by the time it
+   * runs there is a body to hang the arms off. The position arrives from the
+   * simulation every frame - it owns where a ridden body ends up, because it
+   * is the thing that knows about rock, reach and everybody else.
+   */
+  useEffect(() => {
+    if (!walking) return;
+    rendererRef.current?.setPossessed(possessedType);
+  }, [walking, possessedType]);
+
+  useEffect(() => {
+    if (!walking || !possessed) return;
+    rendererRef.current?.setPossessedAt(possessed.x, possessed.y);
+  }, [walking, possessed, possessed?.x, possessed?.y]);
+
+  /** Space swings, the same as the button, for anyone on a keyboard. */
+  useEffect(() => {
+    if (!possessedId) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== "Space" && event.key !== " ") return;
+      event.preventDefault();
+      raid.attack();
+      rendererRef.current?.swing();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [possessedId, raid]);
+
 
   /*
    * Hold to walk forward.
@@ -520,7 +575,21 @@ export default function App() {
       audio.play("skill");
       return;
     }
-    if (raid.raiding) return; // no editing while a raid is running
+    /*
+     * During a raid a tap on the garrison is not an edit, it is a way in.
+     *
+     * Nothing else on the board can be touched while a raid runs, so the
+     * gesture is free - and it reads the way it should: point at the thing
+     * you want to be, and you are it.
+     */
+    if (raid.raiding) {
+      const body = raid.raidState?.minions.find(
+        (m) => m.alive && Math.round(m.x) === x && Math.round(m.y) === y,
+      );
+      if (body && raid.possess(body.id)) audio.play("skill");
+      else if (body) audio.play("error");
+      return;
+    }
 
     /*
      * Taking things down stays free of the guide: a player who put the first
@@ -707,6 +776,9 @@ export default function App() {
       const live: UnitView[] = [];
       for (const m of raid.raidState.minions) {
         if (!m.alive) continue;
+        // Standing inside it: drawing it here would put its ribs across the
+        // lens. The arms in front of the camera are this body's own.
+        if (m.id === possessedId) continue;
         const placed = minions.find((p) => p.id === m.id);
         // A convert keeps the adventurer model it had before turning.
         const kind =
@@ -744,7 +816,7 @@ export default function App() {
         maxHp: stats.hp,
       };
     });
-  }, [raid.raidState, minions, weaponTiers]);
+  }, [raid.raidState, minions, weaponTiers, possessedId]);
 
   const markers: MarkerView[] = useMemo(() => {
     const list: MarkerView[] = traps.map((t) => ({
@@ -1449,7 +1521,7 @@ export default function App() {
             <span>{t("raid_minions")} {raid.raidState.minions.filter((m) => m.alive).length}/{raid.raidState.minions.length}</span>
             <span>{t("raid_traps")} {raid.raidState.trapDamage}</span>
             <span>{raid.raidState.elapsed.toFixed(0)}{t("seconds")}</span>
-            <div className="speeds">
+            <div className="speeds" hidden={possessedId !== null}>
               {RAID_SPEEDS.map((s) => (
                 <button
                   key={s}
@@ -1464,7 +1536,21 @@ export default function App() {
         )}
       </div>
 
-      {raid.raiding && raid.raidState && (
+      {/* The way in, said once where the board is. Only while there is
+          still a body to take, and never while the player is already in one. */}
+      {raid.raiding && !walking && !possessedId && (
+        <div className="possess-hint">{t("possess_pick")}</div>
+      )}
+
+      {/*
+       * The warden orders from above and swings from below, not both at once.
+       *
+       * These are board controls - they point at tiles and at the garrison as
+       * a whole - and down in the corridor they cover a third of the view for
+       * the sake of three buttons the player cannot aim. The build panel is
+       * already hidden here for the same reason.
+       */}
+      {raid.raiding && raid.raidState && !walking && (
         <div className="skillbar">
           {SKILLS.map((skill) => {
             const cd = raid.raidState!.skillCooldowns[skill];
@@ -1861,6 +1947,16 @@ export default function App() {
         * build from in here, and a panel covering a third of the view would
         * undo the only thing this mode is for.
         */}
+      {possessed && (
+        <div className="walk-life">
+          <div
+            className="walk-life-fill"
+            style={{ width: `${Math.max(0, Math.min(1, possessed.hp / possessed.maxHp)) * 100}%` }}
+          />
+          <span>{Math.max(0, Math.ceil(possessed.hp))}</span>
+        </div>
+      )}
+
       {walking && (
         <div className="walkbar">
           <div
@@ -1880,7 +1976,28 @@ export default function App() {
           >
             <div ref={knobRef} className="knob" />
           </div>
-          <button className="walk-exit" onClick={() => { audio.play("click"); setWalking(false); }}>
+          {possessed && (
+            <button
+              className="walk-strike"
+              onClick={() => {
+                audio.play("hit");
+                raid.attack();
+                rendererRef.current?.swing();
+              }}
+            >
+              {t("walk_attack")}
+            </button>
+          )}
+          <button
+            className="walk-exit"
+            onClick={() => {
+              audio.play("click");
+              // Leaving the corridor gives the body back first: a released
+              // minion goes straight back to standing its ground.
+              if (possessedId) raid.release();
+              else setWalking(false);
+            }}
+          >
             {t("walk_map")}
           </button>
         </div>

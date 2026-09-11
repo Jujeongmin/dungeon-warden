@@ -258,6 +258,8 @@ export const zhHans: Record<StringKey, string> = {
   menu_walk: "走进地牢",
   walk_exit: "离开",
   walk_map: "地图",
+  walk_attack: "攻击",
+  possess_pick: "点击手下附身",
   connect_first: "先挖通入口与核心",
   tut_nook_place: "挖出通道旁的小空间",
 };

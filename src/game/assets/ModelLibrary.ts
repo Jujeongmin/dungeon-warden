@@ -89,6 +89,18 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   m_warrior: [/^skeleton_rogue$/, /^skeleton_warrior$/, /skeleton.*warrior/],
   m_mage: [/^skeleton_mage$/, /skeleton.*mage/],
 
+  /*
+   * The same two, cut down to the arms the warden sees when it rides one.
+   *
+   * Possessing a skeleton and looking down at an imp's claws is worse than
+   * having no arms at all, so each body gets its own pair, cut out of the
+   * shipped model by scripts/bake-minion-arms.mjs the same way the warden's
+   * were. A checkout where that script has not been run falls back to the
+   * warden's arms rather than showing none.
+   */
+  m_warrior_arms: [/^warrior-arms$/],
+  m_mage_arms: [/^mage-arms$/],
+
   // Adventurers, also used for converts. Each class has its own model.
   a_knight: [/^knight$/],
   a_barbarian: [/^barbarian$/],

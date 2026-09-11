@@ -2160,6 +2160,88 @@ button.ad-gold {
   .walkbar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
 }
 
+/* How to get down there, said on the board while a raid runs. Low contrast
+   and out of the way: it is an offer, not an instruction, and the player who
+   has taken it up once never needs to read it again. */
+.possess-hint {
+  /* Fixed rather than absolute: the board is drawn inside a dock that does
+     not reach the foot of the screen, and this belongs at the foot. */
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: var(--fs-2xs);
+  color: rgba(239, 231, 216, 0.72);
+  border: 1px solid rgba(232, 164, 76, 0.22);
+  background: rgba(20, 15, 11, 0.55);
+  pointer-events: none;
+}
+
+/* The swing, opposite the stick: one thumb walks the body, the other hits
+   with it. Round and large for the same reason the stick is - it is found by
+   feel, by a thumb that is not being looked at. */
+.walk-strike {
+  flex: none;
+  margin-left: auto;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  border: 1px solid rgba(232, 164, 76, 0.45);
+  background: radial-gradient(circle at 50% 34%, rgba(232, 164, 76, 0.34), rgba(20, 15, 11, 0.74));
+  box-shadow: inset 0 1px 0 rgba(255, 226, 178, 0.18);
+}
+
+.walk-strike:active { transform: scale(0.94); }
+
+.walk-strike + .walk-exit { margin-left: 12px; }
+
+/* What is left of the body being ridden.
+
+   Above the bar rather than in it: this is the number the player is watching
+   while both thumbs are busy, and it has to be readable without looking down
+   at either of them. */
+.walk-life {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 132px);
+  transform: translateX(-50%);
+  z-index: 3;
+  width: min(44%, 300px);
+  height: 15px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 99px;
+  border: 1px solid rgba(232, 164, 76, 0.32);
+  background: rgba(20, 15, 11, 0.62);
+  pointer-events: none;
+}
+
+.walk-life-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #8d2f2a, #d0564a);
+  transition: width 0.12s linear;
+}
+
+.walk-life span {
+  position: relative;
+  font-size: var(--fs-2xs);
+  color: var(--ink);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+@media (max-height: 520px) {
+  .walk-strike { width: 74px; height: 74px; }
+  .walk-life { bottom: calc(env(safe-area-inset-bottom, 0px) + 104px); }
+}
+
 .walk-exit {
   flex: none;
   margin-left: auto;

@@ -26,6 +26,7 @@ import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { dedup, prune, quantize, resample, textureCompress, weld } from "@gltf-transform/functions";
 import sharp from "sharp";
+import { cutArmsAndPrune } from "./lib/cut-arms.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -37,22 +38,21 @@ const BODY = join(src, "bestiary/Exports/GLB (Godot-Unreal)/Imp.glb");
 const CLIPS = join(src, "ual2/Unreal-Godot/UAL2_Standard.glb");
 
 /*
- * Two motions, chosen for a monster rather than for a person.
+ * Three motions, chosen for a monster rather than for a person.
  *
  * The library is built for an adventurer - it has sword combos, farming and a
- * phone call. First-person mode is inspection-only, so the zombie idle and
- * walk are the only clips it needs.
+ * phone call. A warden stands in its own corridor, walks it, and when a raid
+ * goes badly swings at whoever is in it, so the zombie locomotion and one
+ * hook are the ones that fit, renamed to what this game calls them.
  */
 const WANTED = {
   Zombie_Idle_Loop: "idle",
   Zombie_Walk_Fwd_Loop: "walk",
+  Melee_Hook: "attack",
 };
 
 /** How big a texture may be after baking. The body fills a corner of the view. */
 const TEXTURE_SIZE = 512;
-
-/** Which bones count as an arm, when cutting the view model out of the body. */
-const ARM_BONES = /^(clavicle|upperarm|lowerarm|hand|index|middle|ring|pinky|thumb)_/;
 
 async function main() {
   for (const file of [BODY, CLIPS]) {
@@ -181,69 +181,19 @@ async function main() {
 }
 
 /**
- * The same body, with everything that is not an arm cut away.
+ * The same body again, cut down to the pair of arms the player looks past.
  *
- * A first-person view needs arms, and no free pack ships a monster's. What
- * it does ship is a whole monster weighted to a named skeleton - so the arms
- * can be taken out of it here, by keeping only the triangles whose vertices
- * are held by an arm bone. Head, chest, legs and tail go; what is left is
- * two arms, their claws, and the mace, on the same rig running the same
- * clips as the body in the room.
- *
- * Done by weight rather than by hand because the alternative is opening a
- * modelling tool, and a script that re-runs is worth more than a file
- * nobody can rebuild.
+ * The cut itself lives in scripts/lib/cut-arms.mjs, because the minions get
+ * the same treatment - see scripts/bake-minion-arms.mjs - and one rule for
+ * what counts as an arm is worth more than two that drift apart.
  */
 async function bakeArms(io) {
   const document = await io.read(join(out, "warden.glb"));
-  const root = document.getRoot();
-
-  for (const skin of root.listSkins()) {
-    const joints = skin.listJoints();
-    const arm = new Set();
-    joints.forEach((joint, index) => {
-      if (ARM_BONES.test(joint.getName())) arm.add(index);
-    });
-    if (arm.size === 0) continue;
-
-    for (const mesh of root.listMeshes()) {
-      for (const primitive of mesh.listPrimitives()) {
-        const joints0 = primitive.getAttribute("JOINTS_0");
-        const weights0 = primitive.getAttribute("WEIGHTS_0");
-        const indices = primitive.getIndices();
-        if (!joints0 || !weights0 || !indices) continue;
-
-        // A vertex belongs to the arms when most of its weight does.
-        const held = new Uint8Array(joints0.getCount());
-        const j = [0, 0, 0, 0];
-        const w = [0, 0, 0, 0];
-        for (let v = 0; v < held.length; v += 1) {
-          joints0.getElement(v, j);
-          weights0.getElement(v, w);
-          let share = 0;
-          for (let k = 0; k < 4; k += 1) if (arm.has(j[k])) share += w[k];
-          held[v] = share > 0.5 ? 1 : 0;
-        }
-
-        const kept = [];
-        for (let i = 0; i < indices.getCount(); i += 3) {
-          const a = indices.getScalar(i);
-          const b = indices.getScalar(i + 1);
-          const c = indices.getScalar(i + 2);
-          if (held[a] && held[b] && held[c]) kept.push(a, b, c);
-        }
-
-        if (kept.length === 0) {
-          primitive.dispose();
-          continue;
-        }
-        indices.setArray(new Uint32Array(kept));
-      }
-      if (mesh.listPrimitives().length === 0) mesh.dispose();
-    }
+  if (!(await cutArmsAndPrune(document))) {
+    console.error("no arm bones found in warden.glb, nothing written");
+    process.exitCode = 1;
+    return;
   }
-
-  await document.transform(prune({ keepAttributes: false }));
   await io.write(join(out, "warden-arms.glb"), document);
 }
 

@@ -10,4 +10,4 @@ downloaded by hand into `art-src/` and never committed:
 - **Universal Animation Library 2** (CC0) — the motion. Both are rigged to
   the same Unreal mannequin skeleton, which is what lets one drive the other.
 
-Clips kept: idle, walk. Textures cut to 512px WebP, ORM dropped.
+Clips kept: idle, walk, attack. Textures cut to 512px WebP, ORM dropped.

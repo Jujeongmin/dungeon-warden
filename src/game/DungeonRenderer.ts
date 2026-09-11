@@ -46,6 +46,22 @@ const BODY = 0.36;
 const LOOK_SPEED = 0.0045;
 /** Tiles a second on foot. A tile is about two metres. */
 const WALK_SPEED = 2.2;
+/**
+ * Which arms each kind of ridden body shows.
+ *
+ * A convert wears an adventurer's model on the board but has no arms baked of
+ * its own, so it borrows the warrior's - a pair of skeletal arms on something
+ * that used to be a knight is odd, but far less odd than no hands.
+ */
+const ARMS_FOR: Record<string, string> = {
+  warrior: "m_warrior_arms",
+  mage: "m_mage_arms",
+  convert: "m_warrior_arms",
+};
+
+/** How long one swing owns the arms, in milliseconds. */
+const SWING_MS = 450;
+
 /** Where the copy hangs off the lens, in tiles: back, aside, and down. */
 const VIEW_BACK = -0.85;
 const VIEW_ASIDE = 0;
@@ -2042,6 +2058,10 @@ export class DungeonRenderer {
   private warden: THREE.Object3D | null = null;
   /** The same body again, cut down to two arms and hung off the camera. */
   private viewArms: THREE.Object3D | null = null;
+  /** Which kind of body is being ridden, or null for the warden's own. */
+  private possessedType: string | null = null;
+  /** Wall-clock time the current swing ends at. */
+  private swingUntil = 0;
   /** Shoulders, arms and elbows of that copy, turned into view every frame. */
   private viewBones: Array<[string, THREE.Object3D]> = [];
   private viewHolder = new THREE.Group();
@@ -2199,7 +2219,11 @@ export class DungeonRenderer {
    * inside whatever wall the warden is standing at, and the room would
    * eat it.
    */
-  private buildViewArms(clips: THREE.AnimationClip[], body: THREE.Object3D): void {
+  private buildViewArms(
+    clips: THREE.AnimationClip[],
+    body: THREE.Object3D,
+    key = "warden_arms",
+  ): void {
     /*
      * Arms if the bake made them, the whole body if it did not.
      *
@@ -2207,7 +2231,7 @@ export class DungeonRenderer {
      * because no free pack ships a monster's. Falling back to the body keeps
      * the view working on a checkout where that file was never built.
      */
-    const model = this.loaded.get("warden_arms") ?? this.loaded.get("warden");
+    const model = this.loaded.get(key) ?? this.loaded.get("warden_arms") ?? this.loaded.get("warden");
     if (!model) return;
 
     const arms = this.models.instantiate(model);
@@ -2264,6 +2288,7 @@ export class DungeonRenderer {
       this.viewArms = null;
       this.viewBones = [];
     }
+    this.possessedType = null;
     if (!this.warden) return;
     this.mixers.delete("warden");
     this.disposeObject(this.scene, this.warden);
@@ -2315,8 +2340,93 @@ export class DungeonRenderer {
     body.rotation.y = walk.yaw;
     this.poseViewArms();
 
+    // A swing owns the arms until it is done, or walking would cut it off
+    // at the first frame the player moved.
+    if (performance.now() < this.swingUntil) return;
     this.playClip("warden", this.wardenMoving ? "walk" : "idle");
     this.playClip("view-arms", this.wardenMoving ? "walk" : "idle");
+  }
+
+  /**
+   * Puts the view inside one of the garrison instead of the warden's own body.
+   *
+   * Only the picture changes here. Where that body stands, what it hits and
+   * whether it lives are the simulation's, and arrive through
+   * `setPossessedAt`; this swaps the arms for the ones belonging to the type
+   * of thing being ridden, so a warden in a skeleton looks down at bone.
+   *
+   * Passing null hands the view back to the warden's own arms.
+   */
+  setPossessed(type: string | null): void {
+    if (this.possessedType === type) return;
+    this.possessedType = type;
+
+    const body = this.warden;
+    if (!body) return;
+
+    if (this.viewArms) {
+      this.mixers.delete("view-arms");
+      this.disposeObject(this.viewHolder, this.viewArms);
+      this.viewArms = null;
+      this.viewBones = [];
+    }
+
+    if (type) {
+      // The skeletons carry no clips of their own; the pack ships one rig's
+      // worth for everything built on it, which is what sharedClips holds.
+      this.buildViewArms(this.sharedClips, body, ARMS_FOR[type] ?? "warden_arms");
+      return;
+    }
+
+    const own = this.loaded.get("warden")?.animations ?? [];
+    const rigged = this.loaded.get("warden_clips")?.animations ?? [];
+    this.buildViewArms(own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips, body);
+  }
+
+  /**
+   * Where the ridden body ended up this step.
+   *
+   * The simulation owns the position while something is being ridden - it is
+   * the thing that knows about rock, about reach and about the rest of the
+   * raid - so the view follows rather than leads.
+   */
+  setPossessedAt(x: number, y: number): void {
+    if (!this.walk) return;
+    this.walk.at.x = x;
+    this.walk.at.z = y;
+  }
+
+  /**
+   * Which way the player is asking the ridden body to go, in arena tiles.
+   *
+   * The same two axes free walking uses, turned into the world by the heading
+   * the player is looking along, so forward is wherever they are facing. Zero
+   * on both when nothing is held.
+   */
+  moveRequest(): { x: number; y: number; facing: number } {
+    const yaw = this.walk?.yaw ?? 0;
+    const { forward, strafe } = this.moveAxes();
+    // The same basis as step(): right is forward crossed with up.
+    return {
+      x: Math.sin(yaw) * forward - Math.cos(yaw) * strafe,
+      y: Math.cos(yaw) * forward + Math.sin(yaw) * strafe,
+      facing: yaw,
+    };
+  }
+
+  /**
+   * Throws the arms through one swing.
+   *
+   * Timed off the wall clock rather than counted down in the frame loop,
+   * because the swing is a picture: it has no say in what the simulation
+   * decides the blow did, and a dropped frame should not leave an arm stuck
+   * out in front of the camera.
+   */
+  swing(): void {
+    if (!this.viewArms && !this.warden) return;
+    this.swingUntil = performance.now() + SWING_MS;
+    this.playClip("warden", "attack");
+    this.playClip("view-arms", "attack");
   }
 
   /** Turns the head. Radians, from a drag. */
@@ -2360,18 +2470,33 @@ export class DungeonRenderer {
     this.moveInput.strafe = THREE.MathUtils.clamp(strafe, -1, 1);
   }
 
+  /** The two movement axes, from whichever input is live. */
+  private moveAxes(): { forward: number; strafe: number } {
+    const forward = this.moveInput.forward;
+    const strafe = this.moveInput.strafe;
+    if (forward !== 0 || strafe !== 0) return { forward, strafe };
+
+    const k = this.keys;
+    return {
+      forward: (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0),
+      strafe: (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0),
+    };
+  }
+
   /** One frame of walking, from whichever input is live. */
   private updateWalk(delta: number): void {
     if (!this.walk) return;
-    this.wardenMoving = false;
-    let forward = this.moveInput.forward;
-    let strafe = this.moveInput.strafe;
-    if (forward === 0 && strafe === 0) {
-      const k = this.keys;
-      forward = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
-      strafe = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
-    }
+    const { forward, strafe } = this.moveAxes();
     this.wardenMoving = forward !== 0 || strafe !== 0;
+    /*
+     * A ridden body is walked by the simulation, not from here.
+     *
+     * It has rock to respect that this view does not know about - other
+     * minions, the edge of the raid - and more importantly the adventurers
+     * have to see it move. So the input is read for the animation and handed
+     * out through moveRequest; the position arrives back via setPossessedAt.
+     */
+    if (this.possessedType !== null) return;
     if (!this.wardenMoving) return;
     // Diagonals are not faster: the two axes share one speed.
     const length = Math.hypot(forward, strafe);

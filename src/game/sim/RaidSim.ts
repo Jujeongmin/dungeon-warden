@@ -39,6 +39,15 @@ export const DOWNED_SECONDS = 3;
 /** How close a living minion must be to drag a downed adventurer away. */
 const CAPTURE_RADIUS = 1.6;
 
+/**
+ * How fast a ridden body walks, in tiles per second.
+ *
+ * Above every adventurer in the roster, which top out at 2.1. A body under a
+ * hand should feel like one - and the warden is spending its own attention on
+ * driving it, which is the scarcest thing it has during a raid.
+ */
+const POSSESSED_SPEED = 2.6;
+
 export interface SimMinion {
   id: string;
   type: MinionType;
@@ -156,6 +165,8 @@ export interface RaidState {
   waves: number;
   /** Seconds left in the build window. Zero unless the status is intermission. */
   intermissionLeft: number;
+  /** Which minion the warden is riding, if any. */
+  possessedId: string | null;
 }
 
 function distance(ax: number, ay: number, bx: number, by: number): number {
@@ -250,6 +261,22 @@ export class RaidSim {
     detonate: 0,
   };
   private events: SimEvent[] = [];
+  /**
+   * The body the warden is riding, and what it is being told to do.
+   *
+   * A warden that can only watch its own raid is a spectator with a budget.
+   * Taking a minion puts it in the corridor with everything at stake: the
+   * body it rides is one it paid for, it fights with that body's numbers, and
+   * when the body dies it dies for real and the warden is back on the board.
+   *
+   * Nothing else in the simulation knows about this. A ridden minion is a
+   * minion - adventurers fight it when it blocks them, traps ignore it, and
+   * the raid ends the way it always did.
+   */
+  private possessedId: string | null = null;
+  private control = { x: 0, y: 0, facing: 0, attack: false };
+  /** Which tile the ridden body was on last step, so hunts re-route on a step. */
+  private possessedTile = { x: -1, y: -1 };
 
   constructor(options: RaidSimOptions) {
     this.seed = options.seed;
@@ -590,6 +617,9 @@ export class RaidSim {
   private killMinion(minion: SimMinion): void {
     minion.hp = 0;
     minion.alive = false;
+    // A warden inside it goes back to the board, which is the whole risk of
+    // having climbed in.
+    if (minion.id === this.possessedId) this.release();
     // Whoever came for it has no reason to stand there any more.
     for (const adventurer of this.adventurers) {
       if (adventurer.hunting === minion.id) adventurer.hunting = null;
@@ -621,6 +651,7 @@ export class RaidSim {
       wave: this.waveIndex + 1,
       waves: this.waves.length,
       intermissionLeft: this.intermissionLeft,
+      possessedId: this.possessedId,
     };
   }
 
@@ -723,6 +754,55 @@ export class RaidSim {
       this.fireTrap(trap, true);
     }
     return true;
+  }
+
+  /**
+   * Puts the warden inside one of its own minions.
+   *
+   * Refused for a body that is not there to be ridden - dead, unknown, or
+   * belonging to a raid that is over. Returns whether it took.
+   */
+  possess(id: string): boolean {
+    if (this.status !== "running") return false;
+    const minion = this.minions.find((m) => m.id === id && m.alive);
+    if (!minion) return false;
+
+    this.possessedId = id;
+    this.control = { x: 0, y: 0, facing: minion.facing, attack: false };
+    this.possessedTile = { x: Math.round(minion.x), y: Math.round(minion.y) };
+    return true;
+  }
+
+  /** Hands the body back to its own devices. Safe to call when riding nothing. */
+  release(): void {
+    if (!this.possessedId) return;
+    this.possessedId = null;
+    this.control = { x: 0, y: 0, facing: 0, attack: false };
+  }
+
+  /** The body being ridden, or null. */
+  get possessed(): SimMinion | null {
+    if (!this.possessedId) return null;
+    return this.minions.find((m) => m.id === this.possessedId && m.alive) ?? null;
+  }
+
+  /**
+   * What the ridden body is being asked to do.
+   *
+   * Movement is a direction in tile space rather than a speed, so the caller
+   * does not have to know the frame rate or the step size; the attack is a
+   * request that survives until the next step spends it, so a tap that lands
+   * between two steps is never dropped.
+   */
+  setControl(input: { x: number; y: number; facing: number }): void {
+    this.control.x = input.x;
+    this.control.y = input.y;
+    this.control.facing = input.facing;
+  }
+
+  /** Asks for one swing. Spent by the next step, whether or not it connects. */
+  requestAttack(): void {
+    this.control.attack = true;
   }
 
   /** Advances exactly one SIM_DT. Call repeatedly from a fixed-step accumulator. */
@@ -996,6 +1076,10 @@ export class RaidSim {
   private stepMinions(): void {
     for (const minion of this.minions) {
       if (!minion.alive) continue;
+      if (minion.id === this.possessedId) {
+        this.stepPossessed(minion);
+        continue;
+      }
 
       // Converts and equipped minions have per-unit stats, so they come from
       // the map built in the constructor rather than a static table.
@@ -1012,6 +1096,75 @@ export class RaidSim {
       minion.cooldown = stats.attackInterval;
       this.damageAdventurer(target, stats.damage, "melee", minion);
     }
+  }
+
+  /**
+   * Drives the ridden body from the player's input instead of from the rules.
+   *
+   * It is the same minion in every other respect - the same stats, the same
+   * hit points, the same place in the road - so nothing here can hand the
+   * warden a unit the board could not have bought. What it gains is the two
+   * things a placed minion has never had: it can walk, and it swings when
+   * told rather than whenever something wanders into reach.
+   *
+   * Walking is the real power. The garrison is not in the pathfinding blocked
+   * set, so a route is never recomputed around a body - but an adventurer
+   * fights whatever stands on its next tile, so stepping into the road starts
+   * a fight and stepping out of it ends one. A warden who knows that can hold
+   * a corridor mouth with one skeleton.
+   */
+  private stepPossessed(minion: SimMinion): void {
+    const stats = this.minionStats.get(minion.id)!;
+    minion.cooldown = Math.max(0, minion.cooldown - SIM_DT);
+    minion.shield = Math.max(0, minion.shield - SIM_DT);
+    minion.facing = this.control.facing;
+
+    const push = Math.hypot(this.control.x, this.control.y);
+    if (push > 0.01) {
+      const step = (POSSESSED_SPEED * SIM_DT) / push;
+      const nx = minion.x + this.control.x * step;
+      const ny = minion.y + this.control.y * step;
+      // One axis at a time, so a body pressed into a corner slides along the
+      // wall instead of stopping dead against it.
+      if (this.standable(nx, minion.y)) minion.x = nx;
+      if (this.standable(minion.x, ny)) minion.y = ny;
+      minion.action = "walk";
+    } else {
+      minion.action = "idle";
+    }
+
+    /*
+     * Anyone hunting this body was sent to where it used to be.
+     *
+     * Only on a change of tile: re-routing every step would be a breadth-first
+     * search twenty times a second for a body that has moved a few
+     * centimetres, and a hunt is decided in whole tiles anyway.
+     */
+    const tx = Math.round(minion.x);
+    const ty = Math.round(minion.y);
+    if (tx !== this.possessedTile.x || ty !== this.possessedTile.y) {
+      this.possessedTile = { x: tx, y: ty };
+      this.routeAll();
+    }
+
+    if (!this.control.attack) return;
+    this.control.attack = false;
+    if (minion.cooldown > 0) return;
+
+    // A swing costs its cooldown whether or not anything was in reach: the
+    // player who mistimes it has to wait for the next one.
+    minion.cooldown = stats.attackInterval;
+    minion.action = "attack";
+    const target = this.nearestAdventurer(minion.x, minion.y, stats.range);
+    if (target) this.damageAdventurer(target, stats.damage, "melee", minion);
+  }
+
+  /** Whether a body may stand here: inside the arena, and on dug floor. */
+  private standable(x: number, y: number): boolean {
+    const tx = Math.round(x);
+    const ty = Math.round(y);
+    if (!inArena(this.arena, tx, ty)) return false;
+    return !this.terrain.has(blockedKey(tx, ty, this.arena.w));
   }
 
   /*

@@ -63,6 +63,14 @@ interface Options {
   onFinished: (result: RaidFinishResult) => void;
   /** Where the speed control starts, remembered from last session. */
   initialSpeed?: RaidSpeed;
+  /**
+   * What the player is asking a ridden body to do, read once per frame.
+   *
+   * A function rather than a value because it is sampled on the animation
+   * frame, between renders: the stick moves far more often than React does,
+   * and a body that only turned when a render happened would feel broken.
+   */
+  readControl?: () => { x: number; y: number; facing: number } | null;
 }
 
 /**
@@ -87,9 +95,12 @@ export function useRaid({
   onFinished,
   onEvents,
   initialSpeed,
+  readControl,
 }: Options) {
   const eventsRef = useRef(onEvents);
   eventsRef.current = onEvents;
+  const controlRef = useRef(readControl);
+  controlRef.current = readControl;
   const { server } = useGameServer();
 
   const [raidState, setRaidState] = useState<RaidState | null>(null);
@@ -189,7 +200,20 @@ export function useRaid({
       // of feeding it in — the freeze is entirely a wall-clock pacing effect
       // on top of the fixed-step loop, so it cannot change how many times
       // sim.step() below ends up running for a given raid.
-      if (hitStopRef.current > 0) {
+      /*
+       * A warden inside a body is playing, not watching.
+       *
+       * Hit stop is a tenth of a second of frozen wall clock on every telling
+       * blow - read as weight from above the board, and as dropped input from
+       * inside the corridor. Fast forward goes the same way: a body under a
+       * hand should move at the speed a hand expects.
+       */
+      const riding = sim.state.possessedId !== null;
+      if (riding) {
+        const control = controlRef.current?.();
+        if (control) sim.setControl(control);
+        accumulatorRef.current += delta;
+      } else if (hitStopRef.current > 0) {
         hitStopRef.current = Math.max(0, hitStopRef.current - delta);
       } else {
         accumulatorRef.current += delta * speedRef.current;
@@ -215,6 +239,10 @@ export function useRaid({
       }
 
       const next = sim.state;
+      // The build window is played from the board: there is nothing to fight
+      // during it, and a warden left standing in an empty corridor cannot
+      // spend the gold it just won.
+      if (next.possessedId !== null && next.status !== "running") sim.release();
       setRaidState({ ...next, minions: [...next.minions], adventurers: [...next.adventurers] });
 
       if (isRaidOver(next.status)) {
@@ -344,6 +372,33 @@ export function useRaid({
   ]);
 
   /**
+   * Climbs into one of the garrison, or gets back out.
+   *
+   * The body keeps everything it had - its hit points, its reach, its place in
+   * the road - and gains only a pair of legs and a swing on demand. Losing it
+   * loses the minion for real, which is what makes going down there a
+   * decision rather than a camera angle.
+   */
+  const possess = useCallback((id: string) => {
+    const sim = simRef.current;
+    if (!sim || !sim.possess(id)) return false;
+    setRaidState({ ...sim.state, minions: [...sim.state.minions], adventurers: [...sim.state.adventurers] });
+    return true;
+  }, []);
+
+  const release = useCallback(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    sim.release();
+    setRaidState({ ...sim.state, minions: [...sim.state.minions], adventurers: [...sim.state.adventurers] });
+  }, []);
+
+  /** Asks the ridden body for one swing. Spent by the next simulation step. */
+  const attack = useCallback(() => {
+    simRef.current?.requestAttack();
+  }, []);
+
+  /**
    * Fires a warden skill. Rally needs a tile, so selecting it arms a pending
    * state and the next tap on the dungeon supplies the target.
    */
@@ -447,6 +502,13 @@ export function useRaid({
     error,
     pendingSkill,
     startRaid,
+    possess,
+    release,
+    attack,
+    /** The body being ridden right now, if it is still standing. */
+    possessed: raidState?.possessedId
+      ? (raidState.minions.find((m) => m.id === raidState.possessedId && m.alive) ?? null)
+      : null,
     useSkill: activateSkill,
     resolveSkillTarget,
     stepRaid,

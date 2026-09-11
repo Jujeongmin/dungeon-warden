@@ -263,6 +263,8 @@ export const ja: Record<StringKey, string> = {
   menu_walk: "ダンジョンを歩く",
   walk_exit: "戻る",
   walk_map: "地図",
+  walk_attack: "攻撃",
+  possess_pick: "手下をタップして憑依",
   connect_first: "入口とコアを繋げて",
   tut_nook_place: "通路の横を掘って場所を",
 };

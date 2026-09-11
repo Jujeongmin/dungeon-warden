@@ -97,6 +97,12 @@
       "bytes": 352472
     },
     {
+      "url": "/assets/arms/mage-arms.glb",
+      "name": "mage-arms",
+      "group": "arms",
+      "bytes": 99944
+    },
+    {
       "url": "/assets/kaykit/dungeon/pillar_decorated.gltf",
       "name": "pillar_decorated",
       "group": "kaykit/dungeon",
@@ -226,7 +232,13 @@
       "url": "/assets/warden/warden-clips.glb",
       "name": "warden-clips",
       "group": "warden",
-      "bytes": 121340
+      "bytes": 160740
+    },
+    {
+      "url": "/assets/arms/warrior-arms.glb",
+      "name": "warrior-arms",
+      "group": "arms",
+      "bytes": 108000
     }
   ]
 }

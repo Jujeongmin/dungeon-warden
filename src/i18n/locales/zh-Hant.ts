@@ -258,6 +258,8 @@ export const zhHant: Record<StringKey, string> = {
   menu_walk: "走進地牆",
   walk_exit: "離開",
   walk_map: "地圖",
+  walk_attack: "攻擊",
+  possess_pick: "點擊手下附身",
   connect_first: "先挖通入口與核心",
   tut_nook_place: "挖出通道旁的小空間",
 };
