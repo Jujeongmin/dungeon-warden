@@ -3,7 +3,6 @@ import type {
   MinionType,
   PartyMember,
   PlacedMinion,
-  PlacedObstacle,
   PlacedTrap,
   RaidOutcome,
   TrapType,
@@ -18,9 +17,8 @@ import {
 } from "./traps";
 import type { Point } from "./pathfinding";
 import { buildRaidPath, findPath } from "./pathfinding";
-import { blockedKey, blockedSet, inArena, type Arena } from "../arena";
+import { blockedKey, inArena, type Arena } from "../arena";
 
-import { OBSTACLE_STATS, type SimObstacle } from "./obstacles";
 
 /** Simulation step. Everything advances in whole steps so runs are reproducible. */
 export const SIM_DT = 1 / 20;
@@ -88,9 +86,7 @@ export type SimEvent =
   | { kind: "down"; targetId: string; x: number; y: number }
   | { kind: "killed"; targetId: string; x: number; y: number }
   | { kind: "captured"; targetId: string; x: number; y: number }
-  | { kind: "minionDown"; targetId: string; x: number; y: number }
-  | { kind: "obstacleHit"; targetId: string; amount: number; x: number; y: number }
-  | { kind: "obstacleDown"; targetId: string; x: number; y: number };
+  | { kind: "minionDown"; targetId: string; x: number; y: number };
 
 export interface SimAdventurer {
   id: string;
@@ -117,8 +113,6 @@ export interface SimAdventurer {
   champion: boolean;
   /** This adventurer's own route. A falling wall changes it for everyone. */
   path: Point[];
-  /** True while walking a route that runs through obstacles it must break. */
-  breaking: boolean;
   /**
    * Id of a minion this adventurer has turned aside to kill.
    *
@@ -149,7 +143,6 @@ export interface RaidState {
   minions: SimMinion[];
   adventurers: SimAdventurer[];
   traps: SimTrap[];
-  obstacles: SimObstacle[];
   skillCooldowns: Record<WardenSkill, number>;
   killed: number;
   captured: number;
@@ -190,7 +183,6 @@ export interface RaidSimOptions {
   core: Point;
   /** Treasury tiles that pull the party off the direct line. */
   lures: Point[];
-  obstacles: PlacedObstacle[];
   seed: number;
   /**
    * The rock: every tile nobody dug out.
@@ -232,16 +224,6 @@ export class RaidSim {
    */
   private terrain: Set<number>;
   private entrance: Point;
-  /**
-   * Every mutation of this array's `alive`/`hp` must be followed by a call to
-   * `routeAll()` in the same operation — a route computed against a stale
-   * obstacle set can strand an adventurer mid-`breaking` while a walkable
-   * path already exists elsewhere. Kill an obstacle through `killObstacle()`
-   * below rather than flipping `alive` inline, so there is exactly one place
-   * that has to get this right.
-   */
-  private obstacles: SimObstacle[];
-  private destroyed: string[] = [];
   private minions: SimMinion[];
   private traps: SimTrap[];
   private adventurers: SimAdventurer[];
@@ -309,16 +291,6 @@ export class RaidSim {
     this.core = options.core;
     this.lures = options.lures;
     this.terrain = options.terrain ?? new Set<number>();
-    this.obstacles = options.obstacles.map((o) => ({
-      id: o.id,
-      type: o.type,
-      x: o.x,
-      y: o.y,
-      hp: OBSTACLE_STATS[o.type].hp,
-      maxHp: OBSTACLE_STATS[o.type].hp,
-      alive: true,
-    }));
-
     this.entrance = options.entrance;
     this.waves = options.waves?.length ? options.waves : [options.party];
     this.adventurers = [];
@@ -344,15 +316,12 @@ export class RaidSim {
    * of a knight that is already swinging at one, and the whole point of the
    * window is that building has its own moment.
    *
-   * Additive and subtractive both: a wall put up changes every route, and so
-   * does one taken down, so this ends with a re-route either way. What was
-   * already standing keeps the damage it has taken - that is the reason the
-   * simulation survives between waves at all.
+   * What was already standing keeps the damage it has taken - that is the
+   * reason the simulation survives between waves at all.
    */
   syncPlacements(
     minions: PlacedMinion[],
     traps: PlacedTrap[],
-    obstacles: PlacedObstacle[],
     weaponTiers: Record<string, number> = {},
   ): void {
     if (this.status !== "intermission") return;
@@ -379,17 +348,6 @@ export class RaidSim {
       this.traps.push({
         id: placed.id, type: placed.type, x: placed.x, y: placed.y,
         cooldown: 0, triggers: 0,
-      });
-    }
-
-    const wantedObstacles = new Set(obstacles.map((o) => o.id));
-    this.obstacles = this.obstacles.filter((o) => !o.alive || wantedObstacles.has(o.id));
-    for (const placed of obstacles) {
-      if (this.obstacles.some((o) => o.id === placed.id)) continue;
-      const hp = OBSTACLE_STATS[placed.type].hp;
-      this.obstacles.push({
-        id: placed.id, type: placed.type, x: placed.x, y: placed.y,
-        hp, maxHp: hp, alive: true,
       });
     }
 
@@ -436,7 +394,6 @@ export class RaidSim {
         action: "walk" as SimAction,
         facing: 0,
         path: [],
-        breaking: false,
         hunting: null,
       });
     }
@@ -463,31 +420,27 @@ export class RaidSim {
    * the game: the player decides which of the two they are building.
    */
   /**
-   * What a route may not pass through.
+   * What a route may not pass through: the rock, and nothing else.
    *
-   * Walls and scenery, and nothing else. Minions used to be in here and that
-   * was the wrong rule: it made a minion a piece of maze, so putting one in
-   * the road bent the road around it and the thing the player had just paid
-   * for was never fought at all. The route now ignores the garrison entirely,
-   * and a minion standing on it is walked into - see blockingTarget.
+   * Minions used to be in here and that was the wrong rule: it made a minion
+   * a piece of maze, so putting one in the road bent the road around it and
+   * the thing the player had just paid for was never fought at all. The route
+   * ignores the garrison entirely now, and a minion standing on it is walked
+   * into - see blockingTarget.
    *
-   * Which leaves walls as the only thing that shapes the route, and that is
-   * the division the game was designed around: walls decide where they walk,
+   * Which leaves the rock as the only thing that shapes a route, and that is
+   * the division the game is built on: what you dug decides where they walk,
    * minions decide what happens to them on the way.
    */
   private blocked(): Set<number> {
-    const set = blockedSet(this.arena, this.obstacles.filter((o) => o.alive));
-    for (const key of this.terrain) set.add(key);
-    return set;
+    return new Set(this.terrain);
   }
 
   /**
    * Gives one adventurer a route from where it stands.
    *
    * A walkable route always wins, however long it is — that is the whole rule
-   * of this game, and it is what makes folding the corridor worth doing. Only
-   * when there is no way through at all does it fall back to the route it
-   * would walk if the walls were not there, and start hitting them.
+   * of this game, and it is what makes folding the corridor worth doing.
    */
   private route(adventurer: SimAdventurer): void {
     const from = { x: Math.round(adventurer.x), y: Math.round(adventurer.y) };
@@ -506,37 +459,36 @@ export class RaidSim {
       if (chase) {
         adventurer.path = chase;
         adventurer.pathIndex = 0;
-        adventurer.breaking = false;
         return;
       }
       adventurer.hunting = null;
     }
 
+    /*
+     * There is always a route, or the raid should never have opened.
+     *
+     * The rock is the only thing that shapes a route and it cannot change
+     * mid-raid, so a missing route here is not a game state - it is a raid
+     * that started from a dungeon whose door does not reach its core, which
+     * both the client and the server refuse. Thrown rather than patched
+     * around: resolveStatus() reads "already at the end of the path" as a
+     * breach, so quietly handing back a one-step path would give the
+     * attacker a free and unreported win.
+     *
+     * There used to be a fallback here that dropped the player's walls and
+     * walked the line underneath them, which is what breaking a barricade
+     * meant. Nothing is breakable now - a wall is rock the player chose not
+     * to dig - so that fallback computed the identical route and could only
+     * ever fail the same way.
+     */
     const open = buildRaidPath(this.arena, from, this.core, this.lures, this.blocked());
-    if (open) {
-      adventurer.path = open;
-      adventurer.breaking = false;
-    } else {
-      // No walkable route exists right now, so fall back to the route the
-      // party would take if no obstacle stood in the way at all — that is
-      // what breaking through means. If even THAT is unreachable, `from` or
-      // `this.core` sits outside the arena, which is a bug, not a game state:
-      // resolveStatus() treats "already at path end" as a breach, so silently
-      // falling back to a length-1 path here would hand the attacker a free,
-      // unreported win instead of surfacing the broken input.
-      // The rubble the room came with is still there. Breaking through means
-      // going through what the player built, not through the walls of the
-      // dungeon itself — so the fallback drops the placements and keeps the
-      // terrain.
-      const fallback = buildRaidPath(this.arena, from, this.core, this.lures, this.terrain);
-      if (!fallback) {
-        throw new Error(
-          `RaidSim: no route from (${from.x}, ${from.y}) to the core (${this.core.x}, ${this.core.y}) exists even with no obstacles — start or core must be outside the arena.`,
-        );
-      }
-      adventurer.path = fallback;
-      adventurer.breaking = true;
+    if (!open) {
+      throw new Error(
+        `RaidSim: no route from (${from.x}, ${from.y}) to the core (${this.core.x}, ${this.core.y}) — the dungeon was not connected when the raid opened.`,
+      );
     }
+
+    adventurer.path = open;
     adventurer.pathIndex = 0;
   }
 
@@ -544,13 +496,6 @@ export class RaidSim {
     for (const adventurer of this.adventurers) {
       if (adventurer.alive) this.route(adventurer);
     }
-  }
-
-  private obstacleAt(x: number, y: number): SimObstacle | null {
-    for (const o of this.obstacles) {
-      if (o.alive && o.x === x && o.y === y) return o;
-    }
-    return null;
   }
 
   /**
@@ -615,9 +560,7 @@ export class RaidSim {
    * whole way past and they do not so much as turn their head. The player who
    * wants that minion fought has to put it in the road.
    */
-  private blockingTarget(
-    adventurer: SimAdventurer,
-  ): { obstacle: SimObstacle } | { minion: SimMinion } | null {
+  private blockingTarget(adventurer: SimAdventurer): SimMinion | null {
     const next = adventurer.path[adventurer.pathIndex + 1];
     if (!next) return null;
 
@@ -627,30 +570,15 @@ export class RaidSim {
      * Routes are built without the garrison in them, so a minion never has a
      * way round to be compared against - if it is on the route, the route
      * goes through it, and going through it means killing it.
+     *
+     * Walls used to be the other half of this. They were breakable once, and
+     * a wall on the route meant there had been no route at all. Nothing is
+     * breakable now: what shapes a route is the rock the player did not dig,
+     * and a raid cannot open unless there is a way through it.
      */
-    const minion = this.minionAt(next.x, next.y);
-    if (minion) return { minion };
-
-    /*
-     * A wall is different, and the `breaking` test is why. Routes DO go round
-     * walls, so a wall on the route can only mean there was no route at all
-     * and this party is chewing its way through in a straight line.
-     */
-    if (!adventurer.breaking) return null;
-    const obstacle = this.obstacleAt(next.x, next.y);
-    return obstacle ? { obstacle } : null;
+    return this.minionAt(next.x, next.y);
   }
 
-  /**
-   * Kills one obstacle: zeroes it out, reports `obstacleDown`, and re-routes
-   * every adventurer.
-   *
-   * This is the only place allowed to set an obstacle's `alive` to false —
-   * see the comment on the `obstacles` field. Routing every kill through here
-   * means a second kill site added later (a warden skill that collapses a
-   * wall, say) gets the mandatory re-route for free instead of relying on
-   * whoever writes it to remember the rule.
-   */
   /**
    * Kills one minion and re-routes.
    *
@@ -675,24 +603,6 @@ export class RaidSim {
     this.routeAll();
   }
 
-  private killObstacle(obstacle: SimObstacle): void {
-    obstacle.hp = 0;
-    obstacle.alive = false;
-    this.destroyed.push(obstacle.id);
-    this.events.push({
-      kind: "obstacleDown",
-      targetId: obstacle.id,
-      x: obstacle.x,
-      y: obstacle.y,
-    });
-    // One hole changes the map for everyone, so everyone re-routes.
-    this.routeAll();
-  }
-
-  /** A copy, not a live reference — callers must not be able to mutate sim state. */
-  get destroyedObstacleIds(): string[] {
-    return [...this.destroyed];
-  }
 
   get state(): RaidState {
     return {
@@ -701,7 +611,6 @@ export class RaidSim {
       minions: this.minions,
       adventurers: this.adventurers,
       traps: this.traps,
-      obstacles: this.obstacles.map((o) => ({ ...o })),
       skillCooldowns: this.skillCooldowns,
       killed: this.adventurers.filter((a) => a.fate === "killed").length,
       captured: this.adventurers.filter((a) => a.fate === "captured").length,
@@ -792,8 +701,7 @@ export class RaidSim {
       const illegal =
         !inArena(this.arena, target.x, target.y) ||
         this.terrain.has(key) ||
-        (target.x === this.core.x && target.y === this.core.y) ||
-        this.obstacles.some((o) => o.alive && o.x === target.x && o.y === target.y);
+        (target.x === this.core.x && target.y === this.core.y);
 
       if (illegal) {
         this.skillCooldowns[skill] = 0;
@@ -1038,34 +946,18 @@ export class RaidSim {
         continue;
       }
 
-      const barrier = this.blockingTarget(adventurer);
-      if (barrier) {
-        const spot = "obstacle" in barrier ? barrier.obstacle : barrier.minion;
+      const guard = this.blockingTarget(adventurer);
+      if (guard) {
         adventurer.action = "attack";
-        adventurer.facing = Math.atan2(spot.x - adventurer.x, spot.y - adventurer.y);
+        adventurer.facing = Math.atan2(guard.x - adventurer.x, guard.y - adventurer.y);
 
         if (adventurer.cooldown === 0) {
           adventurer.cooldown = stats.attackInterval;
-
-          if ("obstacle" in barrier) {
-            const wall = barrier.obstacle;
-            wall.hp -= stats.damage;
-            this.events.push({
-              kind: "obstacleHit",
-              targetId: wall.id,
-              amount: stats.damage,
-              x: wall.x,
-              y: wall.y,
-            });
-            if (wall.hp <= 0) this.killObstacle(wall);
-          } else {
-            const guard = barrier.minion;
-            // A blessed minion still occupies the corridor, it just takes no
-            // damage — the skill buys time rather than removing the fight.
-            if (guard.shield <= 0) {
-              guard.hp -= stats.damage;
-              if (guard.hp <= 0) this.killMinion(guard);
-            }
+          // A blessed minion still occupies the corridor, it just takes no
+          // damage — the skill buys time rather than removing the fight.
+          if (guard.shield <= 0) {
+            guard.hp -= stats.damage;
+            if (guard.hp <= 0) this.killMinion(guard);
           }
         }
         continue;

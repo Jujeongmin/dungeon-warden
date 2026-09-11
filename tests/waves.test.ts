@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { wavesFor } from "../src/game/party";
 import { INTERMISSION_SECONDS, RaidSim, SIM_DT, isRaidOver } from "../src/game/sim/RaidSim";
 import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
-import type { PartyMember, PlacedMinion, PlacedObstacle } from "../src/game/types";
+import type { PartyMember, PlacedMinion, PlacedTrap } from "../src/game/types";
 
 const arena = arenaFor([]);
 const entrance = entranceOf(arena);
@@ -12,9 +12,9 @@ const core = coreOf(arena);
 const knight = (id: string): PartyMember => ({ id, cls: "knight", name: id, level: 1 });
 const archer = (id: string, x: number, y: number): PlacedMinion => ({ id, type: "warrior", x, y });
 
-function makeSim(waves: PartyMember[][], minions: PlacedMinion[] = [], obstacles: PlacedObstacle[] = []) {
+function makeSim(waves: PartyMember[][], minions: PlacedMinion[] = [], traps: PlacedTrap[] = []) {
   return new RaidSim({
-    minions, traps: [], obstacles,
+    minions, traps,
     party: waves[0], waves,
     arena, entrance, core, lures: [], seed: 1,
   });
@@ -100,7 +100,7 @@ describe("a raid made of waves", () => {
 
   it("runs as one wave when the caller sends one party, as older servers do", () => {
     const sim = new RaidSim({
-      minions: garrison(), traps: [], obstacles: [],
+      minions: garrison(), traps: [],
       party: [knight("a1")],
       arena, entrance, core, lures: [], seed: 1,
     });
@@ -111,13 +111,13 @@ describe("a raid made of waves", () => {
 });
 
 describe("building during the window", () => {
-  it("takes on a wall put up between waves", () => {
+  it("takes on a trap laid between waves", () => {
     const sim = makeSim([[knight("a1")], [knight("b1")]], garrison());
     runWhile(sim, "running");
 
-    const before = sim.state.obstacles.length;
-    sim.syncPlacements(garrison(), [], [{ id: "new", type: "wall", x: entrance.x, y: entrance.y + 2 }]);
-    expect(sim.state.obstacles.length).toBe(before + 1);
+    const before = sim.state.traps.length;
+    sim.syncPlacements(garrison(), [{ id: "new", type: "spike", x: entrance.x, y: entrance.y + 2 }]);
+    expect(sim.state.traps.length).toBe(before + 1);
   });
 
   it("takes on a minion put up between waves, at full health", () => {
@@ -125,7 +125,7 @@ describe("building during the window", () => {
     runWhile(sim, "running");
 
     const added = [...garrison(), archer("fresh", core.x + 2, core.y - 4)];
-    sim.syncPlacements(added, [], []);
+    sim.syncPlacements(added, []);
     const fresh = sim.state.minions.find((m) => m.id === "fresh")!;
     expect(fresh.hp).toBe(fresh.maxHp);
   });
@@ -135,7 +135,7 @@ describe("building during the window", () => {
     runWhile(sim, "running");
 
     const kept = garrison().filter((m) => m.id !== "g1");
-    sim.syncPlacements(kept, [], []);
+    sim.syncPlacements(kept, []);
     const survivors = sim.state.minions.filter((m) => m.alive).map((m) => m.id);
     expect(survivors).not.toContain("g1");
     // Casualties stay on the board: they are not the player's to remove.
@@ -149,9 +149,9 @@ describe("building during the window", () => {
     sim.step();
     expect(sim.state.status).toBe("running");
 
-    const before = sim.state.obstacles.length;
-    sim.syncPlacements(garrison(), [], [{ id: "cheat", type: "wall", x: entrance.x, y: entrance.y + 2 }]);
-    expect(sim.state.obstacles.length).toBe(before);
+    const before = sim.state.traps.length;
+    sim.syncPlacements(garrison(), [{ id: "cheat", type: "spike", x: entrance.x, y: entrance.y + 2 }]);
+    expect(sim.state.traps.length).toBe(before);
   });
 
   it("cannot be made to skip a wave by pressing the button twice", () => {

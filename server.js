@@ -8,15 +8,12 @@ const SAVE_VERSION = 2;
 const GRID_W = 12;
 const GRID_H = 12;
 
-const OBSTACLE_COST = { barricade: 12, wall: 35 };
-const BASE_MAX_OBSTACLES = 20;
-
 /**
  * Reads a key that a client chose out of a plain-object table.
  *
  * `TABLE[key]` alone is not a membership test: every object inherits
  * `toString`, `constructor`, `valueOf` and friends from Object.prototype, so
- * `OBSTACLE_COST["toString"]` returns a *function* — truthy enough to walk
+ * `MINION_COST["toString"]` returns a *function* — truthy enough to walk
  * straight past a `if (!TABLE[key])` guard. Every lookup on a client-supplied
  * key goes through here so only an own key can ever answer.
  */
@@ -42,7 +39,7 @@ function priceOf(table, type) {
   return price;
 }
 
-/** Room height and obstacle budget both come from the expansion research. */
+/** How tall the room is, which the expansion research decides. */
 function arenaFor(research) {
   const owned = Array.isArray(research) ? research : [];
   let h = GRID_H;
@@ -79,15 +76,6 @@ function applyArena(dungeon) {
   dungeon.entrance = entranceOf(arena);
   dungeon.core = coreOf(arena);
   return arena;
-}
-
-function maxObstaclesFor(research, entitlements) {
-  const owned = Array.isArray(research) ? research : [];
-  let cap = BASE_MAX_OBSTACLES;
-  if (owned.includes("expand1")) cap = 28;
-  if (owned.includes("expand2")) cap = 36;
-  if (entitlements && entitlements.extraObstacles) cap += ENTITLEMENT_OBSTACLES;
-  return cap;
 }
 
 const START_GOLD = 200;
@@ -316,12 +304,15 @@ const ADVENTURER_NAMES = [
 //  is the entitlement key. Adding a row here is the whole server-side
 // change;  below reads this table and nothing else.
 const PRODUCTS = {
+  // Nothing reads extraObstacles any more: it raised a cap on placed walls,
+  // and walls are not placed - the player digs the room out of rock, which
+  // only gold limits. The row stays so an entitlement already granted is
+  // never revoked; the product needs something to grant before it is listed.
   deeper_dungeon: { grants: "extraObstacles", repeatable: false },
   larger_garrison: { grants: "extraMinions", repeatable: false },
 };
 
 /** How much each entitlement is worth, applied on top of the research caps. */
-const ENTITLEMENT_OBSTACLES = 8;
 const ENTITLEMENT_MINIONS = 4;
 
 // Accounts allowed to call devGrantPurchase, which exercises the grant path
@@ -597,9 +588,8 @@ function pickParty(dungeon, threat, now) {
  *
  * Rooms claim four tiles each, and nothing else may sit on them. `claimed` is
  * a shared Set the caller seeds with the entrance and core keys before this
- * runs, and it is shared onward with the trap, minion and obstacle checks so
- * one occupant ever holds a tile — there is no more floor/rock distinction to
- * lean on for that.
+ * runs, and it is shared onward with the trap and minion checks so one
+ * occupant ever holds a tile.
  *
  * Ids the client chose index a Map and a Set, never a plain object, and the
  * type indexes ROOM_COST through priceOf — an id or type of "toString" is then
@@ -751,24 +741,6 @@ function priceMinions(nextMinions, prevMinions, arena, claimed, minionCap) {
 }
 
 /**
- * Charges for obstacles that are new or changed type, and refuses a dungeon
- * that breaks the rules. Removing an obstacle refunds nothing, which is what
- * makes a wall a purchase rather than a fixture.
- *
- * Two things here are load-bearing and were missing:
- *
- * 1. The price comes from priceOf, not `OBSTACLE_COST[o.type]`. A type of
- *    "toString" used to resolve to Object.prototype.toString, sail past the
- *    `!OBSTACLE_COST[o.type]` guard, and then `cost += <function>` made the
- *    running total a string. saveDungeon's `if (cost > 0)` is false for a
- *    string, so the entire save — rooms, traps, minions and all — was free.
- * 2. `seenIds`, which the room, trap and minion pricers already had. Without
- *    it one saved wall could be listed many times at different coordinates:
- *    savedById matched every copy, the type never changed, and each clone cost
- *    nothing while still eating a tile and an obstacle slot. It also confused
- *    finishRaid, where destroying that one id deleted every clone at once.
- */
-/**
  * What taking something down pays back, as a share of what it cost.
  * Mirrored in src/game/placements.ts (REFUND_RATE), which shows the player
  * the number before they commit to it.
@@ -805,15 +777,21 @@ const REFUND_RATE = 1;
  * If this returned an empty corridor instead, the first save after the
  * change would read every tile as newly dug and bill for the whole room.
  */
-/** The straight corridor a brand new dungeon is handed. */
+/**
+ * What a brand new dungeon is handed: the door, the core, and solid rock in
+ * between.
+ *
+ * Mirrors startingDig in src/game/dig.ts. It used to be a corridor joining
+ * the two, which handed the player the one dungeon shape nobody would have
+ * chosen and made digging feel like editing somebody elses work.
+ */
 function startingDig(arena) {
   const entrance = entranceOf(arena);
   const core = coreOf(arena);
-  const tiles = [];
-  for (let y = entrance.y; y <= core.y; y++) {
-    tiles.push({ id: "d" + entrance.x + "," + y, type: "dig", x: entrance.x, y: y });
-  }
-  return tiles;
+  return [
+    { id: "d" + entrance.x + "," + entrance.y, type: "dig", x: entrance.x, y: entrance.y },
+    { id: "d" + core.x + "," + core.y, type: "dig", x: core.x, y: core.y },
+  ];
 }
 
 function dugOf(dungeon, arena) {
@@ -832,12 +810,11 @@ function dugOf(dungeon, arena) {
     return tiles;
   }
 
-  const entrance = entranceOf(arena);
-  const core = coreOf(arena);
-  for (let y = entrance.y; y <= core.y; y++) {
-    tiles.push({ id: "d" + entrance.x + "," + y, type: "dig", x: entrance.x, y: y });
-  }
-  return tiles;
+  // Nothing was ever built in it, so there is nothing to carry across and
+  // it starts where a new dungeon starts. Mirrors the client exactly: if
+  // the two disagreed, the first save would price the difference and hand
+  // out - or take - gold for tiles nobody touched.
+  return startingDig(arena);
 }
 
 /** Whether the door can reach the core through what has been dug. */
@@ -918,40 +895,6 @@ function refundFor(next, saved, prices) {
   return Math.floor(value * REFUND_RATE);
 }
 
-function priceObstacles(next, saved, arena, research, occupied, entitlements) {
-  if (!Array.isArray(next)) throw new Error("BAD_OBSTACLES");
-  const cap = maxObstaclesFor(research, entitlements);
-  if (next.length > cap) throw new Error("TOO_MANY_OBSTACLES");
-
-  const savedById = new Map((saved || []).map((o) => [o.id, o]));
-  const seenIds = new Set();
-  let cost = 0;
-
-  for (const o of next) {
-    if (!o || typeof o.id !== "string") throw new Error("BAD_OBSTACLE_ID");
-    if (seenIds.has(o.id)) throw new Error("DUPLICATE_OBSTACLE_ID");
-    seenIds.add(o.id);
-
-    const price = priceOf(OBSTACLE_COST, o.type);
-    if (price === null) throw new Error("UNKNOWN_OBSTACLE");
-
-    if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) {
-      throw new Error("OUT_OF_BOUNDS");
-    }
-    if (o.x < 0 || o.y < 0 || o.x >= arena.w || o.y >= arena.h) {
-      throw new Error("OUT_OF_BOUNDS");
-    }
-    const key = `${o.x},${o.y}`;
-    if (occupied.has(key)) throw new Error("TILE_OCCUPIED");
-    occupied.add(key);
-
-    const previous = savedById.get(o.id);
-    if (!previous || previous.type !== o.type) cost += price;
-  }
-
-  return cost;
-}
-
 /**
  * Rebuilds the minion list from trusted fields.
  *
@@ -1024,7 +967,6 @@ function resolveConversions(dungeon, arena, now) {
   const occupied = {};
   for (const minion of dungeon.minions || []) occupied[minion.x + ":" + minion.y] = true;
   for (const trap of dungeon.traps || []) occupied[trap.x + ":" + trap.y] = true;
-  for (const obstacle of dungeon.obstacles || []) occupied[obstacle.x + ":" + obstacle.y] = true;
 
   // Derived from the arena, not read off the save: a dungeon whose stored core
   // was left behind by an expansion would otherwise reserve the wrong tile and
@@ -1035,17 +977,15 @@ function resolveConversions(dungeon, arena, now) {
   occupied[entrance.x + ":" + entrance.y] = true;
   occupied[core.x + ":" + core.y] = true;
 
-  // Converts appear in a jail if there is room, otherwise on any free tile —
-  // the whole arena is floor now, so every tile is a candidate.
+  // Converts appear in a jail if there is room, otherwise on any free tile
+  // that has been dug out. Rock is not a candidate: a convert standing in
+  // undug stone would be a minion no raid can ever reach or fight.
   const preferred = [];
   for (const room of dungeon.rooms || []) {
     if (room.type !== "jail") continue;
     for (const tile of roomTiles(room)) preferred.push(tile);
   }
-  const fallback = [];
-  for (let y = 0; y < arena.h; y++) {
-    for (let x = 0; x < arena.w; x++) fallback.push({ x, y });
-  }
+  const fallback = dugOf(dungeon, arena).map((tile) => ({ x: tile.x, y: tile.y }));
 
   function freeTile() {
     for (const tile of preferred.concat(fallback)) {
@@ -1093,43 +1033,9 @@ function resolveConversions(dungeon, arena, now) {
 }
 
 /**
- * Drops entries whose id was already seen, keeping the first of each.
- *
- * priceObstacles rejects a list containing a repeated id, and it is right to:
- * one saved wall listed twice used to cost nothing for the second copy while
- * still eating a tile and a cap slot. But saveDungeon re-prices the *whole*
- * obstacle list on every save, so a duplicate that is already sitting in
- * storage makes that dungeon permanently unsaveable — every save after it is
- * refused, including edits that touch no obstacle at all. Such saves exist:
- * the client seeds its id counter from the number of items rather than the
- * highest suffix in use, so deleting obstacles and placing more regenerates an
- * id, and before the guard those saves were written out silently. The client
- * deletes obstacles by tile, not by id, so the player cannot see or clear it.
- *
- * De-duplicating on load makes those saves repair themselves: loadGame writes
- * the cleaned dungeon straight back, so the very next save prices a list the
- * guard accepts. First occurrence wins, for three reasons — it is the older,
- * already-paid-for wall rather than the one the recycled counter produced; it
- * leaves the layout the player has been looking at where it was instead of
- * teleporting a wall to the newer tile; and it is stable, so loading twice
- * converges on the same dungeon.
- */
-function dedupeById(list) {
-  const seen = new Set();
-  const out = [];
-  for (const item of list) {
-    if (!item || typeof item.id !== "string" || seen.has(item.id)) continue;
-    seen.add(item.id);
-    out.push(item);
-  }
-  return out;
-}
-
-/**
- * Version 1 carved corridors out of rock. Version 2 has no terrain, so the
- * grid is simply dropped — every placement sat on carved floor, and the
- * whole room is floor now, so all coordinates stay valid. Nobody loses a
- * dungeon, gold, or a research node.
+ * Version 1 kept its terrain in a `grid`, which is simply dropped: what a
+ * dungeon has dug is derived by dugOf instead, and every placement keeps
+ * its coordinates. Nobody loses a dungeon, gold, or a research node.
  *
  * Anything that isn't version 1 or the current version is unreadable and
  * comes back as null, so loadGame replaces it with a fresh dungeon instead
@@ -1143,7 +1049,6 @@ function migrate(dungeon) {
   return {
     ...rest,
     version: SAVE_VERSION,
-    obstacles: [],
     milestonesSeen: [],
     minions: transposeAll(rest.minions),
     traps: transposeAll(rest.traps),
@@ -1179,7 +1084,6 @@ function createDefaultDungeon() {
   return {
     version: SAVE_VERSION,
     dug: startingDig(arenaFor([])),
-    obstacles: [],
     milestonesSeen: [],
     minions: [],
     traps: [],
@@ -1218,11 +1122,6 @@ class Server {
     const dungeon = state && state.dungeon ? migrate(state.dungeon) : null;
 
     if (dungeon) {
-      if (!Array.isArray(dungeon.obstacles)) dungeon.obstacles = [];
-      // Alongside the coercions rather than after them: a stored duplicate
-      // obstacle id is exactly as unsaveable as a missing array, and the
-      // player has no way to clear one from inside the game. See dedupeById.
-      dungeon.obstacles = dedupeById(dungeon.obstacles);
       if (!Array.isArray(dungeon.minions)) dungeon.minions = [];
       if (!Array.isArray(dungeon.traps)) dungeon.traps = [];
       if (!Array.isArray(dungeon.rooms)) dungeon.rooms = [];
@@ -1346,7 +1245,6 @@ class Server {
     const nextRooms = payload.rooms || prev.rooms || [];
     const nextTraps = payload.traps || prev.traps || [];
     const nextMinions = payload.minions || prev.minions || [];
-    const nextObstacles = payload.obstacles || prev.obstacles || [];
     const nextDug = payload.dug || dugOf(prev, arena);
 
     // Locked content cannot be placed, whatever the client sends.
@@ -1365,8 +1263,8 @@ class Server {
 
     // Everything is priced against the same arena, and one occupant ever
     // holds a tile. The entrance and core are claimed before anything else,
-    // so a room, trap, minion or obstacle can never land on either. Rooms
-    // claim their tiles first, then traps, then minions, then obstacles.
+    // so a room, trap or minion can never land on either. Rooms claim their
+    // tiles first, then traps, then minions.
     // Both come from the arena, never from the stored fields — a save carrying
     // a stale core would otherwise reserve a tile the client does not draw a
     // core on, refusing a legal placement while leaving the real core buildable.
@@ -1389,26 +1287,16 @@ class Server {
       claimed,
       effects.minionCap,
     );
-    const obstacleCost = priceObstacles(
-      nextObstacles,
-      prev.obstacles || [],
-      arena,
-      research,
-      claimed,
-      owned,
-    );
-
     const digCost = priceDug(nextDug, dugOf(prev, arena), arena);
 
     // What the player cleared since the last save comes back in full. The
     // two are settled against each other rather than paid separately, so a
-    // save that swaps one wall for another moves the difference and nothing
-    // more.
+    // save that swaps one minion for another moves the difference and
+    // nothing more.
     const refund =
       refundFor(nextRooms, prev.rooms || [], ROOM_COST) +
       refundFor(nextTraps, prev.traps || [], TRAP_COST) +
       refundFor(nextMinions, prev.minions || [], MINION_COST) +
-      refundFor(nextObstacles, prev.obstacles || [], OBSTACLE_COST) +
       // Rock put back pays the same way anything else cleared does. Keyed on
       // the tile, since a dug tile has no type to price by.
       (function () {
@@ -1421,7 +1309,7 @@ class Server {
         return Math.floor(back * REFUND_RATE);
       })();
 
-    const cost = roomCost + trapCost + minionCost + obstacleCost + digCost - refund;
+    const cost = roomCost + trapCost + minionCost + digCost - refund;
     if (cost > 0) {
       const affordable = await $asset.has("gold", cost);
       if (!affordable) throw new Error("INSUFFICIENT_GOLD");
@@ -1434,7 +1322,6 @@ class Server {
     const dungeon = {
       version: SAVE_VERSION,
       dug: nextDug,
-      obstacles: nextObstacles,
       minions: sanitizeMinions(nextMinions, prev.minions || [], prev.loot || []),
       traps: nextTraps,
       rooms: nextRooms,
@@ -1461,7 +1348,6 @@ class Server {
 
     return {
       ok: true,
-      obstacleCost,
       minionCost,
       trapCost,
       roomCost,
@@ -1478,9 +1364,9 @@ class Server {
 
   /**
    * Opens a raid. The party is built here, not on the client, so a player
-   * cannot pick an easy wave. A sealed room — no route from entrance to core —
-   * is a legal, and expensive, way to buy time: the party simply breaks
-   * through the nearest obstacle once the raid runs.
+   * cannot pick an easy wave. A dungeon whose door does not reach its core is
+   * refused rather than fought: nothing in the game breaks rock, so such a
+   * raid could never resolve.
    */
   async startRaid() {
     const state = await $global.getMyState();
@@ -1579,7 +1465,6 @@ class Server {
     killedIds,
     capturedIds,
     lostMinionIds,
-    destroyedObstacleIds,
   }) {
     const state = await $global.getMyState();
     if (!state || !state.dungeon) throw new Error("NO_SAVE");
@@ -1696,14 +1581,6 @@ class Server {
         : { ...minion, revivesAt: now + downTime },
     );
 
-    // Walls the party broke through to reach the core are gone for good —
-    // removing an obstacle refunds nothing, so a client that lies here only
-    // destroys its own walls and pays to rebuild them.
-    const destroyed = new Set(
-      Array.isArray(destroyedObstacleIds) ? destroyedObstacleIds : [],
-    );
-    dungeon.obstacles = (dungeon.obstacles || []).filter((o) => !destroyed.has(o.id));
-
     const threatDelta =
       (outcome === "repelled" ? 1 : -1) +
       (outcome === "repelled" ? effects.treasuryCount * TREASURY_THREAT : 0);
@@ -1727,7 +1604,6 @@ class Server {
       wavesRepelled: dungeon.wavesRepelled,
       coreBreaches: dungeon.coreBreaches,
       minions: dungeon.minions,
-      obstacles: dungeon.obstacles,
       loot: dungeon.loot,
       lootGained,
       prisoners: dungeon.prisoners || [],

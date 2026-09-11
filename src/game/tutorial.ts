@@ -1,7 +1,6 @@
-import type { PlacedMinion, PlacedObstacle, PlacedTrap } from "./types";
+import type { PlacedMinion, PlacedTrap } from "./types";
 
 export interface TutorialContext {
-  obstacles: PlacedObstacle[];
   entrance: { x: number; y: number } | null;
   core: { x: number; y: number } | null;
   minions: PlacedMinion[];
@@ -64,9 +63,9 @@ export interface TutorialStep {
  * works it out on their own is never told to do something they already did,
  * and reloading mid-way does not lose the thread.
  *
- * Each step is also two beats rather than one. "Place an obstacle" is a
- * sentence about the game; pointing at the barricade button and then at the
- * floor is the game telling you where to put your thumb. The steps that place
+ * Each step is also two beats rather than one. "Dig a corridor" is a
+ * sentence about the game; pointing at the dig button and then at the rock
+ * is the game telling you where to put your thumb. The steps that place
  * something say which tool to pick up, wait until it is in hand, and only then
  * ask for the tap — which is the order the player has to do it in anyway.
  */

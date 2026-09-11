@@ -23,19 +23,15 @@ import {
   MAX_ROOMS,
   MAX_TRAPS,
   MINION_COST,
-  OBSTACLE_COST,
   ROOM_COST,
   TRAP_COST,
-  maxObstaclesFor,
   type AdventurerRecord,
   type Dungeon,
   type Entitlements,
   type LoadResult,
   type LootItem,
   type MinionType,
-  type ObstacleType,
   type PlacedMinion,
-  type PlacedObstacle,
   type PlacedRoom,
   type PlacedTrap,
   type Prisoner,
@@ -84,7 +80,6 @@ function createLocalDungeon(): Dungeon {
   const now = Date.now();
   return {
     version: 2,
-    obstacles: [],
     minions: [],
     traps: [],
     rooms: [],
@@ -116,7 +111,6 @@ export function useDungeonSave() {
   const [gold, setGold] = useState(0);
   const [entitlements, setEntitlements] = useState<Entitlements>(EMPTY_ENTITLEMENTS);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [obstacles, setObstacles] = useState<PlacedObstacle[]>([]);
   const [minions, setMinions] = useState<PlacedMinion[]>([]);
   const [traps, setTraps] = useState<PlacedTrap[]>([]);
   const [rooms, setRooms] = useState<PlacedRoom[]>([]);
@@ -137,7 +131,6 @@ export function useDungeonSave() {
   const savedMinionsRef = useRef<PlacedMinion[]>([]);
   const savedTrapsRef = useRef<PlacedTrap[]>([]);
   const savedRoomsRef = useRef<PlacedRoom[]>([]);
-  const savedObstaclesRef = useRef<PlacedObstacle[]>([]);
 
   const minionsRef = useRef<PlacedMinion[]>([]);
   const lootRef = useRef<LootItem[]>([]);
@@ -145,13 +138,11 @@ export function useDungeonSave() {
   const savedDugRef = useRef<DugTile[]>([]);
   const trapsRef = useRef<PlacedTrap[]>([]);
   const roomsRef = useRef<PlacedRoom[]>([]);
-  const obstaclesRef = useRef<PlacedObstacle[]>([]);
   minionsRef.current = minions;
   lootRef.current = loot;
   dugRef.current = dug;
   trapsRef.current = traps;
   roomsRef.current = rooms;
-  obstaclesRef.current = obstacles;
 
   const entitlementsRef = useRef(entitlements);
   entitlementsRef.current = entitlements;
@@ -183,7 +174,8 @@ export function useDungeonSave() {
   }, [server]);
 
   const applyLoad = useCallback((result: LoadResult) => {
-    const loadedObstacles = result.dungeon.obstacles ?? [];
+    // Only ever read to work out what an uncarved dungeon had dug.
+    const legacyWalls = result.dungeon.obstacles ?? [];
 
     /*
      * A dungeon that predates the carving reads as one anyway.
@@ -198,8 +190,8 @@ export function useDungeonSave() {
     const loadedArena = arenaFor(result.dungeon.research ?? []);
     const loadedDug =
       result.dungeon.dug ??
-      (loadedObstacles.length > 0
-        ? digFromWalls(loadedArena, loadedObstacles)
+      (legacyWalls.length > 0
+        ? digFromWalls(loadedArena, legacyWalls)
         : startingDig(loadedArena));
     savedDugRef.current = loadedDug;
     setDug(loadedDug);
@@ -207,11 +199,9 @@ export function useDungeonSave() {
     const loadedTraps = result.dungeon.traps ?? [];
     const loadedRooms = result.dungeon.rooms ?? [];
 
-    savedObstaclesRef.current = loadedObstacles;
     savedMinionsRef.current = loadedMinions;
     savedTrapsRef.current = loadedTraps;
     savedRoomsRef.current = loadedRooms;
-    setObstacles(loadedObstacles);
     setMinions(loadedMinions);
     setTraps(loadedTraps);
     setRooms(loadedRooms);
@@ -227,7 +217,6 @@ export function useDungeonSave() {
     // deleted and can then regenerate an id still present in the save).
     seqRef.current = Math.max(
       seqRef.current,
-      maxIdSuffix(loadedObstacles.map((o) => o.id), "o"),
       maxIdSuffix(loadedMinions.map((m) => m.id), "m"),
       maxIdSuffix(loadedTraps.map((t) => t.id), "t"),
       maxIdSuffix(loadedRooms.map((r) => r.id), "r"),
@@ -292,13 +281,11 @@ export function useDungeonSave() {
       addCost(minionsRef.current, savedMinionsRef.current, MINION_COST) +
       addCost(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
       addCost(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
-      addCost(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST) +
       addCost(dugRef.current, savedDugRef.current, { dig: DIG_COST });
     const back =
       removedValue(minionsRef.current, savedMinionsRef.current, MINION_COST) +
       removedValue(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
       removedValue(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
-      removedValue(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST) +
       removedValue(dugRef.current, savedDugRef.current, { dig: DIG_COST });
     return added - back;
   }, []);
@@ -308,7 +295,6 @@ export function useDungeonSave() {
       !sameList(minionsRef.current, savedMinionsRef.current) ||
       !sameList(trapsRef.current, savedTrapsRef.current) ||
       !sameList(roomsRef.current, savedRoomsRef.current) ||
-      !sameList(obstaclesRef.current, savedObstaclesRef.current) ||
       !sameList(dugRef.current, savedDugRef.current)
     );
   }, []);
@@ -328,7 +314,6 @@ export function useDungeonSave() {
     const nextMinions = minionsRef.current;
     const nextTraps = trapsRef.current;
     const nextRooms = roomsRef.current;
-    const nextObstacles = obstaclesRef.current;
     const nextDug = dugRef.current;
 
     if (!HAS_VERSE) {
@@ -337,7 +322,6 @@ export function useDungeonSave() {
       savedMinionsRef.current = nextMinions;
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
-      savedObstaclesRef.current = nextObstacles;
       savedDugRef.current = nextDug;
       setLastSavedAt(Date.now());
       return;
@@ -349,7 +333,6 @@ export function useDungeonSave() {
       const result: SaveResult = await server.remoteFunction("saveDungeon", [
         {
           dug: nextDug,
-          obstacles: nextObstacles,
           minions: nextMinions,
           traps: nextTraps,
           rooms: nextRooms,
@@ -358,7 +341,6 @@ export function useDungeonSave() {
       savedMinionsRef.current = nextMinions;
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
-      savedObstaclesRef.current = nextObstacles;
       savedDugRef.current = nextDug;
       setGold(result.gold);
       setLastSavedAt(result.savedAt);
@@ -382,7 +364,7 @@ export function useDungeonSave() {
 
   /** Anything already standing on this tile — one occupant per tile. */
   const occupantAt = useCallback(
-    (x: number, y: number): "minion" | "trap" | "room" | "obstacle" | "terrain" | null => {
+    (x: number, y: number): "minion" | "trap" | "room" | "terrain" | null => {
       // Rock. Checked first and checked here, because this one function is
       // the gate every placement goes through - putting it anywhere else
       // means remembering it four times.
@@ -391,7 +373,6 @@ export function useDungeonSave() {
       if (minionsRef.current.some((m) => m.x === x && m.y === y)) return "minion";
       if (trapsRef.current.some((t) => t.x === x && t.y === y)) return "trap";
       if (roomsRef.current.some((r) => roomCovers(r, x, y))) return "room";
-      if (obstaclesRef.current.some((o) => o.x === x && o.y === y)) return "obstacle";
       return null;
     },
     [],
@@ -433,24 +414,6 @@ export function useDungeonSave() {
       return true;
     },
     [canAfford, occupantAt, isEntrance, isCore, unlocked.unlockedTraps],
-  );
-
-  const placeObstacle = useCallback(
-    (type: ObstacleType, x: number, y: number): boolean => {
-      const arena = arenaRef.current;
-      if (!inArena(arena, x, y)) return false;
-      // The two tiles the whole game is measured between stay clear.
-      if (isEntrance(x, y) || isCore(x, y)) return false;
-      if (occupantAt(x, y)) return false;
-      if (obstaclesRef.current.length >= maxObstaclesFor(researchRef.current, entitlementsRef.current)) return false;
-      if (!canAfford(OBSTACLE_COST[type])) return false;
-
-      seqRef.current += 1;
-      setObstacles([...obstaclesRef.current, { id: `o${seqRef.current}`, type, x, y }]);
-      setGold((current) => current - OBSTACLE_COST[type]);
-      return true;
-    },
-    [canAfford, occupantAt, isEntrance, isCore],
   );
 
   /** Rooms anchor at (x, y) and claim a 2x2 block of corridor. */
@@ -582,22 +545,19 @@ export function useDungeonSave() {
      *
      * Priced from what is actually standing there rather than from the tool
      * in hand, because the remove tool clears whatever it lands on and the
-     * four things it can land on do not cost the same.
+     * three things it can land on do not cost the same.
      */
     const minion = minionsRef.current.find((m) => m.x === x && m.y === y);
     const trap = trapsRef.current.find((t) => t.x === x && t.y === y);
     const room = roomsRef.current.find((r) => roomCovers(r, x, y));
-    const obstacle = obstaclesRef.current.find((o) => o.x === x && o.y === y);
     const back =
       (minion ? Math.floor(MINION_COST[minion.type] * REFUND_RATE) : 0) +
       (trap ? Math.floor(TRAP_COST[trap.type] * REFUND_RATE) : 0) +
-      (room ? Math.floor(ROOM_COST[room.type] * REFUND_RATE) : 0) +
-      (obstacle ? Math.floor(OBSTACLE_COST[obstacle.type] * REFUND_RATE) : 0);
+      (room ? Math.floor(ROOM_COST[room.type] * REFUND_RATE) : 0);
 
     setMinions((current) => current.filter((m) => !(m.x === x && m.y === y)));
     setTraps((current) => current.filter((t) => !(t.x === x && t.y === y)));
     setRooms((current) => current.filter((r) => !roomCovers(r, x, y)));
-    setObstacles((current) => current.filter((o) => !(o.x === x && o.y === y)));
     if (back > 0) setGold((current) => current + back);
     return true;
   }, [occupantAt]);
@@ -676,18 +636,6 @@ export function useDungeonSave() {
     [],
   );
 
-  /**
-   * Drops obstacles a raid destroyed from local state, matching the server
-   * (which already removed them in finishRaid) so the board never disagrees
-   * with the save until the next reload.
-   */
-  const clearDestroyedObstacles = useCallback((ids: string[]): void => {
-    if (ids.length === 0) return;
-    const destroyed = new Set(ids);
-    savedObstaclesRef.current = savedObstaclesRef.current.filter((o) => !destroyed.has(o.id));
-    setObstacles((current) => current.filter((o) => !destroyed.has(o.id)));
-  }, []);
-
   const refreshEntitlements = useCallback(async (): Promise<void> => {
     if (!HAS_VERSE) return;
     try {
@@ -735,7 +683,7 @@ export function useDungeonSave() {
     if (!HAS_VERSE) return;
     const timer = window.setTimeout(() => void saveNow(), 700);
     return () => window.clearTimeout(timer);
-  }, [minions, traps, rooms, obstacles, saveNow]);
+  }, [minions, traps, rooms, dug, saveNow]);
 
   // Autosave, and save when the tab goes away.
   useEffect(() => {
@@ -758,7 +706,6 @@ export function useDungeonSave() {
     arena,
     gold,
     entitlements,
-    obstacles,
     minions,
     traps,
     rooms,
@@ -785,7 +732,6 @@ export function useDungeonSave() {
     placeMinion,
     placeTrap,
     placeRoom,
-    placeObstacle,
     dig,
     /** Whether the door can reach the core: what a raid needs. */
     connected: connects(arena, dug),
@@ -798,7 +744,6 @@ export function useDungeonSave() {
     applyRaidResult,
     /** For anything that mints gold server-side and hands back the new total. */
     setGoldFromServer: setGold,
-    clearDestroyedObstacles,
     saveNow,
     resetGame,
     refreshEntitlements,

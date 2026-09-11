@@ -80,50 +80,6 @@ export interface PlacedRoom {
 
 export const ROOM_SIZE = 2;
 
-/** A wall the player puts down. Adventurers only attack one when sealed in. */
-export type ObstacleType = "barricade" | "wall";
-
-export interface PlacedObstacle {
-  id: string;
-  type: ObstacleType;
-  x: number;
-  y: number;
-}
-
-/** Kept in sync with server.js. */
-export const OBSTACLE_COST: Record<ObstacleType, number> = {
-  barricade: 12,
-  wall: 35,
-};
-
-export const BASE_MAX_OBSTACLES = 20;
-
-/**
- * How many obstacles may stand at once.
- *
- * The budget rides on the expansion research rather than nodes of its own: a
- * bigger room with the same wall budget makes the maze thinner, not deeper, so
- * the two numbers have to move together.
- */
-export function maxObstaclesFor(research: string[], entitlements?: Entitlements): number {
-  let cap = BASE_MAX_OBSTACLES;
-  if (research.includes("expand1")) cap = 28;
-  if (research.includes("expand2")) cap = 36;
-  // Mirrors ENTITLEMENT_OBSTACLES in server.js. The server's answer wins.
-  if (entitlements && entitlements.extraObstacles) cap += 8;
-  return cap;
-}
-
-export const OBSTACLE_LABEL: Record<ObstacleType, StringKey> = {
-  barricade: "obstacle_barricade",
-  wall: "obstacle_wall",
-};
-
-export const OBSTACLE_DESCRIPTION: Record<ObstacleType, StringKey> = {
-  barricade: "obstacle_barricade_desc",
-  wall: "obstacle_wall_desc",
-};
-
 export type WardenSkill = "blessing" | "rally" | "detonate";
 
 export type AdventurerClass = "knight" | "barbarian" | "rogue" | "mage" | "ranger";
@@ -186,7 +142,13 @@ export interface Dungeon {
    * room was carved rather than built, and derived from `obstacles` then.
    */
   dug?: DugTile[];
-  obstacles: PlacedObstacle[];
+  /**
+   * The walls a dungeon was built with before it was carved.
+   *
+   * Read once, to work out what such a save had dug, and never written
+   * again — see digFromWalls. Nothing in the game places one any more.
+   */
+  obstacles?: Array<{ id: string; type: string; x: number; y: number }>;
   minions: PlacedMinion[];
   traps: PlacedTrap[];
   rooms: PlacedRoom[];

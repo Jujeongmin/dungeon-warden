@@ -1,7 +1,7 @@
 /**
- * Shared rules for the four things a player puts down: minions, traps,
- * rooms and obstacles. All four price the same way, so the logic lives here
- * instead of being written out once per collection.
+ * Shared rules for the things a player puts down: dug tiles, minions, traps
+ * and rooms. They all price the same way, so the logic lives here instead of
+ * being written out once per collection.
  */
 export interface Placed {
   id: string;

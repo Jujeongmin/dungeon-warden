@@ -3,10 +3,10 @@ import type { Point } from "./sim/pathfinding";
 /**
  * The room the whole game happens in.
  *
- * There is no terrain any more: every tile inside the rectangle is floor, and
- * the only thing that stops a walker is an obstacle the player put there. Size
- * comes from research rather than the save, so a dungeon cannot claim to be
- * bigger than what its owner has unlocked.
+ * The rectangle is the outer edge of the rock, not a floor: what a walker may
+ * enter is whatever the player has dug out of it. Size comes from research
+ * rather than the save, so a dungeon cannot claim to be bigger than what its
+ * owner has unlocked.
  */
 export interface Arena {
   w: number;
@@ -41,13 +41,13 @@ export function blockedKey(x: number, y: number, w: number): number {
   return y * w + x;
 }
 
-/** The coordinates a walker cannot enter, as flat keys for cheap lookup. */
+/** The given coordinates as flat keys, for cheap lookup. */
 export function blockedSet(
   arena: Arena,
-  obstacles: Array<{ x: number; y: number }>,
+  tiles: Array<{ x: number; y: number }>,
 ): Set<number> {
   const set = new Set<number>();
-  for (const o of obstacles) set.add(blockedKey(o.x, o.y, arena.w));
+  for (const tile of tiles) set.add(blockedKey(tile.x, tile.y, arena.w));
   return set;
 }
 

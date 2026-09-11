@@ -11,7 +11,6 @@ import { watchReviveAd } from "./ads";
 import type { DungeonMeta } from "./useDungeonSave";
 import type {
   PlacedMinion,
-  PlacedObstacle,
   PlacedRoom,
   PlacedTrap,
   RaidFinishResult,
@@ -40,7 +39,6 @@ const DECISIVE_EVENTS = new Set<SimEvent["kind"]>([
   "killed",
   "captured",
   "minionDown",
-  "obstacleDown",
 ]);
 
 export const RAID_SPEEDS = [1, 2, 4] as const;
@@ -54,7 +52,6 @@ interface Options {
   minions: PlacedMinion[];
   traps: PlacedTrap[];
   rooms: PlacedRoom[];
-  obstacles: PlacedObstacle[];
   /** Every tile taken out of the rock: how far the garrison is spread. */
   dug: DugTile[];
   /** The rock: every tile nobody dug out. */
@@ -64,12 +61,6 @@ interface Options {
   weaponTiers: Record<string, number>;
   research: ResearchEffects;
   onFinished: (result: RaidFinishResult) => void;
-  /**
-   * Walls the party broke through to reach the core are gone for good. The
-   * server already drops them in `finishRaid`; this keeps local state from
-   * disagreeing with the save until the next reload.
-   */
-  onObstaclesDestroyed: (ids: string[]) => void;
   /** Where the speed control starts, remembered from last session. */
   initialSpeed?: RaidSpeed;
 }
@@ -87,7 +78,6 @@ export function useRaid({
   minions,
   traps,
   rooms,
-  obstacles,
   dug,
   terrain,
   effects,
@@ -95,7 +85,6 @@ export function useRaid({
   weaponTiers,
   research,
   onFinished,
-  onObstaclesDestroyed,
   onEvents,
   initialSpeed,
 }: Options) {
@@ -135,11 +124,8 @@ export function useRaid({
       settlingRef.current = true;
 
       const raidId = raidIdRef.current;
-      const destroyedObstacleIds = simRef.current?.destroyedObstacleIds ?? [];
       simRef.current = null;
       raidIdRef.current = null;
-
-      onObstaclesDestroyed(destroyedObstacleIds);
 
       const outcome = finalState.status === "breached" ? "breached" : "repelled";
       const lostMinionIds = finalState.minions.filter((m) => !m.alive).map((m) => m.id);
@@ -172,7 +158,6 @@ export function useRaid({
             killedIds: finalState.killedIds,
             capturedIds: finalState.capturedIds,
             lostMinionIds,
-            destroyedObstacleIds,
           },
         ]);
         setResult(finish);
@@ -183,7 +168,7 @@ export function useRaid({
         settlingRef.current = false;
       }
     },
-    [server, onFinished, onObstaclesDestroyed],
+    [server, onFinished],
   );
 
   // Fixed-step loop, keyed on the run id so it starts once per raid instead of
@@ -251,8 +236,8 @@ export function useRaid({
    *
    * The player is editing React state the same way they do outside a raid,
    * and the simulation is a separate object that was handed a snapshot when
-   * it started - so without this the wall goes up on screen and the next wave
-   * walks straight through where it is drawn.
+   * it started - so without this a minion posted during the window stands on
+   * screen and the next wave walks straight past where it is drawn.
    *
    * Guarded inside syncPlacements rather than here as well: the only thing
    * this effect knows is that something changed, and whether that is allowed
@@ -260,8 +245,8 @@ export function useRaid({
    */
   useEffect(() => {
     if (!intermissionOpen) return;
-    simRef.current?.syncPlacements(minions, traps, obstacles, weaponTiers);
-  }, [intermissionOpen, minions, traps, obstacles, weaponTiers]);
+    simRef.current?.syncPlacements(minions, traps, weaponTiers);
+  }, [intermissionOpen, minions, traps, weaponTiers]);
 
   const startRaid = useCallback(async (): Promise<void> => {
     if (!meta || starting || simRef.current) return;
@@ -312,7 +297,6 @@ export function useRaid({
       const sim = new RaidSim({
         minions: minions.filter((m) => available.has(m.id)),
         traps,
-        obstacles,
         party: start.party,
         // Absent from a server that predates waves; the simulation then runs
         // the single party as a one-wave raid, exactly as it used to.
@@ -351,7 +335,6 @@ export function useRaid({
     minions,
     traps,
     rooms,
-    obstacles,
     effects.trapCooldownScale,
     jailFree,
     weaponTiers,

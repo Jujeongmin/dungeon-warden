@@ -5,7 +5,7 @@ export interface Point {
   y: number;
 }
 
-/** A tile is walkable unless an obstacle stands on it. There is no terrain. */
+/** A tile is walkable unless it is still rock. */
 function walkable(arena: Arena, x: number, y: number, blocked: Set<number>): boolean {
   if (!inArena(arena, x, y)) return false;
   return !blocked.has(blockedKey(x, y, arena.w));
@@ -14,10 +14,10 @@ function walkable(arena: Arena, x: number, y: number, blocked: Set<number>): boo
 /**
  * 4-directional A* over walkable tiles.
  *
- * Returns the tile sequence from `start` to `goal` inclusive, or null when the
- * player has walled the core off completely. A null path does not stop a
- * raid: the caller has adventurers break through the nearest obstacle
- * instead, which is what stops a sealed dungeon from being a free win.
+ * Returns the tile sequence from `start` to `goal` inclusive, or null when
+ * there is no corridor joining the two. Null is not a game state during a
+ * raid - nothing can be dug or filled while one is running, and a raid is
+ * refused unless the door already reaches the core.
  */
 export function findPath(arena: Arena, start: Point, goal: Point, blocked: Set<number>): Point[] | null {
   if (!walkable(arena, start.x, start.y, blocked) || !walkable(arena, goal.x, goal.y, blocked)) {

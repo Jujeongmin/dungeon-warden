@@ -152,7 +152,7 @@ describe("the champion in the simulation", () => {
   it("arrives with the health the bonus says, not the level alone", () => {
     const arena = arenaFor([]);
     const sim = new RaidSim({
-      minions: [], traps: [], obstacles: [], arena,
+      minions: [], traps: [], arena,
       entrance: entranceOf(arena), core: coreOf(arena), lures: [], seed: 1,
       party: [
         { id: "boss", cls: "knight", name: "Aldric", level: 4, champion: true },

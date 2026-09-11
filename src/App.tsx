@@ -2,13 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DungeonRenderer,
   type MarkerView,
-  type ObstacleView,
   type UnitView,
 } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
-import { OBSTACLE_STATS } from "./game/sim/obstacles";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
 import { blockedKey, coreOf, entranceOf, inArena } from "./game/arena";
@@ -43,7 +41,6 @@ import {
   MAX_TRAPS,
   MINION_COST,
   MINION_LABEL,
-  OBSTACLE_LABEL,
   ROOM_COST,
   ROOM_DESCRIPTION,
   ROOM_LABEL,
@@ -239,7 +236,6 @@ export default function App() {
   const save = useDungeonSave();
   const {
     arena,
-    obstacles,
     dug,
     connected,
     gold,
@@ -364,9 +360,6 @@ export default function App() {
         renderer.spawnRing(event.x, event.y, 0x9d8bd8);
         renderer.knockbackUnit(`m:${event.targetId}`);
         audio.play("minionDown", 120);
-      } else if (event.kind === "obstacleDown") {
-        renderer.shake(0.45); // a wall coming down is the biggest thump here
-        audio.play("wallDown", 0);
       } else if (event.kind === "captured" || event.kind === "killed") {
         renderer.spawnRing(event.x, event.y, event.kind === "captured" ? 0x7fc98a : 0xd86a4c);
         // The two ways an adventurer leaves the board sound different, because
@@ -403,7 +396,6 @@ export default function App() {
     minions,
     traps,
     rooms,
-    obstacles,
     dug,
     terrain,
     effects,
@@ -411,7 +403,6 @@ export default function App() {
     weaponTiers,
     research: unlocked,
     onFinished: save.applyRaidResult,
-    onObstaclesDestroyed: save.clearDestroyedObstacles,
   });
 
   const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "remove" as const };
@@ -550,7 +541,8 @@ export default function App() {
 
     if (!ok) audio.play("error");
     else {
-      audio.play("place");
+      // Moving rock sounds like rock; everything else is set down on it.
+      audio.play(tool.kind === "dig" || tool.kind === "fill" ? "dig" : "place");
       // Building is the answer to the map, so the map steps aside for the
       // route the change just altered.
       if (showAftermath) {
@@ -576,7 +568,7 @@ export default function App() {
     if (raid.raiding) return;
     const ok =
       tool.kind === "dig" ? save.dig(x, y) : tool.kind === "fill" ? save.fill(x, y) : false;
-    if (ok) audio.play("place");
+    if (ok) audio.play("dig");
   };
 
   const altRef = useRef<(x: number, y: number, sx: number, sy: number) => void>(() => {});
@@ -588,7 +580,6 @@ export default function App() {
     const minion = minions.find((m) => m.x === x && m.y === y);
     const trap = traps.find((entry) => entry.x === x && entry.y === y);
     const room = rooms.find((r) => roomCovers(r, x, y));
-    const obstacle = obstacles.find((o) => o.x === x && o.y === y);
 
     const label = minion
       ? t(MINION_LABEL[minion.type] as StringKey)
@@ -596,9 +587,7 @@ export default function App() {
         ? t(TRAP_LABEL[trap.type] as StringKey)
         : room
           ? t(ROOM_LABEL[room.type] as StringKey)
-          : obstacle
-            ? t(OBSTACLE_LABEL[obstacle.type] as StringKey)
-            : null;
+          : null;
 
     if (!label) {
       setRemovePrompt(null);
@@ -773,20 +762,6 @@ export default function App() {
     return list;
   }, [traps, rooms]);
 
-  // During a raid the simulation owns obstacle HP as they get chopped down;
-  // otherwise the placed roster is shown whole, mirroring the `units` memo.
-  const obstacleViews: ObstacleView[] = useMemo(() => {
-    if (raid.raidState) {
-      return raid.raidState.obstacles
-        .filter((o) => o.alive)
-        .map((o) => ({ id: o.id, type: o.type, x: o.x, y: o.y, hp: o.hp, maxHp: o.maxHp }));
-    }
-    return obstacles.map((o) => {
-      const stats = OBSTACLE_STATS[o.type];
-      return { id: o.id, type: o.type, x: o.x, y: o.y, hp: stats.hp, maxHp: stats.hp };
-    });
-  }, [raid.raidState, obstacles]);
-
   /**
    * The preview of what the next tap will place.
    *
@@ -843,7 +818,7 @@ export default function App() {
 
       return !taken(x, y);
     },
-    [arena, entrance, core, terrain, meta, obstacles, minions, traps, rooms, tool],
+    [arena, entrance, core, terrain, meta, minions, traps, rooms, tool],
   );
 
   useEffect(() => {
@@ -896,7 +871,7 @@ export default function App() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [hudOpen, tab, obstacles.length, minions.length, traps.length, rooms.length, research.length]);
+  }, [hudOpen, tab, minions.length, traps.length, rooms.length, research.length]);
 
   useEffect(() => {
     rendererRef.current?.setUnits(units);
@@ -906,10 +881,6 @@ export default function App() {
     rendererRef.current?.setMarkers(markers);
   }, [markers]);
 
-  useEffect(() => {
-    rendererRef.current?.setObstacles(obstacleViews);
-  }, [obstacleViews]);
-
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
   useEffect(() => {
@@ -918,10 +889,10 @@ export default function App() {
       return;
     }
     rendererRef.current?.setPathPreview(
-      // Walls and scenery only - the same set the simulation routes against.
-      // Dropping a minion on the route no longer bends it, which is the whole
-      // point: the line stays where it is and the minion is now standing on
-      // it, waiting to be walked into.
+      // The rock only - the same set the simulation routes against. Dropping
+      // a minion on the route does not bend it, which is the whole point: the
+      // line stays where it is and the minion is now standing on it, waiting
+      // to be walked into.
       buildRaidPath(
         arena,
         entrance,
@@ -930,21 +901,22 @@ export default function App() {
         new Set(terrain),
       ),
     );
-  }, [arena, entrance, core, terrain, obstacles, meta, rooms, raid.raiding, showAftermath]);
+  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, showAftermath]);
 
   /*
-   * What the route becomes if the wall under the cursor goes up.
+   * What the route becomes if the tile under the cursor changes.
    *
-   * Only for walls: they are the only thing that shapes the route now, so a
-   * minion or a trap under the cursor has nothing to preview. Only when the
-   * tile would actually take the placement, or it would be answering a
-   * question the player cannot ask.
+   * Only for the two tools that move rock: rock is the only thing that
+   * shapes a route, so a minion or a trap under the cursor has nothing to
+   * preview. Only when the tile would actually take the change, or it would
+   * be answering a question the player cannot ask.
    */
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    if (!meta || raid.raiding || !hover || tool.kind !== "obstacle" || !ghostLegal(hover.x, hover.y)) {
+    const moves = tool.kind === "dig" || tool.kind === "fill";
+    if (!meta || raid.raiding || !hover || !moves || !ghostLegal(hover.x, hover.y)) {
       renderer.setPathGhost(null);
       return;
     }
@@ -954,10 +926,11 @@ export default function App() {
       arena, entrance, core, lures,
       new Set(terrain),
     );
-    const after = buildRaidPath(
-      arena, entrance, core, lures,
-      new Set([...terrain, blockedKey(hover.x, hover.y, arena.w)]),
-    );
+    // Digging takes the tile out of the rock; filling puts it back in.
+    const rock = new Set(terrain);
+    if (tool.kind === "dig") rock.delete(blockedKey(hover.x, hover.y, arena.w));
+    else rock.add(blockedKey(hover.x, hover.y, arena.w));
+    const after = buildRaidPath(arena, entrance, core, lures, rock);
 
     /*
      * Only when it would actually change something.
@@ -973,7 +946,7 @@ export default function App() {
       now.every((step, i) => step.x === after[i].x && step.y === after[i].y);
 
     renderer.setPathGhost(same ? null : after);
-  }, [hover, tool, meta, raid.raiding, arena, entrance, core, terrain, obstacles, rooms, ghostLegal]);
+  }, [hover, tool, meta, raid.raiding, arena, entrance, core, terrain, rooms, ghostLegal]);
 
   /**
    * Paint the aftermath when the fighting stops; wipe it when it starts again.
@@ -1036,9 +1009,8 @@ export default function App() {
 
   useEffect(() => {
     installDevTools({
-      arena, obstacles, minions, traps, rooms, loot, prisoners, adventurers,
+      arena, minions, traps, rooms, loot, prisoners, adventurers,
       research, unlocked, effects, jailFree, meta, gold,
-      placeObstacle: save.placeObstacle,
       placeMinion: save.placeMinion,
       placeTrap: save.placeTrap,
       placeRoom: save.placeRoom,
@@ -1121,7 +1093,6 @@ export default function App() {
   const spread = garrisonScale(dug.length);
 
   const guide = guideFor({
-    obstacles,
     entrance,
     core,
     minions,

@@ -13,7 +13,7 @@ import { publicUrl } from "./assets/publicUrl";
 export type Cue =
   | "click"
   | "place"
-  | "wallDown"
+  | "dig"
   | "minionDown"
   | "captured"
   | "error"
@@ -41,8 +41,8 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 180, to: 260, seconds: 0.09, type: "triangle", gain: 0.09 },
     { from: 90, seconds: 0.14, type: "sine", gain: 0.07 },
   ],
-  // A wall coming down: the lowest, longest thing in the mix.
-  wallDown: [
+  // Rock coming out: the lowest, longest thing in the mix.
+  dig: [
     { from: 150, to: 45, seconds: 0.34, type: "sawtooth", gain: 0.1 },
     { from: 70, to: 40, seconds: 0.5, type: "sine", gain: 0.08 },
   ],
@@ -79,7 +79,7 @@ const TONES: Record<Cue, ToneSpec[]> = {
 const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   click: [/click_00[12]/, /^click/, /select/, /^tick/],
   place: [/^drop_00/, /^switch/, /^bong/, /place/],
-  wallDown: [/^footstep/, /rubble/, /^rock/, /impact.*heavy/],
+  dig: [/rubble/, /^rock/, /impact.*heavy/, /^footstep/],
   // No file matches these on purpose: the packs have nothing that reads as
   // bone breaking or a body being dragged away, and a wrong sound is worse
   // than the synthesised one the engine falls back to.

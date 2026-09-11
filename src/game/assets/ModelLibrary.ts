@@ -65,33 +65,6 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   entrance: [/^stairs_/, /^stairs$/, /^door_/, /^doorway/],
   core: [/^chest_gold$/, /^chest$/, /^banner_red$/],
 
-  /*
-   * Obstacles — walls the player places to block a raiding party's route.
-   *
-   * Five pieces each, because a row of obstacles is a fence and a fence has
-   * ends, corners and junctions. The renderer picks between them from which
-   * neighbouring tiles are also built on; every set falls back to its own
-   * straight piece so a pack missing the fancier parts still draws a wall.
-   *
-   * The barricade is the exception, and deliberately: it is the same crate on
-   * every piece. It used to be the pack's fence, and a fence is a thing you
-   * put ALONGSIDE a road - which is the opposite of what this does. The game
-   * is about folding the route ninety degrees, so the cheap obstacle has to
-   * read as a block sitting IN the way. A crate also needs no corner or
-   * junction piece: stack two side by side and they simply touch, where two
-   * fence sections leave a gap and look like scenery that failed to line up.
-   */
-  obstacle_barricade: [/^box_stacked$/, /^barrel_large$/],
-  obstacle_barricade_end: [/^box_stacked$/, /^barrel_large$/],
-  obstacle_barricade_corner: [/^box_stacked$/, /^barrel_large$/],
-  obstacle_barricade_post: [/^box_stacked$/, /^barrel_large$/],
-
-  obstacle_wall: [/^wall$/, /^wall_arched$/],
-  obstacle_wall_end: [/^wall_endcap$/, /^wall$/],
-  obstacle_wall_corner: [/^wall_corner$/, /^wall$/],
-  obstacle_wall_tee: [/^wall_tsplit$/, /^wall$/],
-  obstacle_wall_cross: [/^wall_crossing$/, /^wall$/],
-
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
   // minion and a mage adventurer are different models.

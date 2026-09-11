@@ -31,7 +31,7 @@ function followTheTutorial() {
   let seq = 0;
 
   const context = (toolId: string, group = ""): TutorialContext => ({
-    obstacles: [], minions, traps, entrance, core,
+    minions, traps, entrance, core,
     wavesRepelled: 0, coreBreaches: 0, toolId, group,
     dug: dug.length,
     connected: connects(arena, dug),
@@ -88,7 +88,6 @@ function raid(built: ReturnType<typeof followTheTutorial>) {
   const sim = new RaidSim({
     minions: built.minions,
     traps: built.traps,
-    obstacles: [],
     party: waves[0],
     waves,
     arena, entrance, core, lures: [], seed: 1,

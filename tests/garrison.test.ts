@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { RaidSim, SIM_DT } from "../src/game/sim/RaidSim";
-import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
+import { arenaFor, blockedKey, coreOf, entranceOf } from "../src/game/arena";
 import { MINION_STATS } from "../src/game/sim/units";
-import type { PartyMember, PlacedMinion, PlacedObstacle } from "../src/game/types";
+import type { PartyMember, PlacedMinion } from "../src/game/types";
 
 /**
  * What an adventurer will turn aside for, and what it walks past.
@@ -27,11 +27,12 @@ const core = coreOf(arena);
 
 const party: PartyMember[] = [{ id: "a1", cls: "knight", name: "Aldric", level: 1 }];
 
-function makeSim(minions: PlacedMinion[], obstacles: PlacedObstacle[] = []) {
+/** `rock` is undug tile, which is the only thing that shapes a route. */
+function makeSim(minions: PlacedMinion[], rock: Array<{ x: number; y: number }> = []) {
   return new RaidSim({
     minions,
     traps: [],
-    obstacles,
+    terrain: new Set(rock.map((t) => blockedKey(t.x, t.y, arena.w))),
     party,
     arena,
     entrance,
@@ -56,18 +57,9 @@ const minion = (id: string, x: number, y: number): PlacedMinion => ({
   y,
 });
 
-const wall = (id: string, x: number, y: number): PlacedObstacle => ({
-  id,
-  type: "wall",
-  x,
-  y,
-});
-
-/** Every tile of a row except the ones listed, walled off. */
-function rowExcept(y: number, gaps: number[], type: "wall" | "barricade" = "wall") {
-  return [...Array(arena.w).keys()]
-    .filter((x) => !gaps.includes(x))
-    .map((x) => ({ id: `o-${x}`, type, x, y }) as PlacedObstacle);
+/** Every tile of a row except the ones listed, left as rock. */
+function rowExcept(y: number, gaps: number[]) {
+  return [...Array(arena.w).keys()].filter((x) => !gaps.includes(x)).map((x) => ({ x, y }));
 }
 
 describe("a minion in the road", () => {
@@ -110,7 +102,7 @@ describe("a minion in the road", () => {
 
   it("re-routes the party the moment it dies", () => {
     const gap = entrance.x;
-    const sim = makeSim([minion("m1", gap, 5)], rowExcept(5, [gap], "barricade"));
+    const sim = makeSim([minion("m1", gap, 5)], rowExcept(5, [gap]));
     run(sim, 90);
 
     expect(sim.state.minions.find((m) => m.id === "m1")!.alive).toBe(false);
@@ -145,16 +137,16 @@ describe("a minion that shoots", () => {
   });
 
   it("is left alone when there is no way in to it", () => {
-    // Boxed into the corner it stands in. It shoots the whole raid and nothing
-    // can reach it — and the party does not start breaking walls to try.
+    // Walled into the corner it stands in by tiles nobody dug. It shoots the
+    // whole raid and nothing can reach it - there is no digging through rock.
     const sim = makeSim(
       [minion("m1", 0, 5)],
       [
-        wall("w1", 1, 5),
-        wall("w2", 0, 4),
-        wall("w3", 0, 6),
-        wall("w4", 1, 4),
-        wall("w5", 1, 6),
+        { x: 1, y: 5 },
+        { x: 0, y: 4 },
+        { x: 0, y: 6 },
+        { x: 1, y: 4 },
+        { x: 1, y: 6 },
       ],
     );
     run(sim, 90);
@@ -162,7 +154,6 @@ describe("a minion that shoots", () => {
     const after = sim.state.minions.find((m) => m.id === "m1")!;
     expect(after.alive).toBe(true);
     expect(after.hp).toBe(after.maxHp);
-    expect(sim.state.obstacles.every((o) => o.hp === o.maxHp)).toBe(true);
   });
 });
 

@@ -57,19 +57,16 @@ export const ko = {
   saved_at: "저장",
   controls: "드래그 팬 · 휠/핀치 줌 · Q/E 90° 회전",
 
-  hint_remove: "타일 위의 장애물 · 부하 · 함정 · 방을 회수합니다. 전액 돌려받습니다.",
+  hint_remove: "타일 위의 부하 · 함정 · 방을 회수합니다. 전액 돌려받습니다.",
   hint_minion: "통로 타일에 배치합니다.",
   hint_trap: "통로 타일에 설치합니다.",
   hint_room: "2×2 통로가 필요합니다.",
   hint_skill_target: "대상 타일을 선택하세요.",
-  hint_obstacle: "빈 바닥에 놓아 길을 접습니다.",
 
   count_minions: "부하",
   count_traps: "함정",
   count_rooms: "방",
   count_jail: "감옥",
-  count_obstacles: "장애물",
-  obstacle_note: "막아도 됩니다. 길이 없으면 벽을 부숩니다.",
   free: "무료",
   locked_hint: "연구로 해금해야 합니다",
 
@@ -164,8 +161,6 @@ export const ko = {
   err_no_adventurers: "지금은 쳐들어올 모험가가 없습니다. 잠시 후 다시 시도하세요.",
 
   // Tutorial
-  tut_obstacle_pick: "바리케이드를 고르세요",
-  tut_obstacle_place: "빈 바닥을 탭해 길을 접으세요",
   tut_minion_pick: "스켈레톤 궁수를 고르세요",
   tut_minion_place: "길 옆에 세우세요",
   tut_trap_pick: "가시 함정을 고르세요",
@@ -205,9 +200,9 @@ export const ko = {
   res_tp2: "정밀 격발 II",
   res_tp2_n: "함정 피해 +40%",
   res_expand1: "던전 확장 I",
-  res_expand1_n: "방 12 → 16, 장애물 20 → 28",
+  res_expand1_n: "방 12 → 16",
   res_expand2: "던전 확장 II",
-  res_expand2_n: "방 16 → 20, 장애물 28 → 36",
+  res_expand2_n: "방 16 → 20",
 
   // Content names
   minion_warrior: "스켈레톤 궁수",
@@ -217,10 +212,6 @@ export const ko = {
   trap_arrow: "화살 함정",
   trap_rockfall: "낙석 함정",
   trap_flame: "화염 함정",
-  obstacle_barricade: "나무 상자",
-  obstacle_wall: "석벽",
-  obstacle_barricade_desc: "싸고 약합니다. 길을 접는 데 씁니다.",
-  obstacle_wall_desc: "비싸고 튼튼합니다. 봉쇄한 줄을 오래 버팁니다.",
   room_treasury: "보물방",
   room_vault: "창고",
   room_barracks: "병영",
@@ -236,7 +227,6 @@ export const ko = {
   skill_blessing: "어둠의 가호",
   skill_rally: "집결",
   skill_detonate: "강제 발동",
-  group_obstacle: "벽",
   group_minion: "부하",
   group_trap: "함정",
   group_room: "방",
@@ -263,7 +253,6 @@ export const ko = {
   raid_wave: "웨이브 {n}/{of}",
   intermission: "건설 시간",
   next_wave: "다음 웨이브",
-  tut_obstacle_group: "벽 탭을 여세요",
   tut_minion_group: "부하 탭을 여세요",
   tut_trap_group: "함정 탭을 여세요",
   group_dig: "굴착",

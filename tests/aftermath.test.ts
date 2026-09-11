@@ -15,7 +15,6 @@ function raid(options: { minions?: PlacedMinion[]; traps?: PlacedTrap[] }) {
   const sim = new RaidSim({
     minions: options.minions ?? [],
     traps: options.traps ?? [],
-    obstacles: [],
     party,
     arena,
     entrance,
@@ -34,7 +33,7 @@ function raid(options: { minions?: PlacedMinion[]; traps?: PlacedTrap[] }) {
 
 /** A tile the party actually walks over, so a minion put there is in the road. */
 function routeTile(index: number) {
-  const path = buildRaidPath(arena, entrance, core, [], new Set());
+  const path = buildRaidPath(arena, entrance, core, [], new Set())!;
   return path[Math.min(index, path.length - 1)];
 }
 
