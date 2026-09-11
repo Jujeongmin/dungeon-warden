@@ -219,62 +219,148 @@ h3.section {
 .status-error { color: var(--danger); }
 .status-offline { color: var(--accent); }
 
+/*
+   The room keeps turning behind the menu, and it is the picture.
+
+   Only the left edge is covered, and only where something is written: a slab
+   of stone with the controls cut into it, then a short fade, then the dungeon
+   itself at nearly full strength. A flat wash over the whole screen is what
+   this used to be, and it hid the one image the game actually has.
+*/
 .title {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  /* The dungeon keeps rendering behind this, dimmed. */
-  background: linear-gradient(180deg, rgba(14, 12, 10, 0.86), rgba(14, 12, 10, 0.96));
-  backdrop-filter: blur(2px);
+  align-items: stretch;
+  justify-content: flex-start;
+  background: linear-gradient(
+    100deg,
+    rgba(12, 10, 9, 0.92) 54%,
+    rgba(12, 10, 9, 0.62) 72%,
+    rgba(12, 10, 9, 0.24) 100%
+  );
 }
 
-.title-inner {
-  width: min(520px, 100%);
-  text-align: center;
+/*
+   The slab: a photograph of the same stone the walls are cut from, held dark
+   enough to read against. One file serves both, so the menu cannot drift out
+   of material with the room behind it.
+*/
+.title-slab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Held in the upper half rather than spread to the corners: a menu down
+     at the foot of a tall phone is a reach, and the empty stone between the
+     title and the buttons said nothing. */
+  justify-content: flex-start;
+  gap: clamp(18px, 5vh, 34px);
+  width: 62%;
+  min-width: 210px;
+  max-width: 330px;
+  padding: clamp(18px, 5vh, 34px) clamp(14px, 4.5%, 24px);
+  /* Tiled at roughly its own size rather than blown up to cover: a 512px
+     scan stretched down a tall column is a smear, and the grain is the
+     whole reason for using a photograph instead of a gradient. */
+  background-size: 300px auto;
+  background-repeat: repeat;
+  box-shadow: 18px 0 34px rgba(8, 6, 5, 0.55);
+}
+
+/* Darkened here rather than in the image: the stone is scenery, not a
+   surface to read off. */
+.title-slab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, rgba(26, 17, 11, 0.78), rgba(8, 7, 6, 0.96));
+}
+
+/* The cut edge where the slab ends and the room begins. */
+.title-slab::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(232, 164, 76, 0.35) 22%,
+    rgba(232, 164, 76, 0.35) 78%,
+    transparent
+  );
+}
+
+/* Two blocks, not three: the readings belong with the buttons under them,
+   or the slab splits into a header, a hole, and a footer. */
+.title-head,
+.title-foot {
+  position: relative;
+}
+
+.title-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title-sigil {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  color: rgba(232, 164, 76, 0.75);
 }
 
 .title-kicker {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: var(--fs-xs);
   letter-spacing: var(--ls-widest);
   color: var(--accent);
 }
 
 .title-name {
-  margin: 0 0 14px;
-  font-size: var(--fs-xl);
+  margin: 0 0 12px;
+  font-size: var(--fs-lg);
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide);
-  line-height: 1.05;
+  line-height: 1.06;
 }
 
 .title-line {
-  margin: 0 auto 22px;
-  max-width: 420px;
+  margin: 0;
   font-size: var(--fs-sm);
-  line-height: 1.75;
+  line-height: 1.7;
   color: var(--muted);
 }
 
+/* Three readings rather than a panel: label over number, ruled off. */
 .title-save {
+  position: relative;
   display: flex;
-  justify-content: center;
   gap: 14px;
-  margin-bottom: 16px;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  font-size: var(--fs-sm);
+  margin: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.title-save dt {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
   color: var(--muted);
+}
+
+.title-save dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
 }
 
 .title-start {
   width: 100%;
-  max-width: 320px;
   padding: 13px 16px;
   font-size: var(--fs-base);
   font-weight: var(--fw-bold);
@@ -284,18 +370,19 @@ h3.section {
   background: rgba(232, 164, 76, 0.12);
 }
 
+/* Stacked, because they sit in a column a thumb wide. */
 .title-menu {
   display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin: 12px auto 0;
-  max-width: 320px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 10px 0 0;
 }
 
-.title-menu button { flex: 1; font-size: var(--fs-sm); }
+.title-menu button { font-size: var(--fs-sm); }
 
 .title-note {
-  margin: 16px 0 0;
+  margin: 12px 0 0;
   font-size: var(--fs-xs);
   color: var(--accent);
 }
@@ -1737,23 +1824,13 @@ button.ad-gold {
   border: none;
   box-shadow: none;
   color: var(--muted);
-  padding: 8px 4px;
-  border-bottom: 2px solid transparent;
+  padding: 7px 0;
+  text-align: left;
   border-radius: 0;
 }
 
 .title-menu button:hover:not(:disabled) { background: none; color: var(--ink); }
 .title-menu button:active:not(:disabled) { transform: none; box-shadow: none; }
-
-/* The save summary is a reading, not a panel. */
-.title-save {
-  border: none;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  font-variant-numeric: tabular-nums;
-}
 
 /* Research and shop rows were bordered cards inside a bordered panel. One
    border is enough; the rule between them says the rest. */
@@ -2000,9 +2077,10 @@ button.ad-gold {
    Two controls and nothing else. The room is the point, so the screen gives
    it everything except one thumb's worth of corner.
    --------------------------------------------------------------------------- */
-/* The panel sets its own display, which beats the browser default for
-   [hidden] - so hiding it has to be said out loud. */
-.hud[hidden] { display: none; }
+/* Both of these set their own display, which beats the browser default for
+   [hidden] - so hiding either has to be said out loud. */
+.hud[hidden],
+.topdock[hidden] { display: none; }
 
 .walkbar {
   position: absolute;

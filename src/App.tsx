@@ -846,13 +846,14 @@ export default function App() {
   }, [toolId, tool, hover, raid.raiding, ghostLegal]);
 
   /**
-   * Tell the camera how much of itself the HUD is covering.
+   * Tell the camera how much of itself the interface is covering.
    *
-   * The canvas is full-screen and the panel floats on its lower part, so
-   * without this the board frames to the middle of the canvas — which on a
-   * phone is behind the panel, with the core out of sight. Measured rather
-   * than assumed, because the panel's height changes when it collapses and
-   * when the viewport does.
+   * The canvas is full-screen and everything else floats on top of it, so
+   * without this the board frames to the middle of the canvas — which in the
+   * game is behind the panel with the core out of sight, and on the title is
+   * behind the slab the menu is cut into. Measured rather than assumed: the
+   * panel changes height when it collapses, and the slab is a share of a
+   * stage whose width the window decides.
    */
   useEffect(() => {
     const measure = () => {
@@ -862,16 +863,27 @@ export default function App() {
       // Measured against the stage, not the window: on a wide screen the game
       // is a letterboxed column and the window is mostly backdrop.
       const stage = panel.offsetParent as HTMLElement | null;
-      const bottom = stage
-        ? stage.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
-        : 0;
+      const frame = stage?.getBoundingClientRect() ?? null;
+
+      if (screen === "title") {
+        // The panel is hidden behind the title, so it covers nothing - and
+        // measuring it would read a box of zeroes as a full-height sheet.
+        const slab = document.querySelector(".title-slab");
+        const left = slab && frame ? slab.getBoundingClientRect().right - frame.left : 0;
+        renderer.setBottomInset(0);
+        renderer.setLeftInset(Math.max(0, left));
+        return;
+      }
+
+      renderer.setLeftInset(0);
+      const bottom = frame ? frame.bottom - panel.getBoundingClientRect().top : 0;
       renderer.setBottomInset(Math.max(0, bottom));
     };
 
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [hudOpen, tab, minions.length, traps.length, rooms.length, research.length]);
+  }, [screen, hudOpen, tab, minions.length, traps.length, rooms.length, research.length]);
 
   useEffect(() => {
     rendererRef.current?.setUnits(units);
@@ -1234,7 +1246,10 @@ export default function App() {
         * so a banner or the raid readout was drawn under the gold and the
         * icons. Laid out in flow, the offsets cannot be wrong.
         */}
-      <div className="topdock">
+      {/* The title is a door, not a layer over the game: the chrome behind it
+          is hidden rather than dimmed, so what shows past the menu is the room
+          and nothing else. */}
+      <div className="topdock" hidden={screen === "title"}>
       <header className="topbar">
         <div className="brand">DUNGEON WARDEN</div>
         <div className="stats">
@@ -1468,7 +1483,7 @@ export default function App() {
         className={hudOpen ? "hud" : "hud collapsed"}
         // Hidden rather than unmounted: it keeps its scroll position and its
         // open tab for when the player climbs back out.
-        hidden={walking}
+        hidden={walking || screen === "title"}
       >
         <div className="hud-tabs">
           <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>{t("tab_build")}</button>
