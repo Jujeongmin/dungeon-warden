@@ -65,6 +65,16 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   entrance: [/^stairs_/, /^stairs$/, /^door_/, /^doorway/],
   core: [/^chest_gold$/, /^chest$/, /^banner_red$/],
 
+  /*
+   * The player, seen from behind their own eyes.
+   *
+   * A warden is a monster, not a person, so the body the camera rides is
+   * one of the skeletons rather than a pair of human arms from some other
+   * game - and it swings the same clips the garrison does, so nothing new
+   * has to be drawn or rigged for it.
+   */
+  warden: [/^skeleton_rogue$/, /^skeleton_warrior$/, /^skeleton_mage$/],
+
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
   // minion and a mage adventurer are different models.

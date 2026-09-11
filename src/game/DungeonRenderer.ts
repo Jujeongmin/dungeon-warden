@@ -54,6 +54,10 @@ const CENTRE = new THREE.Vector2(0, 0);
 const HOLD_AFTER_MS = 320;
 /** A held primary fires again this often. */
 const HOLD_REPEAT_MS = 380;
+/** How long one dig swing owns the arms before idle or walk take over. */
+const SWING_SECONDS = 0.42;
+/** How far in front of the eyes the camera sits, in tiles. */
+const EYE_LEAD = 0.2;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -877,6 +881,8 @@ export class DungeonRenderer {
     this.clearMarkers();
     this.setUnits(this.lastUnits);
     this.setMarkers(this.lastMarkers);
+    // The body was spawned before its model existed, if it exists at all.
+    if (this.walk) this.spawnWarden();
 
     // The floor/walls/landmarks/decor were built at mount, before models
     // existed, so every tileProto/spawnModel lookup came back null and they
@@ -1991,6 +1997,20 @@ export class DungeonRenderer {
   private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
   /** The block under the crosshair, so a change can be reported once. */
   private aim: AimTile | null = null;
+  /**
+   * The body the camera rides while walking.
+   *
+   * A whole skeleton standing where the player stands, turned the way they
+   * look, so their own arms swing into view when they dig and their own
+   * feet are under them when they look down. The camera sits at its eyes.
+   */
+  private warden: THREE.Object3D | null = null;
+  /** Eye height of that body, measured from the model rather than assumed. */
+  private wardenEye = EYE_HEIGHT;
+  /** Seconds left of the current dig swing, during which idle/walk wait. */
+  private wardenSwing = 0;
+  /** Whether the body moved this frame, for idle against walk. */
+  private wardenMoving = false;
   /** The thin dark box round the block the crosshair is on. */
   private aimBox: THREE.LineSegments;
   private aimPlate: THREE.LineSegments;
@@ -2020,6 +2040,7 @@ export class DungeonRenderer {
       this.walk = null;
       this.setAim(null);
       this.stopHold();
+      this.disposeWarden();
       this.keys.clear();
       this.moveInput.forward = 0;
       this.moveInput.strafe = 0;
@@ -2035,6 +2056,82 @@ export class DungeonRenderer {
       yaw: Math.atan2(this.core.x - this.entrance.x, this.core.y - this.entrance.y),
       pitch: 0,
     };
+    this.spawnWarden();
+  }
+
+  /** Stands the body up where the walk starts. Harmless before models load. */
+  private spawnWarden(): void {
+    this.disposeWarden();
+    const body = this.spawnModel("warden", 0.9);
+    if (!body) return;
+
+    // Eye height from the model: a taller skeleton looks out from higher up,
+    // and the number is otherwise a guess that is wrong for every pack.
+    const box = new THREE.Box3().setFromObject(body);
+    this.wardenEye = (box.max.y - box.min.y) * 0.86;
+
+    /*
+     * Seen from inside, a body is its back faces. Culling them is what lets
+     * the camera sit in the skull and still see the room: every face the eye
+     * is behind vanishes, and only the arms, which swing out in front, draw.
+     * The pack ships some materials double-sided, which is why this is said.
+     */
+    body.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) material.side = THREE.FrontSide;
+    });
+
+    const own = this.loaded.get("warden")?.animations ?? [];
+    this.setupAnimation("warden", body, own.length > 0 ? own : this.sharedClips);
+    this.playClip("warden", "idle");
+    this.warden = body;
+    this.scene.add(body);
+  }
+
+  private disposeWarden(): void {
+    if (!this.warden) return;
+    this.mixers.delete("warden");
+    this.disposeObject(this.scene, this.warden);
+    this.warden = null;
+    this.wardenSwing = 0;
+  }
+
+  /**
+   * One swing of the arms, restarted on every act so a held button reads as
+   * repeated blows rather than one long loop.
+   */
+  private swing(): void {
+    const entry = this.mixers.get("warden");
+    const attack = entry?.actions.get("attack");
+    if (!entry || !attack) return;
+    for (const [state, action] of entry.actions) {
+      if (state !== "attack") action.fadeOut(0.08);
+    }
+    attack.reset().fadeIn(0.05).play();
+    entry.current = "attack";
+    this.wardenSwing = SWING_SECONDS;
+  }
+
+  /** Keeps the body under the camera and in the right clip. */
+  private updateWarden(delta: number): void {
+    const walk = this.walk;
+    const body = this.warden;
+    if (!walk || !body) return;
+
+    body.position.x = walk.at.x;
+    body.position.z = walk.at.z;
+    body.rotation.y = walk.yaw;
+
+    if (this.wardenSwing > 0) {
+      this.wardenSwing -= delta;
+      if (this.wardenSwing > 0) return;
+      // Let the locomotion clip back in by forgetting the swing was current.
+      const entry = this.mixers.get("warden");
+      if (entry) entry.current = null;
+    }
+    this.playClip("warden", this.wardenMoving ? "walk" : "idle");
   }
 
   /** Turns the head. Radians, from a drag. */
@@ -2079,6 +2176,7 @@ export class DungeonRenderer {
   /** One frame of walking, from whichever input is live. */
   private updateWalk(delta: number): void {
     if (!this.walk) return;
+    this.wardenMoving = false;
     let forward = this.moveInput.forward;
     let strafe = this.moveInput.strafe;
     if (forward === 0 && strafe === 0) {
@@ -2086,7 +2184,8 @@ export class DungeonRenderer {
       forward = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
       strafe = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
     }
-    if (forward === 0 && strafe === 0) return;
+    this.wardenMoving = forward !== 0 || strafe !== 0;
+    if (!this.wardenMoving) return;
     // Diagonals are not faster: the two axes share one speed.
     const length = Math.hypot(forward, strafe);
     const scale = (WALK_SPEED * delta) / Math.max(1, length);
@@ -2169,6 +2268,9 @@ export class DungeonRenderer {
   private act(button: "primary" | "secondary"): void {
     const aim = this.aimTile();
     this.setAim(aim);
+    // The arms move whether or not the blow lands on anything: a swing at
+    // empty air is what the hand did, and the game says the rest.
+    if (button === "primary") this.swing();
     if (aim) this.callbacks.onAct?.(button, aim);
   }
 
@@ -2192,13 +2294,23 @@ export class DungeonRenderer {
      * a heading rather than something orbiting a point on the floor.
      */
     if (this.walk) {
+      /*
+       * At the eyes of the body, and a little in front of them: the camera
+       * has a near plane, and a near plane inside a skull draws the inside
+       * of the skull. Far enough forward to be clear of it, close enough
+       * that the arms still come up into view on a swing.
+       */
+      const eye = this.warden ? FLOOR_HEIGHT + this.wardenEye : this.walk.at.y;
+      const lead = this.warden ? EYE_LEAD : 0;
+      const ex = this.walk.at.x + Math.sin(this.walk.yaw) * lead;
+      const ez = this.walk.at.z + Math.cos(this.walk.yaw) * lead;
+      this.camera.position.set(ex, eye, ez);
       this.setAim(this.aimTile());
-      this.camera.position.copy(this.walk.at);
       const cosPitch = Math.cos(this.walk.pitch);
       this.camera.lookAt(
-        this.walk.at.x + Math.sin(this.walk.yaw) * cosPitch,
-        this.walk.at.y + Math.sin(this.walk.pitch),
-        this.walk.at.z + Math.cos(this.walk.yaw) * cosPitch,
+        ex + Math.sin(this.walk.yaw) * cosPitch,
+        eye + Math.sin(this.walk.pitch),
+        ez + Math.cos(this.walk.yaw) * cosPitch,
       );
       const closeFog = this.scene.fog as THREE.Fog | null;
       // Much tighter than the overview: down here the dark is the point.
@@ -2495,35 +2607,41 @@ export class DungeonRenderer {
     if (this.walk) {
       if (e.pointerType === "mouse") {
         /*
-         * The pointer is asked for but not waited on. Inside an iframe that
-         * was not given the permission (which is where this game is played)
-         * the request fails silently, and a click that only asked would be a
-         * click that did nothing. So the mouse always works the way a finger
-         * does - drag to look, buttons to act - and the lock, when granted,
-         * only makes looking around not need the button held.
+         * With the pointer locked the mouse is a proper first-person mouse:
+         * the view follows it with nothing held, left takes out, right puts
+         * down. The lock is asked for on the first click but never waited
+         * on - inside an iframe that was not given the permission (which is
+         * where this game is played) the request fails silently, and a click
+         * that only asked would be a click that did nothing.
          */
-        if (document.pointerLockElement !== this.canvas) {
-          try {
-            const request = this.canvas.requestPointerLock?.() as unknown;
-            if (request instanceof Promise) request.catch(() => undefined);
-          } catch {
-            /* not available here; the drag still turns the head */
-          }
+        if (document.pointerLockElement === this.canvas) {
+          if (e.button === 0) this.startHold();
+          else if (e.button === 2) this.act("secondary");
+          return;
         }
-        // Capture is refused while a lock request is in flight, and it is not
-        // needed to act - only to keep a drag that leaves the canvas.
         try {
-          this.canvas.setPointerCapture(e.pointerId);
+          const request = this.canvas.requestPointerLock?.() as unknown;
+          if (request instanceof Promise) request.catch(() => undefined);
         } catch {
-          /* the lock will hold the pointer instead */
+          /* not available here; the drag turns the head instead */
         }
-        this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
-        if (e.button === 0) this.startHold();
-        else if (e.button === 2) this.act("secondary");
-        return;
+        // Right puts down at once; it is never the start of a look.
+        if (e.button === 2) {
+          this.act("secondary");
+          return;
+        }
+        if (e.button !== 0) return;
+        // Unlocked, the left button is a finger: a click takes out, holding
+        // still keeps taking, and moving turns the head instead.
       }
 
-      this.canvas.setPointerCapture(e.pointerId);
+      // Capture is refused while a lock request is in flight; it only keeps
+      // a drag that leaves the canvas, so doing without is fine.
+      try {
+        this.canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* see above */
+      }
       this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
       this.dragStart = new THREE.Vector2(e.clientX, e.clientY);
       this.dragMoved = false;
@@ -2641,13 +2759,14 @@ export class DungeonRenderer {
 
   private onPointerUp = (e: PointerEvent): void => {
     if (this.walk) {
-      if (e.pointerType === "mouse") {
+      const mouse = e.pointerType === "mouse";
+      if (mouse && document.pointerLockElement === this.canvas) {
         if (e.button === 0) this.stopHold();
-        this.activePointers.delete(e.pointerId);
-        if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
         return;
       }
-      // A finger lifted before the hold fired and without moving: a tap.
+      // Lifted before the hold fired and without moving: a tap. A finger
+      // tapping puts down; a mouse clicking takes out - the finger has no
+      // second button, the mouse does.
       const tap = this.touchPending?.id === e.pointerId && !this.dragMoved;
       this.stopHold();
       this.activePointers.delete(e.pointerId);
@@ -2656,7 +2775,7 @@ export class DungeonRenderer {
         this.dragStart = null;
         this.dragMoved = false;
       }
-      if (tap) this.act("secondary");
+      if (tap) this.act(mouse ? "primary" : "secondary");
       return;
     }
 
@@ -2729,6 +2848,7 @@ export class DungeonRenderer {
     this.updateHealthBars();
     this.updateShake(delta);
     this.updateWalk(delta);
+    this.updateWarden(delta);
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
