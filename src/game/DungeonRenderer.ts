@@ -61,7 +61,10 @@ const EYE_LEAD = 0.3;
 /** How much taller the rock stands while the camera is down among it. */
 const ROCK_STRETCH = 2.1;
 /** The arm, relative to the blocks it is built from. */
-const ARM_SCALE = 0.36;
+const ARM_SCALE = 0.3;
+/** Resting angle of the arm: a little up from the shoulder, turned in toward the crosshair. */
+const ARM_PITCH = 0.36;
+const ARM_YAW = 0.46;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -2200,28 +2203,39 @@ export class DungeonRenderer {
       return mesh;
     };
 
-    // Upper arm runs back and up out of the frame; the forearm comes forward.
-    const upper = part(new THREE.BoxGeometry(0.09, 0.09, 0.42), bone);
-    upper.position.set(0.02, 0.06, 0.16);
-    upper.rotation.x = -0.55;
-    const fore = part(new THREE.BoxGeometry(0.07, 0.07, 0.46), bone);
-    fore.position.set(0, 0, -0.1);
-    const knuckle = part(new THREE.BoxGeometry(0.12, 0.07, 0.1), bone);
-    knuckle.position.set(0, 0, -0.33);
-    this.arm.add(upper, fore, knuckle);
-
-    for (const [i, x] of [-0.04, 0, 0.04].entries()) {
-      const talon = part(new THREE.ConeGeometry(0.03, 0.24, 6), claw);
-      talon.rotation.x = -Math.PI / 2 - 0.35;
-      talon.position.set(x * 1.4, -0.02, -0.5 - (i === 1 ? 0.03 : 0));
-      this.arm.add(talon);
+    /*
+     * The origin is the shoulder. Everything runs forward (-z) from it:
+     * upper arm, a bend at the elbow, forearm, knuckle, claws. The shoulder
+     * is placed just outside the corner of the frame, so however the arm
+     * swings there is never a cut end floating in view - the same trick
+     * every first-person game plays.
+     */
+    const upper = part(new THREE.BoxGeometry(0.1, 0.1, 0.4), bone);
+    upper.position.set(0, 0, -0.2);
+    const elbow = new THREE.Group();
+    elbow.position.set(0, 0, -0.4);
+    elbow.rotation.x = 0.28;
+    const fore = part(new THREE.BoxGeometry(0.08, 0.08, 0.42), bone);
+    fore.position.set(0, 0, -0.21);
+    const knuckle = part(new THREE.BoxGeometry(0.13, 0.07, 0.1), bone);
+    knuckle.position.set(0, -0.005, -0.45);
+    elbow.add(fore, knuckle);
+    for (const [i, x] of [-0.045, 0, 0.045].entries()) {
+      const talon = part(new THREE.ConeGeometry(0.028, 0.22, 6), claw);
+      talon.rotation.x = -Math.PI / 2 - 0.45;
+      talon.position.set(x, -0.03, -0.58 - (i === 1 ? 0.03 : 0));
+      elbow.add(talon);
     }
+    this.arm.add(upper, elbow);
 
     this.arm.position.copy(this.armRest);
-    this.arm.rotation.set(-0.18, 0.3, 0.12);
+    this.arm.rotation.set(ARM_PITCH, ARM_YAW, 0.1);
     // Sized to the corner of the view: at its depth the forearm alone was
     // most of the screen at full size.
     this.arm.scale.setScalar(ARM_SCALE);
+    // Drawn last within its pass, in build order: the joint pieces overlap on
+    // purpose and the depth test sorts them.
+
     this.arm.visible = false;
   }
 
@@ -2298,23 +2312,27 @@ export class DungeonRenderer {
      * position is a fraction of the half-height and half-width the camera
      * sees at the arm's depth, so it is in the same corner on every screen.
      */
-    const depth = 0.62;
+    // The shoulder: just past the bottom-right corner of the frame at the
+    // arm's depth, so the arm always enters from off screen.
+    const depth = 0.5;
     const halfH = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * depth;
     const halfW = halfH * (this.camera.aspect || 1);
-    rest.set(halfW * 0.7, -halfH * 0.66, -depth);
+    rest.set(halfW * 1.02, -halfH * 1.08, -depth);
 
     if (this.wardenSwing > 0) {
       const t = 1 - Math.max(0, this.wardenSwing - delta) / SWING_SECONDS;
       const wind = t < 0.3 ? t / 0.3 : 1 - (t - 0.3) / 0.7;
       const strike = t < 0.3 ? 0 : Math.sin(((t - 0.3) / 0.7) * Math.PI);
-      arm.position.set(rest.x - 0.05 * strike, rest.y + 0.16 * wind - 0.08 * strike, rest.z - 0.16 * strike);
-      arm.rotation.set(-0.18 - 0.9 * wind + 0.6 * strike, 0.3 + 0.15 * strike, 0.12);
+      // Everything turns about the shoulder: up and back to wind, down and
+      // in to strike. The joint itself stays put, off screen.
+      arm.position.copy(rest);
+      arm.rotation.set(ARM_PITCH - 0.35 * wind + 0.5 * strike, ARM_YAW - 0.15 * wind + 0.25 * strike, 0.1);
       return;
     }
 
     const sway = this.wardenMoving ? Math.sin(this.elapsed * 8.5) : 0;
-    arm.position.set(rest.x + sway * 0.012, rest.y + Math.abs(sway) * 0.02, rest.z);
-    arm.rotation.set(-0.18, 0.3 + sway * 0.03, 0.12);
+    arm.position.copy(rest);
+    arm.rotation.set(ARM_PITCH + Math.abs(sway) * 0.05, ARM_YAW + sway * 0.03, 0.1);
   }
 
   /** Keeps the body under the camera and in the right clip. */
