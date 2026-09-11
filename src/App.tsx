@@ -1006,6 +1006,7 @@ export default function App() {
     wavesRepelled: meta?.wavesRepelled ?? 0,
     coreBreaches: meta?.coreBreaches ?? 0,
     toolId,
+    group,
   });
   // The tutorial is dismissed for good, finished, or out of the way while a
   // raid plays — there is nothing to do during one but watch.
@@ -1034,26 +1035,6 @@ export default function App() {
     teaching?.target?.kind === "tile" && !ghostLegal(teaching.target.x, teaching.target.y)
       ? null
       : teaching?.target ?? null;
-  /*
-   * Open the drawer the step is pointing into.
-   *
-   * The toolbar only renders the tools of the group that is selected, so a
-   * step saying "pick the skeleton archer" pointed at a button that was not
-   * on screen: no element, no ring, and a player reading an instruction about
-   * a thing they cannot find. The tabs above it are not a secret to be
-   * discovered halfway through a tutorial.
-   *
-   * Only ever moves to the group the current step names, and only while the
-   * tutorial is running - after that the tabs are the player's.
-   */
-  useEffect(() => {
-    const wanted = teaching?.step.tool;
-    if (!wanted) return;
-    const owner = TOOLS.find((entry) => entry.id === wanted);
-    if (!owner || owner.tool.kind === "remove") return;
-    setGroup(owner.tool.kind);
-  }, [teaching?.step.tool]);
-
   const spotlight = useSpotlight(pointer, locateTile);
 
   /*
@@ -1386,6 +1367,7 @@ export default function App() {
                     <button
                       key={entry.id}
                       className={group === entry.id ? "group active" : "group"}
+                      data-tut={`tool:group-${entry.id}`}
                       onClick={() => { audio.play("click"); setGroup(entry.id); }}
                       disabled={raid.raiding}
                     >

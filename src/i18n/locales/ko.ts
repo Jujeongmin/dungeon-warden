@@ -263,4 +263,7 @@ export const ko = {
   raid_wave: "웨이브 {n}/{of}",
   intermission: "건설 시간",
   next_wave: "다음 웨이브",
+  tut_obstacle_group: "벽 탭을 여세요",
+  tut_minion_group: "부하 탭을 여세요",
+  tut_trap_group: "함정 탭을 여세요",
 };

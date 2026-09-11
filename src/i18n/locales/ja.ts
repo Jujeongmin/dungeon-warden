@@ -256,4 +256,7 @@ export const ja: Record<StringKey, string> = {
   raid_wave: "ウェーブ {n}/{of}",
   intermission: "建設時間",
   next_wave: "次のウェーブ",
+  tut_obstacle_group: "壁タブを開いて",
+  tut_minion_group: "手下タブを開いて",
+  tut_trap_group: "罠タブを開いて",
 };

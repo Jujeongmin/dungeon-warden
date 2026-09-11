@@ -250,4 +250,7 @@ export const en: Record<StringKey, string> = {
   raid_wave: "Wave {n}/{of}",
   intermission: "Build",
   next_wave: "Next wave",
+  tut_obstacle_group: "Open the Walls tab",
+  tut_minion_group: "Open the Minions tab",
+  tut_trap_group: "Open the Traps tab",
 };

@@ -251,4 +251,7 @@ export const zhHans: Record<StringKey, string> = {
   raid_wave: "第 {n}/{of} 波",
   intermission: "建设时间",
   next_wave: "下一波",
+  tut_obstacle_group: "打开墙分页",
+  tut_minion_group: "打开手下分页",
+  tut_trap_group: "打开陷阱分页",
 };

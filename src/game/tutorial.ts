@@ -10,6 +10,8 @@ export interface TutorialContext {
   coreBreaches: number;
   /** Which tool is in hand, so a step can tell "pick it up" from "put it down". */
   toolId: string;
+  /** Which drawer of the toolbar is open, so a step can ask for it to be opened. */
+  group: string;
 }
 
 /** Where the player is being sent. `null` means nowhere in particular. */
@@ -22,6 +24,17 @@ export interface TutorialStep {
   id: string;
   /** The tool this step is about, when the step is about placing something. */
   tool?: string;
+  /**
+   * Which drawer of the toolbar that tool lives in.
+   *
+   * The toolbar only renders the tools of the open drawer, so a step naming a
+   * tool in a closed one is pointing at a button that is not on screen. The
+   * drawer used to be opened for the player; it is asked for instead, because
+   * a tutorial that presses the buttons itself teaches where nothing is.
+   */
+  group?: string;
+  /** Shown while that drawer is still shut. */
+  groupHint?: string;
   /** A button in the build panel, when the step is about pressing one. */
   action?: "save" | "raid";
   /** Translation key: shown while the control still has to be reached. */
@@ -57,6 +70,8 @@ export const TUTORIAL: TutorialStep[] = [
   {
     id: "obstacle",
     tool: "barricade",
+    group: "obstacle",
+    groupHint: "tut_obstacle_group",
     hint: "tut_obstacle_pick",
     placeHint: "tut_obstacle_place",
     // Straight down the line they walk in on, two tiles from the door. A wall
@@ -67,6 +82,8 @@ export const TUTORIAL: TutorialStep[] = [
   {
     id: "minion",
     tool: "warrior",
+    group: "minion",
+    groupHint: "tut_minion_group",
     hint: "tut_minion_pick",
     placeHint: "tut_minion_place",
     /*
@@ -92,6 +109,8 @@ export const TUTORIAL: TutorialStep[] = [
   {
     id: "trap",
     tool: "spike",
+    group: "trap",
+    groupHint: "tut_trap_group",
     hint: "tut_trap_pick",
     placeHint: "tut_trap_place",
     // One tile in front of where the minion was suggested, so the two read as
@@ -139,6 +158,20 @@ export function guideFor(context: TutorialContext): TutorialGuide | null {
   const step = TUTORIAL[index];
 
   if (step.tool) {
+    /*
+     * Three beats, in the order the hands do them: open the drawer, take the
+     * tool, put it down. Each one points at exactly the thing that has to be
+     * pressed next, and none of them presses it.
+     */
+    if (step.group && context.group !== step.group) {
+      return {
+        index,
+        step,
+        hint: step.groupHint ?? step.hint,
+        target: { kind: "tool", id: `group-${step.group}` },
+      };
+    }
+
     // Already holding it: the next thing to do is on the board, and pointing
     // at a button the player has just pressed would be pointing backwards.
     const held = context.toolId === step.tool;

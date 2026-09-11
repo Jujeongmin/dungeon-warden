@@ -32,9 +32,12 @@ function followTheTutorial() {
   const traps: PlacedTrap[] = [];
   let seq = 0;
 
-  const context = (toolId: string): TutorialContext => ({
+  // The drawer the step asks for is treated as already open: this test is
+  // about what the tutorial teaches you to build, not about the taps that
+  // get you to the button.
+  const context = (toolId: string, group = ""): TutorialContext => ({
     obstacles, minions, traps, entrance, core,
-    wavesRepelled: 0, coreBreaches: 0, toolId,
+    wavesRepelled: 0, coreBreaches: 0, toolId, group,
   });
 
   // Generous bound: every step places at most a handful of things, and a
@@ -43,9 +46,9 @@ function followTheTutorial() {
     const guide = guideFor(context(""));
     if (!guide || !guide.step.tool) break;
 
-    // The player picks up the tool the step names, which is what makes the
-    // guide point at a tile rather than at the button.
-    const held = guideFor(context(guide.step.tool));
+    // The player opens the drawer, then picks up the tool the step names,
+    // which is what makes the guide point at a tile rather than at a button.
+    const held = guideFor(context(guide.step.tool, guide.step.group ?? ""));
     const target = held?.target;
     if (!target || target.kind !== "tile") break;
 

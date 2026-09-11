@@ -251,4 +251,7 @@ export const zhHant: Record<StringKey, string> = {
   raid_wave: "第 {n}/{of} 波",
   intermission: "建設時間",
   next_wave: "下一波",
+  tut_obstacle_group: "打開牆分頁",
+  tut_minion_group: "打開手下分頁",
+  tut_trap_group: "打開陷阱分頁",
 };
