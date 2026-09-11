@@ -963,19 +963,38 @@ export default function App() {
         const slab = document.querySelector(".title-slab");
         const left = slab && frame ? slab.getBoundingClientRect().right - frame.left : 0;
         renderer.setBottomInset(0);
+        renderer.setRightInset(0);
+        renderer.setTopInset(0);
         renderer.setLeftInset(Math.max(0, left));
         return;
       }
 
       renderer.setLeftInset(0);
-      const bottom = frame ? frame.bottom - panel.getBoundingClientRect().top : 0;
-      renderer.setBottomInset(Math.max(0, bottom));
+      // The bar and its banners cover the top of the board. Not while
+      // walking: down there the camera is an eye, not a frame, and every
+      // offset would only skew what it sees.
+      const dock = document.querySelector(".topdock");
+      const dockBottom = dock && frame && !walking ? dock.getBoundingClientRect().bottom - frame.top : 0;
+      renderer.setTopInset(Math.max(0, dockBottom));
+      const box = panel.getBoundingClientRect();
+      // A column down the side starts near the top of the stage; a sheet
+      // across the foot starts well below it. Either way, only the covered
+      // strip is handed over, never both.
+      const column = frame ? box.top - frame.top < frame.height * 0.5 && box.width < frame.width * 0.6 : false;
+      if (column && frame && !walking) {
+        renderer.setBottomInset(0);
+        renderer.setRightInset(Math.max(0, frame.right - box.left));
+      } else {
+        renderer.setRightInset(0);
+        const bottom = frame && !walking ? frame.bottom - box.top : 0;
+        renderer.setBottomInset(Math.max(0, bottom));
+      }
     };
 
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [screen, hudOpen, tab, minions.length, traps.length, rooms.length, research.length]);
+  }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length]);
 
   useEffect(() => {
     rendererRef.current?.setUnits(units);
@@ -1207,11 +1226,14 @@ export default function App() {
     traps,
     wavesRepelled: meta?.wavesRepelled ?? 0,
     coreBreaches: meta?.coreBreaches ?? 0,
-    toolId,
+    loot: loot.length,
+    // In the corridor the thing in hand is the hotbar slot, not the board tool.
+    toolId: walking ? (heldEntry?.id ?? "") : toolId,
     group,
     dug: dug.length,
     isDug: (x, y) => terrain.has(blockedKey(x, y, arena.w)) === false && inArena(arena, x, y),
     connected,
+    flat: walking,
   });
   // The tutorial is dismissed for good, finished, or out of the way while a
   // raid plays — there is nothing to do during one but watch.
@@ -1237,7 +1259,7 @@ export default function App() {
   // more, so the pointer is dropped rather than sending them somewhere the tap
   // will be refused.
   const pointer =
-    teaching?.target?.kind === "tile" && !ghostLegal(teaching.target.x, teaching.target.y)
+    teaching?.target?.kind === "tile" && !walking && !ghostLegal(teaching.target.x, teaching.target.y)
       ? null
       : teaching?.target ?? null;
   const spotlight = useSpotlight(pointer, locateTile);
@@ -1753,6 +1775,7 @@ export default function App() {
                   {minions.length > 0 && (
                     <div className="actions">
                       <button
+                        data-tut="action:equip"
                         disabled={raid.raiding}
                         onClick={() => { audio.play("click"); save.equipBest(); }}
                       >
@@ -1959,6 +1982,22 @@ export default function App() {
         </div>
       )}
 
+      {/* Opening the raid from the floor. The same name the panel button
+          carries, so the guide can find whichever of the two is on screen. */}
+      {walking && !raid.raidOpen && (
+        <button
+          className="primary walk-raid"
+          data-tut="action:raid"
+          onClick={() => {
+            audio.play("raidStart");
+            void raid.startRaid();
+          }}
+          disabled={raid.starting || !connected}
+        >
+          {raid.starting ? t("preparing") : connected ? t("start_raid") : t("connect_first")}
+        </button>
+      )}
+
       {/* The crosshair, and under it what the block it rests on will take:
           the dig price on rock, nothing on floor - the bar says what goes
           there. Both take no clicks; the canvas underneath is the hand. */}
@@ -1976,6 +2015,7 @@ export default function App() {
             return (
               <button
                 key={entry.id}
+                data-tut={`tool:${entry.id}`}
                 className={i === held ? "slot active" : locked ? "slot locked" : "slot"}
                 onClick={() => { audio.play("click"); setHeld(i); }}
                 title={locked ? t("locked_hint") : undefined}

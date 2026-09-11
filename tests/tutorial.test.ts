@@ -32,10 +32,11 @@ function followTheTutorial() {
 
   const context = (toolId: string, group = ""): TutorialContext => ({
     minions, traps, entrance, core,
-    wavesRepelled: 0, coreBreaches: 0, toolId, group,
+    wavesRepelled: 0, coreBreaches: 0, loot: 0, toolId, group,
     dug: dug.length,
     isDug: (x, y) => dug.some((tile) => tile.x === x && tile.y === y),
     connected: connects(arena, dug),
+    flat: false,
   });
 
   // Generous bound: a runaway guide should fail the test rather than hang it.

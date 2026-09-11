@@ -106,14 +106,13 @@ body {
 .app {
   position: relative;
   /*
-   * Never wider than 9:16, and as tall as the screen allows.
+   * Never wider than 16:9, and as tall as the screen allows.
    *
-   * Locking the height to 9:16 as well would letterbox a modern phone, which
-   * is 19.5:9 — a 375x812 screen would play in 375x667 and throw away 145
-   * pixels of board on the one device the game is actually for. Capping only
-   * the width gives a phone its whole screen and a desktop the portrait column
-   * it should have had all along; the panel is docked to the foot, so the extra
-   * height on a tall screen goes to the room.
+   * The game went sideways when it went first-person: a corridor seen
+   * through a portrait screen is a keyhole, and two thumbs - one on the
+   * stick, one turning the head - want the width. Only the width is
+   * capped, so a phone that is wider than 16:9 keeps its whole screen
+   * rather than a letterboxed strip of it.
    */
   width: var(--stage-w);
   height: 100vh;
@@ -1141,22 +1140,23 @@ button.primary {
   min-width: 84px;
 }
 
-/* On a phone the HUD becomes a bottom sheet that can be folded away, so the
-   dungeon itself is never buried under controls. */
+/* The panel is a column down the right of a sideways stage: the board keeps
+   its full height on the left, and the tools read top to bottom the way a
+   list does. Folded, it shrinks to its tab strip. */
 .hud {
-  left: 8px;
+  left: auto;
   right: 8px;
+  top: calc(var(--topdock-h, 92px) + 4px);
   bottom: 8px;
-  width: auto;
-  /* Capped well under half the screen so the board — the whole reason the
-     board went portrait — always keeps the other half. Whatever tab
-     content doesn't fit at this height scrolls inside .hud-body instead
-     of pushing the sheet taller. */
-  max-height: 44%;
+  width: min(42%, 360px);
+  max-height: none;
   padding: 10px 12px 8px;
 }
 
-.hud.collapsed { max-height: none; }
+.hud.collapsed {
+  bottom: auto;
+  max-height: none;
+}
 
 .toolbar {
   /* A third column trades row count for width: 15 build tools land in 5
@@ -1944,7 +1944,7 @@ button.ad-gold {
    --------------------------------------------------------------------------- */
 .rotate-guard { display: none; }
 
-@media (orientation: landscape) and (max-height: 500px) {
+@media (orientation: portrait) and (max-width: 600px) {
   .rotate-guard {
     position: fixed;
     inset: 0;
@@ -1977,8 +1977,8 @@ button.ad-gold {
 }
 
 @keyframes rotate-nudge {
-  0%, 55%, 100% { transform: rotate(-90deg); }
-  75%, 95% { transform: rotate(0deg); }
+  0%, 55%, 100% { transform: rotate(0deg); }
+  75%, 95% { transform: rotate(-90deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2124,6 +2124,20 @@ button.ad-gold {
   pointer-events: none;
 }
 
+/* The raid button from the floor: top right, out of the way of both thumbs
+   and of the crosshair, where the eye goes when the building is done. */
+.walk-raid {
+  position: absolute;
+  right: 12px;
+  top: calc(var(--topdock-h, 92px) + 8px);
+  z-index: 2;
+  flex: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
 /* The crosshair: a small cross that takes no clicks, dead centre, with the
    price of the block under it hung just below. Drawn in two colours so it
    reads on a torch-lit wall and on a black one. */
@@ -2161,14 +2175,27 @@ button.ad-gold {
 .hotbar {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 108px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
   z-index: 2;
   transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  max-width: 96%;
+  /* Room for the stick on the left and the map button on the right. */
+  max-width: calc(100% - 300px);
+}
+
+/* A phone on its side is short: the slots lose their price line and the
+   hint goes, so the bar is one row that the banners above never reach. */
+@media (max-height: 480px) {
+  .hotbar .slot { width: 50px; height: 50px; grid-template-rows: 1fr auto; }
+  .hotbar .slot i { display: none; }
+  .hotbar .slot img { width: 20px; height: 20px; }
+  .hotbar-hint { display: none; }
+  .stick { width: 92px; height: 92px; }
+  .stick .knob { width: 44px; height: 44px; }
+  .walkbar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
 }
 
 .hotbar .slot {

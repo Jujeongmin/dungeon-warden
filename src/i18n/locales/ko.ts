@@ -167,6 +167,7 @@ export const ko = {
   tut_trap_place: "부하 앞에 놓으세요",
   tut_save_hint: "저장해야 침입이 시작됩니다",
   tut_raid_hint: "전투는 자동 — 영웅은 갈 수 있는 부하만 잡으러 가고, 못 가면 코어로 갑니다",
+  tut_equip_hint: "전리품이 떨어졌어요 — 관리 탭에서 장비 최적을 누르세요",
 
   // Research nodes
   res_mage: "강령술",
@@ -244,7 +245,7 @@ export const ko = {
   adv_ranger: "레인저",
   banner_offline: "VITE_AGENT8_VERSE 없음 — 로컬 모드, 미저장.",
   aftermath_note: "지난 침입 기록 — 어디서 맞고 어디서 쓰러졌는지",
-  rotate_hint: "세로로 돌려주세요",
+  rotate_hint: "가로로 돌려주세요",
   result_champion: "우두머리 격파",
   party_summary: "Lv{level} · {count}명",
   manage_equip_best: "최적 장착",
@@ -265,6 +266,10 @@ export const ko = {
   tut_dig_group: "굴착 탭을 여세요",
   tut_dig_pick: "파기를 고르세요",
   tut_dig_place: "입구에서 코어까지 끌어서 파세요",
+  tut_dig_walk: "앞의 바위를 꾹 눌러 코어까지 파세요",
+  tut_nook_walk: "옆 벽을 한 칸씩 두 번 파세요",
+  tut_minion_walk: "파낸 자리 바닥을 탭해 궁수를 세우세요",
+  tut_trap_walk: "궁수 사이 통로 바닥을 탭하세요",
   hint_spread: "넓게 파면 부하가 약해집니다 ×{scale}",
   menu_walk: "던전 걸어보기",
   walk_exit: "나가기",

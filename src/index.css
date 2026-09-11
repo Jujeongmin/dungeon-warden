@@ -44,7 +44,7 @@
    * that should grow with the game rather than with the window is measured
    * from here — the same number the stage itself is sized by.
    */
-  --stage-w: min(100vw, calc(100dvh * 9 / 16));
+  --stage-w: min(100vw, calc(100dvh * 16 / 9));
 
   /*
    * Type scale, fluid between a small phone and a desktop column.

@@ -57,7 +57,7 @@ const HOLD_REPEAT_MS = 380;
 /** How long one dig swing owns the arms before idle or walk take over. */
 const SWING_SECONDS = 0.42;
 /** How far in front of the eyes the camera sits, in tiles. */
-const EYE_LEAD = 0.2;
+const EYE_LEAD = 0.3;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -390,6 +390,8 @@ export class DungeonRenderer {
   private markerGroup = new THREE.Group();
   private markerMeshes = new Map<string, THREE.Object3D>();
   private trapGeometry = new THREE.BoxGeometry(0.72, MARKER_HEIGHT, 0.72);
+  /** The floor ring under every trap. Shared; each trap tints its own material. */
+  private trapRing = new THREE.RingGeometry(0.4, 0.5, 28);
   private roomGeometry = new THREE.BoxGeometry(0.94, MARKER_HEIGHT * 0.6, 0.94);
 
 
@@ -449,6 +451,8 @@ export class DungeonRenderer {
   /** Pixels of canvas hidden behind the HUD, so the board can frame above it. */
   private bottomInset = 0;
   private leftInset = 0;
+  private rightInset = 0;
+  private topInset = 0;
 
   /** The see-through preview of what the next tap places. */
   private ghost: THREE.Object3D | null = null;
@@ -665,14 +669,34 @@ export class DungeonRenderer {
     this.fitToArena();
   }
 
+  /** How much of the canvas the top chrome covers: the bar, and any banners under it. */
+  setTopInset(pixels: number): void {
+    const next = Math.max(0, Math.round(pixels));
+    if (next === this.topInset) return;
+    this.topInset = next;
+    this.applyViewOffset();
+    this.fitToArena();
+  }
+
+  /** How much of the canvas the build panel covers down the right edge. */
+  setRightInset(pixels: number): void {
+    const next = Math.max(0, Math.round(pixels));
+    if (next === this.rightInset) return;
+    this.rightInset = next;
+    this.applyViewOffset();
+    this.fitToArena();
+  }
+
   private applyViewOffset(): void {
     const width = this.canvas.clientWidth || 1;
     const height = this.canvas.clientHeight || 1;
     // Never hide so much that there is no room left to play in.
     const bottom = Math.min(this.bottomInset, Math.max(0, height - 80));
     const left = Math.min(this.leftInset, Math.max(0, width - 80));
+    const right = Math.min(this.rightInset, Math.max(0, width - 80 - left));
+    const top = Math.min(this.topInset, Math.max(0, height - 80 - bottom));
 
-    if (bottom <= 0 && left <= 0) {
+    if (bottom <= 0 && left <= 0 && right <= 0 && top <= 0) {
       this.camera.clearViewOffset();
       return;
     }
@@ -680,17 +704,20 @@ export class DungeonRenderer {
     /*
      * Frame as though the canvas were larger by each hidden strip, then show
      * the part of it the player can see. A point at the virtual centre lands
-     * at `full / 2 - offset`, and the board wants to sit at the middle of
-     * what is left — so each offset is its own strip.
+     * at `full / 2 - offset` on screen, and the board wants to sit at the
+     * middle of what is left: for a strip hidden on the right that means an
+     * offset of the strip itself, for one hidden on the left an offset of
+     * nothing (the virtual canvas grows leftwards and the window stays put),
+     * and for the foot the strip again. The left case was wrong before and
+     * framed the title room behind the slab it was meant to sit beside.
      */
-    this.camera.setViewOffset(width + left, height + bottom, left, bottom, width, height);
+    this.camera.setViewOffset(width + left + right, height + top + bottom, right, bottom, width, height);
   }
 
   private fitToArena(): void {
     const arena = this.arena;
     if (!arena) return;
 
-    const aspect = this.camera.aspect || 1;
     /*
      * Square on, so the footprint is the room itself rather than its diagonal:
      * as wide as it is, and as deep as it is times the cosine of the pitch.
@@ -699,24 +726,32 @@ export class DungeonRenderer {
     const turned = this.yawStep % 2 === 1;
     const across = turned ? arena.h : arena.w;
     const along = (turned ? arena.w : arena.h) * Math.cos(PITCH - Math.PI / 2);
-    const span = Math.max(across, along) * 0.62;
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
 
-    const forHeight = span / Math.tan(halfFov);
-    const forWidth = span / (Math.tan(halfFov) * aspect);
-
-    // The view offset spreads the vertical field over the canvas *plus* the
-    // strip hidden by the HUD, so only part of it is on screen. Back off by
-    // that ratio or the board is framed to a height the player cannot see.
+    /*
+     * Fitted to the part of the canvas the player can actually see.
+     *
+     * The view offset spreads the field over the canvas plus every hidden
+     * strip, so a pixel per world unit is the virtual height over the world
+     * height at this distance. The board has to fit its footprint into the
+     * visible region on both axes, and the larger of the two distances wins.
+     * Sharing out ratios used to stand in for this, and got the answer
+     * wrong the moment the panel moved from the foot to the side: it took
+     * the larger ratio and applied it to the wrong axis.
+     */
     const height = this.canvas.clientHeight || 1;
     const width = this.canvas.clientWidth || 1;
-    const visibleShare = Math.max(
-      (height + this.bottomInset) / height,
-      (width + this.leftInset) / width,
-    );
+    const fullHeight = height + this.topInset + this.bottomInset;
+    const visibleHeight = Math.max(80, height - this.topInset - this.bottomInset);
+    const visibleWidth = Math.max(80, width - this.leftInset - this.rightInset);
+    // A little air round the room, so the door and the core are not on the edge.
+    const margin = 1.12;
+
+    const forHeight = (along * margin * fullHeight) / (2 * Math.tan(halfFov) * visibleHeight);
+    const forWidth = (across * margin * fullHeight) / (2 * Math.tan(halfFov) * visibleWidth);
 
     this.distance = THREE.MathUtils.clamp(
-      Math.max(forHeight, forWidth) * 0.66 * visibleShare,
+      Math.max(forHeight, forWidth),
       MIN_DISTANCE,
       MAX_DISTANCE,
     );
@@ -1164,13 +1199,41 @@ export class DungeonRenderer {
 
       if (!object) {
         object =
-          this.spawnModel(modelKey, marker.shape === "trap" ? 0.7 : 0.85) ??
+          this.spawnModel(modelKey, marker.shape === "trap" ? 0.78 : 0.85) ??
           new THREE.Mesh(
             marker.shape === "trap" ? this.trapGeometry : this.roomGeometry,
             new THREE.MeshLambertMaterial({
               color: MARKER_COLORS[marker.kind] ?? 0xffffff,
             }),
           );
+        /*
+         * A ring on the floor in the trap's own colour, under the model.
+         *
+         * The pack's props are dungeon dressing first - a crossbow is a
+         * crossbow, and on a torch-lit floor it is a small dark shape among
+         * other small dark shapes. The ring is what says "this tile does
+         * something", from above and from the corridor alike, and its
+         * colour is the one the same trap flashes when it fires.
+         */
+        if (marker.shape === "trap") {
+          const ring = new THREE.Mesh(
+            this.trapRing,
+            new THREE.MeshBasicMaterial({
+              color: MARKER_COLORS[marker.kind] ?? 0xffffff,
+              transparent: true,
+              opacity: 0.55,
+              depthWrite: false,
+            }),
+          );
+          ring.rotation.x = -Math.PI / 2;
+          // In the model's own space, which is scaled to the tile - so the
+          // ring is scaled back out to keep its size on the floor.
+          const scale = object.scale.x || 1;
+          ring.scale.setScalar(1 / scale);
+          ring.position.y = -object.position.y / scale + 0.015 / scale;
+          ring.userData.ui = true;
+          object.add(ring);
+        }
         this.markerMeshes.set(marker.id, object);
         this.markerGroup.add(object);
       }
@@ -2062,7 +2125,7 @@ export class DungeonRenderer {
   /** Stands the body up where the walk starts. Harmless before models load. */
   private spawnWarden(): void {
     this.disposeWarden();
-    const body = this.spawnModel("warden", 0.9);
+    const body = this.spawnModel("warden", 0.72);
     if (!body) return;
 
     // Eye height from the model: a taller skeleton looks out from higher up,
@@ -2962,6 +3025,7 @@ export class DungeonRenderer {
 
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();
+    this.trapRing.dispose();
     this.roomGeometry.dispose();
     this.highlight.geometry.dispose();
     (this.highlight.material as THREE.Material).dispose();
