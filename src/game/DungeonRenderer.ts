@@ -57,9 +57,9 @@ const HOLD_REPEAT_MS = 380;
 /** How long one dig swing owns the arms before idle or walk take over. */
 const SWING_SECONDS = 0.42;
 /** How far in front of the eye the warden is drawn, in tiles. */
-const VIEW_AHEAD = 1.75;
+const VIEW_AHEAD = 2.0;
 /** And how far to one side, so it does not stand on the crosshair. */
-const VIEW_ASIDE = -0.3;
+const VIEW_ASIDE = -0.5;
 /** Scratch for the holder's transform, so the frame loop allocates nothing. */
 const VIEW_SPIN = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
