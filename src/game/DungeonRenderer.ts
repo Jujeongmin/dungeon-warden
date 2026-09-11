@@ -46,16 +46,6 @@ const BODY = 0.36;
 const LOOK_SPEED = 0.0045;
 /** Tiles a second on foot. A tile is about two metres. */
 const WALK_SPEED = 2.2;
-/** How far a block can be from the eye and still be reached. */
-const REACH = 3.2;
-/** The crosshair, in normalised device coordinates. */
-const CENTRE = new THREE.Vector2(0, 0);
-/** A finger resting on a block this long is a hold, not a tap. */
-const HOLD_AFTER_MS = 320;
-/** A held primary fires again this often. */
-const HOLD_REPEAT_MS = 380;
-/** How long one dig swing owns the arms before idle or walk take over. */
-const SWING_SECONDS = 0.42;
 /** Where the copy hangs off the lens, in tiles: back, aside, and down. */
 const VIEW_BACK = -0.85;
 const VIEW_ASIDE = 0;
@@ -146,28 +136,6 @@ export interface RendererCallbacks {
    */
   isPaintable?: () => boolean;
   onHoverChange: (tile: { x: number; y: number } | null) => void;
-  /**
-   * The block under the crosshair while walking, or null facing nothing.
-   *
-   * Down in the corridor there is no cursor: what the player is looking at
-   * is what they act on, and this is that block.
-   */
-  onAimChange?: (tile: AimTile | null) => void;
-  /**
-   * The player acted on the block under the crosshair.
-   *
-   * Primary is the left hand: it takes things out (rock). Secondary is the
-   * right: it puts things down (fill, or whatever is held). The renderer
-   * only reports the gesture; what either means is the game's to decide.
-   */
-  onAct?: (button: "primary" | "secondary", tile: AimTile) => void;
-}
-
-/** What the crosshair rests on: a block of rock, or a tile of floor. */
-export interface AimTile {
-  x: number;
-  y: number;
-  kind: "rock" | "floor";
 }
 
 /** One drawable unit. The renderer stays ignorant of raid rules. */
@@ -225,9 +193,6 @@ const CLIP_PATTERNS: Record<string, RegExp[]> = {
   // Adding a paid animation pack later lets the first patterns take over.
   attack: [/melee_attack/i, /attack/i, /shoot/i, /spellcast/i, /^interact$/i, /^throw$/i],
   down: [/^death_a$/i, /death/i, /defeat/i, /^die/i],
-  // Only the warden has one: the library's tree-chopping swing, which is
-  // what taking a claw to rock looks like.
-  dig: [/^dig$/i, /chop/i],
 };
 
 /**
@@ -396,9 +361,6 @@ export class DungeonRenderer {
 
   private floorMesh: THREE.InstancedMesh | null = null;
   private rockMesh: THREE.InstancedMesh | null = null;
-  /** Which tile each instance is, so a raycast hit can be named. */
-  private floorTiles: Array<{ x: number; y: number }> = [];
-  private rockTiles: Array<{ x: number; y: number }> = [];
   /** Loaded once and shared; disposed with the renderer. */
   private stone = new Map<string, { color: THREE.Texture; normal: THREE.Texture }>();
   private highlight: THREE.Mesh;
@@ -564,27 +526,6 @@ export class DungeonRenderer {
     );
     this.highlight.visible = false;
     this.scene.add(this.highlight);
-
-    /*
-     * The crosshair outline: a thin dark box round the block being looked
-     * at, and a flat square on a floor tile. An outline rather than a tint
-     * because down here the block fills half the view, and tinting half the
-     * view is a colour cast, not a selection.
-     */
-    const outline = new THREE.LineBasicMaterial({
-      color: 0x0d0a08, transparent: true, opacity: 0.85, depthTest: true,
-    });
-    this.aimBox = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(TILE_SIZE * 0.985, ROCK_HEIGHT * 1.01, TILE_SIZE * 0.985)),
-      outline,
-    );
-    this.aimPlate = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(TILE_SIZE * 0.96, 0.02, TILE_SIZE * 0.96)),
-      outline,
-    );
-    this.aimBox.visible = false;
-    this.aimPlate.visible = false;
-    this.scene.add(this.aimBox, this.aimPlate);
 
     /*
      * The view model's own little world: a holder that copies the camera
@@ -1332,7 +1273,6 @@ export class DungeonRenderer {
     // from eye height the flag was a paving stone the size of a table with
     // a bevel round it, and the scan already says what the floor is made of.
     this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, null);
-    this.floorTiles = floorPositions.map((p) => ({ x: p.x, y: p.y }));
     if (this.floorMesh) {
       // Real stone over the pack's flat flagstone. The per-instance tint that
       // marks the door and the core rides on top of it unchanged.
@@ -1370,7 +1310,6 @@ export class DungeonRenderer {
       }
     }
     this.rockMesh = this.buildInstanced(rockPositions, ROCK_HEIGHT, null);
-    this.rockTiles = rockPositions.map((p) => ({ x: p.x, y: p.y }));
     if (this.rockMesh) {
       /*
        * Standard rather than Lambert, here and on the floor only.
@@ -1909,7 +1848,6 @@ export class DungeonRenderer {
    */
   private tileProto(
     key: string,
-    fallbackHeight: number,
   ): { geometry: THREE.BufferGeometry; material: THREE.Material; scale: number; lift: number } | null {
     const model = this.loaded.get(key);
     if (!model) return null;
@@ -1932,7 +1870,6 @@ export class DungeonRenderer {
 
     const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
     return { geometry, material, scale, lift: -box.min.y * scale };
-    void fallbackHeight;
   }
 
   private buildInstanced(
@@ -1942,7 +1879,7 @@ export class DungeonRenderer {
   ): THREE.InstancedMesh | null {
     if (items.length === 0) return null;
 
-    const proto = modelKey ? this.tileProto(modelKey, height) : null;
+    const proto = modelKey ? this.tileProto(modelKey) : null;
 
     const geo =
       // Full tiles, edge to edge: the gap that drew a grid from above was a
@@ -2095,8 +2032,6 @@ export class DungeonRenderer {
    * cannot pass through is still read per tile.
    */
   private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
-  /** The block under the crosshair, so a change can be reported once. */
-  private aim: AimTile | null = null;
   /**
    * The body the camera rides while walking.
    *
@@ -2113,21 +2048,12 @@ export class DungeonRenderer {
   private viewScene = new THREE.Scene();
   /** Eye height of that body, measured from its own head rather than assumed. */
   private wardenEye = EYE_HEIGHT;
-  /** Seconds left of the current dig swing, during which idle/walk wait. */
-  private wardenSwing = 0;
   /** Whether the body moved this frame, for idle against walk. */
   private wardenMoving = false;
-  /** The thin dark box round the block the crosshair is on. */
-  private aimBox: THREE.LineSegments;
-  private aimPlate: THREE.LineSegments;
   /** Keys held, for walking on a keyboard. */
   private keys = new Set<string>();
   /** A stick or pad, -1..1 on each axis. Overrides the keys while pushed. */
   private moveInput = { forward: 0, strafe: 0 };
-  /** Holding the primary button repeats it, the way a pick keeps swinging. */
-  private holdTimer = 0;
-  /** A touch that has not moved yet may still turn into a tap or a hold. */
-  private touchPending: { id: number; timer: number } | null = null;
 
   /** True while the camera is down in the corridor. */
   get walking(): boolean {
@@ -2144,10 +2070,11 @@ export class DungeonRenderer {
   setWalking(on: boolean): void {
     if (!on) {
       this.walk = null;
-      this.setAim(null);
-      this.stopHold();
       this.disposeWarden();
       this.keys.clear();
+      this.activePointers.clear();
+      this.dragStart = null;
+      this.dragMoved = false;
       this.moveInput.forward = 0;
       this.moveInput.strafe = 0;
       if (document.pointerLockElement === this.canvas) document.exitPointerLock();
@@ -2183,7 +2110,6 @@ export class DungeonRenderer {
       // feet on it.
       this.rockMesh.position.y = 0;
     }
-    this.aimBox.scale.y = k;
   }
 
   /** Stands the body up where the walk starts. Harmless before models load. */
@@ -2342,36 +2268,6 @@ export class DungeonRenderer {
     this.mixers.delete("warden");
     this.disposeObject(this.scene, this.warden);
     this.warden = null;
-    this.wardenSwing = 0;
-  }
-
-  /**
-   * One swing of the arms, restarted on every act so a held button reads as
-   * repeated blows rather than one long loop.
-   */
-  private swing(state: "attack" | "dig" = "attack"): void {
-    this.wardenSwing = SWING_SECONDS;
-    const entry = this.mixers.get("warden");
-    // Whichever of the two the body has: the dig swing is a chop, the attack
-    // a hook, and a rig missing either falls back to the one it has.
-    const action = entry?.actions.get(state) ?? entry?.actions.get("attack");
-    if (!entry || !action) return;
-    for (const [name, other] of entry.actions) {
-      if (other !== action) other.fadeOut(0.08);
-      void name;
-    }
-    action.reset().fadeIn(0.05).play();
-    entry.current = state;
-
-    // The arms in front of the camera are the same swing, seen from inside.
-    const view = this.mixers.get("view-arms");
-    const held = view?.actions.get(state) ?? view?.actions.get("attack");
-    if (!view || !held) return;
-    for (const other of view.actions.values()) {
-      if (other !== held) other.fadeOut(0.08);
-    }
-    held.reset().fadeIn(0.05).play();
-    view.current = state;
   }
 
   /**
@@ -2408,7 +2304,7 @@ export class DungeonRenderer {
   }
 
   /** Keeps the body under the camera and in the right clip. */
-  private updateWarden(delta: number): void {
+  private updateWarden(): void {
     const walk = this.walk;
     const body = this.warden;
     if (!walk || !body) return;
@@ -2419,15 +2315,6 @@ export class DungeonRenderer {
     body.rotation.y = walk.yaw;
     this.poseViewArms();
 
-    if (this.wardenSwing > 0) {
-      this.wardenSwing -= delta;
-      if (this.wardenSwing > 0) return;
-      // Let the locomotion clip back in by forgetting the swing was current.
-      const entry = this.mixers.get("warden");
-      if (entry) entry.current = null;
-      const view = this.mixers.get("view-arms");
-      if (view) view.current = null;
-    }
     this.playClip("warden", this.wardenMoving ? "walk" : "idle");
     this.playClip("view-arms", this.wardenMoving ? "walk" : "idle");
   }
@@ -2511,83 +2398,6 @@ export class DungeonRenderer {
     return true;
   }
 
-  /**
-   * The tile straight ahead of the walker.
-   *
-   * One tile, in whichever of the four directions the head is turned most
-   * towards. Digging is per tile and the corridor is one tile wide, so the
-   * rock a player is facing is never ambiguous the way a free-aimed ray
-   * would make it - a ray at a corner hits the tile beside the one they
-   * meant, and a dig that lands one over is a hole nobody wanted.
-   */
-  private aimTile(): AimTile | null {
-    const walk = this.walk;
-    const arena = this.arena;
-    if (!walk || !arena) return null;
-
-    const targets: THREE.Object3D[] = [];
-    if (this.rockMesh) targets.push(this.rockMesh);
-    if (this.floorMesh) targets.push(this.floorMesh);
-    if (targets.length === 0) return null;
-
-    this.raycaster.setFromCamera(CENTRE, this.camera);
-    this.raycaster.far = REACH;
-    const hit = this.raycaster.intersectObjects(targets, false)[0];
-    // Shared with the cursor above, which expects it unbounded.
-    this.raycaster.far = Infinity;
-    if (!hit || hit.instanceId === undefined) return null;
-
-    const rock = hit.object === this.rockMesh;
-    const tile = (rock ? this.rockTiles : this.floorTiles)[hit.instanceId];
-    if (!tile || !inArena(arena, tile.x, tile.y)) return null;
-    return { x: tile.x, y: tile.y, kind: rock ? "rock" : "floor" };
-  }
-
-  /** Outlines the block under the crosshair and tells the screen when it changes. */
-  private setAim(tile: AimTile | null): void {
-    const same =
-      (tile === null && this.aim === null) ||
-      (tile !== null &&
-        this.aim !== null &&
-        tile.x === this.aim.x &&
-        tile.y === this.aim.y &&
-        tile.kind === this.aim.kind);
-    if (same) return;
-
-    this.aim = tile;
-    this.aimBox.visible = tile?.kind === "rock";
-    this.aimPlate.visible = tile?.kind === "floor";
-    if (tile) {
-      this.aimBox.position.set(tile.x, (ROCK_HEIGHT * this.aimBox.scale.y) / 2, tile.y);
-      this.aimPlate.position.set(tile.x, FLOOR_HEIGHT + 0.012, tile.y);
-    }
-    this.callbacks.onAimChange?.(tile);
-  }
-
-  /** Fires the gesture at whatever the crosshair is on right now. */
-  private act(button: "primary" | "secondary"): void {
-    const aim = this.aimTile();
-    this.setAim(aim);
-    // The arms move whether or not the blow lands on anything: a swing at
-    // empty air is what the hand did, and the game says the rest.
-    if (button === "primary") this.swing(aim?.kind === "rock" ? "dig" : "attack");
-    if (aim) this.callbacks.onAct?.(button, aim);
-  }
-
-  /** Primary now, and again every so often while the button stays down. */
-  private startHold(): void {
-    this.stopHold();
-    this.act("primary");
-    this.holdTimer = window.setInterval(() => this.act("primary"), HOLD_REPEAT_MS);
-  }
-
-  private stopHold(): void {
-    if (this.holdTimer !== 0) window.clearInterval(this.holdTimer);
-    this.holdTimer = 0;
-    if (this.touchPending) window.clearTimeout(this.touchPending.timer);
-    this.touchPending = null;
-  }
-
   private updateCamera(): void {
     /*
      * Down in the corridor: the camera is the player, so it is a position and
@@ -2608,7 +2418,6 @@ export class DungeonRenderer {
       const ex = this.walk.at.x;
       const ez = this.walk.at.z;
       this.camera.position.set(ex, eye, ez);
-      this.setAim(this.aimTile());
       const cosPitch = Math.cos(this.walk.pitch);
       this.camera.lookAt(
         ex + Math.sin(this.walk.yaw) * cosPitch,
@@ -2899,43 +2708,26 @@ export class DungeonRenderer {
 
   private onPointerDown = (e: PointerEvent): void => {
     /*
-     * Down in the corridor the pointer is a hand, not a cursor.
-     *
-     * Mouse: the first click takes the pointer (the view follows the mouse
-     * from then on, the way it does in any first-person game); after that,
-     * left takes out and right puts down. Touch: a drag turns the head, a
-     * tap puts down, and holding still on a block takes it out - which is
-     * the split every pocket edition of this kind of game settled on.
+     * Down in the corridor the pointer only turns the head. Construction is
+     * deliberately confined to the overview, where the player can read the
+     * whole route before changing it.
      */
     if (this.walk) {
       if (e.pointerType === "mouse") {
         /*
          * With the pointer locked the mouse is a proper first-person mouse:
-         * the view follows it with nothing held, left takes out, right puts
-         * down. The lock is asked for on the first click but never waited
-         * on - inside an iframe that was not given the permission (which is
-         * where this game is played) the request fails silently, and a click
-         * that only asked would be a click that did nothing.
+         * the view follows it with nothing held. The lock is asked for on the
+         * first primary click but never waited on; inside an iframe without
+         * that permission the drag fallback below still turns the head.
          */
-        if (document.pointerLockElement === this.canvas) {
-          if (e.button === 0) this.startHold();
-          else if (e.button === 2) this.act("secondary");
-          return;
-        }
+        if (document.pointerLockElement === this.canvas) return;
+        if (e.button !== 0) return;
         try {
           const request = this.canvas.requestPointerLock?.() as unknown;
           if (request instanceof Promise) request.catch(() => undefined);
         } catch {
           /* not available here; the drag turns the head instead */
         }
-        // Right puts down at once; it is never the start of a look.
-        if (e.button === 2) {
-          this.act("secondary");
-          return;
-        }
-        if (e.button !== 0) return;
-        // Unlocked, the left button is a finger: a click takes out, holding
-        // still keeps taking, and moving turns the head instead.
       }
 
       // Capture is refused while a lock request is in flight; it only keeps
@@ -2948,14 +2740,6 @@ export class DungeonRenderer {
       this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
       this.dragStart = new THREE.Vector2(e.clientX, e.clientY);
       this.dragMoved = false;
-      this.stopHold();
-      this.touchPending = {
-        id: e.pointerId,
-        timer: window.setTimeout(() => {
-          this.touchPending = null;
-          if (!this.dragMoved) this.startHold();
-        }, HOLD_AFTER_MS),
-      };
       return;
     }
 
@@ -2972,7 +2756,7 @@ export class DungeonRenderer {
        * a dig and turned into a pan halfway through is a dungeon with a hole
        * in a place nobody chose.
        */
-      this.painting = !this.walk && this.callbacks.isPaintable?.() === true;
+      this.painting = this.callbacks.isPaintable?.() === true;
       this.paintedTile = null;
       this.paintedAt = null;
       if (this.painting) this.paintAt(e.clientX, e.clientY);
@@ -2996,11 +2780,8 @@ export class DungeonRenderer {
       }
       if (!previous) return;
       const current = new THREE.Vector2(e.clientX, e.clientY);
-      // A finger that has travelled is turning the head, not resting on a
-      // block: the tap and the hold both stand down.
       if (!this.dragMoved && this.dragStart && current.distanceTo(this.dragStart) > TAP_SLOP) {
         this.dragMoved = true;
-        this.stopHold();
       }
       this.look(
         (current.x - previous.x) * LOOK_SPEED,
@@ -3062,23 +2843,18 @@ export class DungeonRenderer {
 
   private onPointerUp = (e: PointerEvent): void => {
     if (this.walk) {
-      const mouse = e.pointerType === "mouse";
-      if (mouse && document.pointerLockElement === this.canvas) {
-        if (e.button === 0) this.stopHold();
+      if (e.pointerType === "mouse" && document.pointerLockElement === this.canvas) {
+        this.activePointers.clear();
+        this.dragStart = null;
+        this.dragMoved = false;
         return;
       }
-      // Lifted before the hold fired and without moving: a tap. A finger
-      // tapping puts down; a mouse clicking takes out - the finger has no
-      // second button, the mouse does.
-      const tap = this.touchPending?.id === e.pointerId && !this.dragMoved;
-      this.stopHold();
       this.activePointers.delete(e.pointerId);
       if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
       if (this.activePointers.size === 0) {
         this.dragStart = null;
         this.dragMoved = false;
       }
-      if (tap) this.act(mouse ? "primary" : "secondary");
       return;
     }
 
@@ -3088,9 +2864,8 @@ export class DungeonRenderer {
       this.canvas.releasePointerCapture(e.pointerId);
     }
 
-    // No placing from inside the dungeon: this is a look around, not a
-    // second way to build, and a tap down here has no tile to mean.
-    if (wasSingle && !this.dragMoved && !this.walk && !this.painting) {
+    // A tap in the overview edits the tile; the walking branch returned above.
+    if (wasSingle && !this.dragMoved && !this.painting) {
       const tile = this.pointerToTile(e.clientX, e.clientY);
       if (tile && e.button === 2) {
         this.callbacks.onTileAlt?.(tile.x, tile.y, e.clientX, e.clientY);
@@ -3151,7 +2926,7 @@ export class DungeonRenderer {
     this.updateHealthBars();
     this.updateShake(delta);
     this.updateWalk(delta);
-    this.updateWarden(delta);
+    this.updateWarden();
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
@@ -3235,7 +3010,6 @@ export class DungeonRenderer {
     this.resizeObserver.disconnect();
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
-    this.stopHold();
 
     const c = this.canvas;
     c.removeEventListener("pointerdown", this.onPointerDown);

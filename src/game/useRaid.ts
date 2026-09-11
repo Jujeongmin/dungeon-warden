@@ -347,7 +347,7 @@ export function useRaid({
    * Fires a warden skill. Rally needs a tile, so selecting it arms a pending
    * state and the next tap on the dungeon supplies the target.
    */
-  const useSkill = useCallback((skill: WardenSkill, target?: { x: number; y: number }) => {
+  const activateSkill = useCallback((skill: WardenSkill, target?: { x: number; y: number }) => {
     const sim = simRef.current;
     if (!sim || !sim.canUseSkill(skill)) return;
 
@@ -365,10 +365,10 @@ export function useRaid({
   const resolveSkillTarget = useCallback(
     (x: number, y: number) => {
       if (!pendingSkill) return false;
-      useSkill(pendingSkill, { x, y });
+      activateSkill(pendingSkill, { x, y });
       return true;
     },
-    [pendingSkill, useSkill],
+    [pendingSkill, activateSkill],
   );
 
   /**
@@ -447,7 +447,7 @@ export function useRaid({
     error,
     pendingSkill,
     startRaid,
-    useSkill,
+    useSkill: activateSkill,
     resolveSkillTarget,
     stepRaid,
     /** Dev only: drives the result screen without a server. See devtools. */

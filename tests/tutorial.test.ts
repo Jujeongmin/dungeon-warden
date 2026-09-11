@@ -36,7 +36,6 @@ function followTheTutorial() {
     dug: dug.length,
     isDug: (x, y) => dug.some((tile) => tile.x === x && tile.y === y),
     connected: connects(arena, dug),
-    flat: false,
   });
 
   // Generous bound: a runaway guide should fail the test rather than hang it.

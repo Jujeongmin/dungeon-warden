@@ -13,7 +13,7 @@
  *   skeleton, which is the whole reason these two were chosen together.
  *
  * What comes out is three files: a body with its textures cut to something a
- * phone can hold, the handful of clips it actually plays with the library's
+ * phone can hold, the locomotion clips it actually plays with the library's
  * own mannequin thrown away, and the same body cut down to a pair of arms
  * for the view from inside its head. Run with:
  *
@@ -37,18 +37,15 @@ const BODY = join(src, "bestiary/Exports/GLB (Godot-Unreal)/Imp.glb");
 const CLIPS = join(src, "ual2/Unreal-Godot/UAL2_Standard.glb");
 
 /*
- * Four motions, chosen for a monster rather than for a person.
+ * Two motions, chosen for a monster rather than for a person.
  *
  * The library is built for an adventurer - it has sword combos, farming and a
- * phone call. What a warden does is stand in its own corridor, walk it, swing
- * a claw and chew through rock, so the zombie locomotion and the two swings
- * are the ones that fit, renamed to what this game calls them.
+ * phone call. First-person mode is inspection-only, so the zombie idle and
+ * walk are the only clips it needs.
  */
 const WANTED = {
   Zombie_Idle_Loop: "idle",
   Zombie_Walk_Fwd_Loop: "walk",
-  Melee_Hook: "attack",
-  TreeChopping_Loop: "dig",
 };
 
 /** How big a texture may be after baking. The body fills a corner of the view. */
@@ -94,6 +91,7 @@ async function main() {
     // reads the quantization extension natively, and it is most of the file.
     quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12, quantizeWeight: 8 }),
   );
+  const bodyNodes = new Set(body.getRoot().listNodes().map((node) => node.getName()));
   await io.write(join(out, "warden.glb"), body);
 
   // --- the clips -----------------------------------------------------------
@@ -104,6 +102,25 @@ async function main() {
     const rename = WANTED[animation.getName()];
     if (rename) {
       animation.setName(rename);
+
+      /*
+       * The animation library's mannequin has a few finger and foot-tip
+       * joints that the imp does not. Three.js can ignore those tracks, but
+       * it reports every missing target for every copy of the rig, which
+       * floods the console as soon as first-person mode creates its body and
+       * view-arms mixers. Keep only channels the shipped body can actually
+       * bind, then drop samplers that no surviving channel uses.
+       */
+      for (const channel of animation.listChannels()) {
+        const target = channel.getTargetNode();
+        if (!target || !bodyNodes.has(target.getName())) channel.dispose();
+      }
+      const usedSamplers = new Set(
+        animation.listChannels().map((channel) => channel.getSampler()).filter(Boolean),
+      );
+      for (const sampler of animation.listSamplers()) {
+        if (!usedSamplers.has(sampler)) sampler.dispose();
+      }
       continue;
     }
     /*

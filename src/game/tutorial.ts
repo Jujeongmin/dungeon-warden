@@ -19,13 +19,6 @@ export interface TutorialContext {
   isDug: (x: number, y: number) => boolean;
   /** Whether the door can reach the core yet. */
   connected: boolean;
-  /**
-   * Down in the corridor, where there are no drawers and digging needs no
-   * tool: the bar along the foot is flat, and the rock is dug by looking at
-   * it. Steps skip the beats that would point at buttons that are not
-   * there, and say what they want in the words of that view.
-   */
-  flat: boolean;
 }
 
 /** Where the player is being sent. `null` means nowhere in particular. */
@@ -55,8 +48,6 @@ export interface TutorialStep {
   hint: string;
   /** Translation key: shown once the tool is in hand and the tap goes on the board. */
   placeHint?: string;
-  /** Translation key: the same beat, said for someone standing in the corridor. */
-  walkHint?: string;
   /**
    * A tile worth putting it on.
    *
@@ -98,7 +89,6 @@ export const TUTORIAL: TutorialStep[] = [
     groupHint: "tut_dig_group",
     hint: "tut_dig_pick",
     placeHint: "tut_dig_place",
-    walkHint: "tut_dig_walk",
     /*
      * The way in, first.
      *
@@ -132,7 +122,6 @@ export const TUTORIAL: TutorialStep[] = [
     groupHint: "tut_dig_group",
     hint: "tut_dig_pick",
     placeHint: "tut_nook_place",
-    walkHint: "tut_nook_walk",
     /*
      * Two nooks beside the corridor, near the core.
      *
@@ -167,7 +156,6 @@ export const TUTORIAL: TutorialStep[] = [
     groupHint: "tut_minion_group",
     hint: "tut_minion_pick",
     placeHint: "tut_minion_place",
-    walkHint: "tut_minion_walk",
     /*
      * Two of them, and that is not padding - it is the first raid's arithmetic.
      *
@@ -196,7 +184,6 @@ export const TUTORIAL: TutorialStep[] = [
     groupHint: "tut_trap_group",
     hint: "tut_trap_pick",
     placeHint: "tut_trap_place",
-    walkHint: "tut_trap_walk",
     // On the corridor itself, between the two nooks, so the trap and the
     // archers read as working together rather than as two separate purchases.
     placeAt: ({ core }) => (core ? { x: core.x, y: core.y - 3 } : null),
@@ -262,7 +249,7 @@ export function guideFor(context: TutorialContext): TutorialGuide | null {
      * tool, put it down. Each one points at exactly the thing that has to be
      * pressed next, and none of them presses it.
      */
-    if (step.group && !context.flat && context.group !== step.group) {
+    if (step.group && context.group !== step.group) {
       return {
         index,
         step,
@@ -273,14 +260,12 @@ export function guideFor(context: TutorialContext): TutorialGuide | null {
 
     // Already holding it: the next thing to do is on the board, and pointing
     // at a button the player has just pressed would be pointing backwards.
-    // Digging needs no tool in the corridor: the rock is what is looked at.
-    const held = context.toolId === step.tool || (context.flat && step.tool === "dig");
+    const held = context.toolId === step.tool;
     const tile = held ? step.placeAt?.(context) : null;
-    const placeHint = (context.flat && step.walkHint) || step.placeHint;
     return {
       index,
       step,
-      hint: held && placeHint ? placeHint : step.hint,
+      hint: held && step.placeHint ? step.placeHint : step.hint,
       target: held
         ? tile
           ? { kind: "tile", x: tile.x, y: tile.y }

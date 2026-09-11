@@ -1045,7 +1045,7 @@ function migrate(dungeon) {
   if (dungeon.version === SAVE_VERSION) return dungeon;
   if (dungeon.version !== 1) return null;
 
-  const { grid, ...rest } = dungeon;
+  const { grid: _grid, ...rest } = dungeon;
   return {
     ...rest,
     version: SAVE_VERSION,

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DungeonRenderer,
-  type AimTile,
   type MarkerView,
   type UnitView,
 } from "./game/DungeonRenderer";
@@ -35,7 +34,6 @@ import { DIG_COST, dugSet, garrisonScale, rockSet } from "./game/dig";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
 import {
-  ADVENTURER_CLASSES,
   ADVENTURER_LABEL,
   CHAMPION_MODEL_SCALE,
   MAX_ROOMS,
@@ -132,14 +130,6 @@ const HAS_MOUSE =
   window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 /**
- * The five adventurer models, photographed for the party row.
- *
- * Baked from the same pack the raid draws, so the face above the raid button
- * is the figure that walks in when it is pressed.
- */
-const PARTY_MODEL_KEYS = ADVENTURER_CLASSES.map((cls) => `a_${cls}`);
-
-/**
  * Which drawer each tool lives in.
  *
  * Named rather than derived from the tool's kind, which is what it used to
@@ -197,16 +187,6 @@ export default function App() {
   const hudRef = useRef<HTMLElement>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
-  /** The block under the crosshair while walking the corridor. */
-  const [aim, setAim] = useState<AimTile | null>(null);
-  /**
-   * Which slot of the hotbar is in hand down in the corridor.
-   *
-   * An index rather than a tool id, because the bar is what the player
-   * sees: the number keys pick by position, and a slot that changes what
-   * it holds (a trap unlocked by research) keeps its place in the row.
-   */
-  const [held, setHeld] = useState(0);
   /** Baked from the tool models once the pack loads; empty until then. */
   const [toolIcons, setToolIcons] = useState<Record<string, string>>({});
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
@@ -528,69 +508,6 @@ export default function App() {
     rendererRef.current?.setMoveInput(0, 0);
   };
 
-  /*
-   * The hotbar: what can be put down from inside the corridor.
-   *
-   * Filling first, then the garrison, then the traps - the order they come
-   * up in the tutorial. Rooms are not here: a room is a two-by-two block
-   * anchored at a corner, which is a thing you place looking at the whole
-   * board, not at one tile of it. Locked entries stay in the row, greyed,
-   * so the row keeps its shape as research fills it in.
-   */
-  const hotbar = TOOLS.filter((entry) => entry.tool.kind !== "room" && entry.id !== "dig" && entry.id !== "remove");
-  const heldEntry = hotbar[Math.min(held, hotbar.length - 1)] ?? null;
-  const heldLocked = (entry: (typeof TOOLS)[number]): boolean =>
-    (entry.tool.kind === "minion" && !unlocked.unlockedMinions.includes(entry.tool.type)) ||
-    (entry.tool.kind === "trap" && !unlocked.unlockedTraps.includes(entry.tool.type));
-
-  /*
-   * Left hand takes out, right hand puts down.
-   *
-   * Primary on rock digs it. Secondary on floor puts down whatever is in
-   * hand - or fills the tile back in when that is what is held. Anything
-   * else (primary on floor, secondary on rock) is a swing at nothing, and
-   * says so with the same sound a refused placement makes above.
-   */
-  const actRef = useRef<(button: "primary" | "secondary", tile: AimTile) => void>(() => {});
-  actRef.current = (button, tile) => {
-    if (raid.raiding || !meta) return;
-
-    let ok = false;
-    if (button === "primary") {
-      if (tile.kind !== "rock") return;
-      ok = save.dig(tile.x, tile.y);
-    } else {
-      if (tile.kind !== "floor" || !heldEntry || heldLocked(heldEntry)) return;
-      const tool = heldEntry.tool;
-      if (tool.kind === "fill") ok = save.fill(tile.x, tile.y);
-      else if (tool.kind === "minion") ok = save.placeMinion(tool.type, tile.x, tile.y);
-      else if (tool.kind === "trap") ok = save.placeTrap(tool.type, tile.x, tile.y);
-    }
-
-    if (!ok) {
-      audio.play("error");
-      return;
-    }
-    audio.play(button === "primary" || heldEntry?.tool.kind === "fill" ? "dig" : "place");
-    // Rock coming out in front of your face is felt, not just seen.
-    if (button === "primary") rendererRef.current?.shake(0.16);
-    if (showAftermath) {
-      setShowAftermath(false);
-      rendererRef.current?.setAftermath(null);
-    }
-  };
-
-  // Number keys pick a slot, the way every game with a bar does it.
-  useEffect(() => {
-    if (!walking) return;
-    const onKey = (e: KeyboardEvent) => {
-      const n = Number(e.key);
-      if (Number.isInteger(n) && n >= 1 && n <= hotbar.length) setHeld(n - 1);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [walking, hotbar.length]);
-
   const [removePrompt, setRemovePrompt] = useState<
     { x: number; y: number; sx: number; sy: number; label: string } | null
   >(null);
@@ -706,8 +623,6 @@ export default function App() {
       // Digging and filling are the only tools a drag runs along.
       isPaintable: () => paintableRef.current,
       onHoverChange: setHover,
-      onAimChange: setAim,
-      onAct: (button, tile) => actRef.current(button, tile),
     });
     rendererRef.current = renderer;
 
@@ -716,7 +631,7 @@ export default function App() {
     // keeps its labels and nothing else changes.
     let alive = true;
     void renderer
-      .bakeToolIcons([...TOOL_MODEL_KEYS, ...PARTY_MODEL_KEYS])
+      .bakeToolIcons(TOOL_MODEL_KEYS)
       .then((icons) => { if (alive) setToolIcons(icons); })
       .catch(() => {});
 
@@ -1194,7 +1109,9 @@ export default function App() {
   const enterGame = useCallback(() => {
     audio.play("click");
     setScreen("game");
-    setWalking(true);
+    // Building is taught and performed from the overview. First-person is an
+    // optional inspection mode, entered explicitly with the eye button.
+    setWalking(false);
     if (!settings.introSeen) {
       setIntroOpen(true);
       patchSettings({ introSeen: true });
@@ -1226,17 +1143,15 @@ export default function App() {
     wavesRepelled: meta?.wavesRepelled ?? 0,
     coreBreaches: meta?.coreBreaches ?? 0,
     loot: loot.length,
-    // In the corridor the thing in hand is the hotbar slot, not the board tool.
-    toolId: walking ? (heldEntry?.id ?? "") : toolId,
+    toolId,
     group,
     dug: dug.length,
     isDug: (x, y) => terrain.has(blockedKey(x, y, arena.w)) === false && inArena(arena, x, y),
     connected,
-    flat: walking,
   });
   // The tutorial is dismissed for good, finished, or out of the way while a
   // raid plays — there is nothing to do during one but watch.
-  const teaching = settings.tutorialDone || raid.raiding ? null : guide;
+  const teaching = settings.tutorialDone || raid.raiding || walking ? null : guide;
 
   /** Where a board tile is on screen, so the ring can sit on one. */
   const locateTile = useCallback((x: number, y: number) => {
@@ -1985,47 +1900,6 @@ export default function App() {
         >
           {raid.starting ? t("preparing") : connected ? t("start_raid") : t("connect_first")}
         </button>
-      )}
-
-      {/* The crosshair, and under it what the block it rests on will take:
-          the dig price on rock, nothing on floor - the bar says what goes
-          there. Both take no clicks; the canvas underneath is the hand. */}
-      {walking && (
-        <div className="crosshair" aria-hidden="true">
-          <i />
-          {aim?.kind === "rock" && <b>{DIG_COST}G</b>}
-        </div>
-      )}
-
-      {walking && (
-        <div className="hotbar">
-          {heldEntry && (
-            <p className="hotbar-held">
-              {t(heldEntry.label)}
-              <i> · {heldEntry.cost === null ? t("free") : `${heldEntry.cost}G`}</i>
-            </p>
-          )}
-          <div className="hotbar-row">
-            {hotbar.map((entry, i) => {
-              const locked = heldLocked(entry);
-              const modelKey = TOOL_MODEL[entry.id];
-              const icon = modelKey ? toolIcons[modelKey] : undefined;
-              return (
-                <button
-                  key={entry.id}
-                  data-tut={`tool:${entry.id}`}
-                  className={i === held ? "slot active" : locked ? "slot locked" : "slot"}
-                  onClick={() => { audio.play("click"); setHeld(i); }}
-                  title={locked ? t("locked_hint") : t(entry.label)}
-                  aria-label={t(entry.label)}
-                >
-                  <em>{i + 1}</em>
-                  {icon ? <img src={icon} alt="" /> : <b>{t(entry.label).slice(0, 2)}</b>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       )}
 
       {/* Anchored where the click landed, and clamped so it cannot hang off
