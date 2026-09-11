@@ -92,6 +92,24 @@ export interface RendererCallbacks {
    * board knows nothing about.
    */
   onTileAlt?: (x: number, y: number, clientX: number, clientY: number) => void;
+  /**
+   * A tile crossed while dragging with a tool held.
+   *
+   * Cutting the first corridor is ten tiles in a line, and ten taps for one
+   * intention is the kind of thing that makes a verb feel like paperwork.
+   * Only fired for tiles the drag actually enters, once each.
+   */
+  onTileDrag?: (x: number, y: number) => void;
+  /**
+   * Whether the tool in hand is one a drag should run along.
+   *
+   * Asked at the moment the gesture starts rather than pushed in by a setter.
+   * A setter has to be called from an effect, and the effect that would do it
+   * runs before the one that builds this renderer - so on the pass that
+   * matters it was setting a field on nothing, and every drag panned the
+   * camera instead of digging.
+   */
+  isPaintable?: () => boolean;
   onHoverChange: (tile: { x: number; y: number } | null) => void;
 }
 
@@ -498,6 +516,10 @@ export class DungeonRenderer {
   private activePointers = new Map<number, THREE.Vector2>();
   private dragStart: THREE.Vector2 | null = null;
   private dragMoved = false;
+  /** The last tile a drag painted, so crossing one tile twice does nothing. */
+  private paintedTile: string | null = null;
+  /** Whether the current drag paints tiles rather than moving the camera. */
+  private painting = false;
   private pinchStartDistance = 0;
   private pinchStartCameraDistance = 0;
 
@@ -890,6 +912,9 @@ export class DungeonRenderer {
     object.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
+      // Anything hanging off the model that is a readout rather than a part
+      // of it keeps its own colours.
+      if (mesh.userData.ui) return;
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of materials) {
         const colored = material as THREE.MeshStandardMaterial;
@@ -929,6 +954,17 @@ export class DungeonRenderer {
         }),
       );
       fill.name = "fill";
+      /*
+       * Marked as chrome, so the wounded-and-flashing tint below leaves it
+       * alone.
+       *
+       * tint() walks the whole model to darken it as it takes damage, and the
+       * bar is a child of that model - so the bar was being repainted in the
+       * unit's own colour every frame. At full health that colour is white,
+       * which is why a full bar looked like a blank strip of paper.
+       */
+      back.userData.ui = true;
+      fill.userData.ui = true;
       // Drawn over the room rather than into it: a bar hidden behind the wall
       // its owner is standing next to is a bar that is not there.
       back.renderOrder = 10;
@@ -2502,6 +2538,17 @@ export class DungeonRenderer {
     c.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
+  /** Reports one tile under the pointer, once per tile per gesture. */
+  private paintAt(clientX: number, clientY: number): void {
+    const tile = this.pointerToTile(clientX, clientY);
+    if (!tile) return;
+
+    const key = `${tile.x},${tile.y}`;
+    if (key === this.paintedTile) return;
+    this.paintedTile = key;
+    this.callbacks.onTileDrag?.(tile.x, tile.y);
+  }
+
   private onPointerDown = (e: PointerEvent): void => {
     this.canvas.setPointerCapture(e.pointerId);
     this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
@@ -2509,6 +2556,16 @@ export class DungeonRenderer {
     if (this.activePointers.size === 1) {
       this.dragStart = new THREE.Vector2(e.clientX, e.clientY);
       this.dragMoved = false;
+      /*
+       * A drag with a tool in hand paints tiles instead of moving the camera.
+       *
+       * Decided once, here, rather than per move: a gesture that started as
+       * a dig and turned into a pan halfway through is a dungeon with a hole
+       * in a place nobody chose.
+       */
+      this.painting = !this.walk && this.callbacks.isPaintable?.() === true;
+      this.paintedTile = null;
+      if (this.painting) this.paintAt(e.clientX, e.clientY);
     } else if (this.activePointers.size === 2) {
       const [a, b] = [...this.activePointers.values()];
       this.pinchStartDistance = a.distanceTo(b);
@@ -2564,6 +2621,13 @@ export class DungeonRenderer {
     if (this.dragStart && current.distanceTo(this.dragStart) > TAP_SLOP) {
       this.dragMoved = true;
     }
+
+    // Painting a run of tiles, not moving the camera.
+    if (this.painting) {
+      this.paintAt(e.clientX, e.clientY);
+      return;
+    }
+
     if (!this.dragMoved) return;
 
     // Pan along the camera's own axes so dragging feels the same at every yaw.
@@ -2585,7 +2649,7 @@ export class DungeonRenderer {
 
     // No placing from inside the dungeon: this is a look around, not a
     // second way to build, and a tap down here has no tile to mean.
-    if (wasSingle && !this.dragMoved && !this.walk) {
+    if (wasSingle && !this.dragMoved && !this.walk && !this.painting) {
       const tile = this.pointerToTile(e.clientX, e.clientY);
       if (tile && e.button === 2) {
         this.callbacks.onTileAlt?.(tile.x, tile.y, e.clientX, e.clientY);
@@ -2597,6 +2661,8 @@ export class DungeonRenderer {
     if (this.activePointers.size === 0) {
       this.dragStart = null;
       this.dragMoved = false;
+      this.painting = false;
+      this.paintedTile = null;
       this.pinchStartDistance = 0;
     }
   };

@@ -12,8 +12,10 @@ export interface TutorialContext {
   toolId: string;
   /** Which drawer of the toolbar is open, so a step can ask for it to be opened. */
   group: string;
-  /** How many tiles have been dug out, so the first step knows it happened. */
+  /** How many tiles have been dug out, so a step can tell one from none. */
   dug: number;
+  /** Whether the door can reach the core yet. */
+  connected: boolean;
 }
 
 /** Where the player is being sent. `null` means nowhere in particular. */
@@ -69,10 +71,12 @@ export interface TutorialStep {
  * ask for the tap — which is the order the player has to do it in anyway.
  */
 /**
- * Tiles a brand new dungeon is handed, as a straight corridor. The first step
- * is done when there is one more than that - see startingDig.
+ * Tiles in the straight corridor from the door to the core, once cut.
+ *
+ * The nook step is done when there are two more than that, which is the two
+ * it asks for. Mirrors the arena height in src/game/arena.ts.
  */
-const STARTING_DIG_TILES = 12;
+const CORRIDOR_TILES = 12;
 
 export const TUTORIAL: TutorialStep[] = [
   {
@@ -82,6 +86,25 @@ export const TUTORIAL: TutorialStep[] = [
     groupHint: "tut_dig_group",
     hint: "tut_dig_pick",
     placeHint: "tut_dig_place",
+    /*
+     * The way in, first.
+     *
+     * A dungeon starts as two tiles with rock between them, so before
+     * anything else there has to be a corridor - and cutting it is the verb
+     * the whole game is built on. Dragging digs a run of tiles, so this is
+     * one gesture rather than ten taps.
+     */
+    placeAt: ({ entrance, dug }) =>
+      entrance ? { x: entrance.x, y: entrance.y + Math.max(1, dug - 1) } : null,
+    done: ({ connected }) => connected,
+  },
+  {
+    id: "nook",
+    tool: "dig",
+    group: "dig",
+    groupHint: "tut_dig_group",
+    hint: "tut_dig_pick",
+    placeHint: "tut_nook_place",
     /*
      * Two nooks beside the corridor, near the core.
      *
@@ -95,9 +118,12 @@ export const TUTORIAL: TutorialStep[] = [
      * tests/tutorial.test.ts. Near the door they would get two shots each as
      * the party walked past and the raid would be lost.
      */
+    // Counted off the corridor rather than off the garrison: no minion
+    // exists yet at this step, so keying on minions.length aimed both nooks
+    // at the same tile and left the second archer standing in rock.
     placeAt: ({ core, dug }) =>
-      core ? { x: core.x + (dug > STARTING_DIG_TILES ? -1 : 1), y: core.y - 3 } : null,
-    done: ({ dug }) => dug >= STARTING_DIG_TILES + 2,
+      core ? { x: core.x + (dug <= CORRIDOR_TILES ? 1 : -1), y: core.y - 3 } : null,
+    done: ({ dug, connected }) => connected && dug >= CORRIDOR_TILES + 2,
   },
   {
     id: "minion",

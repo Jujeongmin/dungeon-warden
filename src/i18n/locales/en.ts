@@ -260,8 +260,10 @@ export const en: Record<StringKey, string> = {
   hint_fill: "Puts the rock back.",
   tut_dig_group: "Open the Dig tab",
   tut_dig_pick: "Take the pick",
-  tut_dig_place: "Cut a nook beside the corridor",
+  tut_dig_place: "Drag from the door to the core",
   hint_spread: "A sprawling dungeon thins the garrison ×{scale}",
   menu_walk: "Walk the dungeon",
   walk_exit: "Come back up",
+  connect_first: "Connect the door to the core",
+  tut_nook_place: "Cut a nook beside the corridor",
 };

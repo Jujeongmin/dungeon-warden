@@ -27,8 +27,14 @@ export interface DugTile extends Placed {
   type: "dig";
 }
 
-/** What one tile of rock costs to take out, and gives back when filled in. */
-export const DIG_COST = 6;
+/**
+ * What one tile of rock costs to take out, and gives back when filled in.
+ *
+ * Cheap, because it is the verb of the game and a new dungeon has to cut the
+ * whole way from the door to the core before it can do anything else - ten
+ * tiles at six put the opening two gold over what a dungeon starts with.
+ */
+export const DIG_COST = 5;
 
 /** The id a tile always has, so digging the same tile twice is one entry. */
 export function dugId(x: number, y: number): string {
@@ -123,9 +129,7 @@ export function connects(arena: Arena, dug: DugTile[]): boolean {
 export function startingDig(arena: Arena): DugTile[] {
   const entrance = entranceOf(arena);
   const core = coreOf(arena);
-  const tiles: DugTile[] = [];
-  for (let y = entrance.y; y <= core.y; y++) tiles.push(dugTile(entrance.x, y));
-  return tiles;
+  return [dugTile(entrance.x, entrance.y), dugTile(core.x, core.y)];
 }
 
 /**

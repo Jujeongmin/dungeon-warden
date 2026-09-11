@@ -241,6 +241,7 @@ export default function App() {
     arena,
     obstacles,
     dug,
+    connected,
     gold,
     entitlements,
     minions,
@@ -486,6 +487,7 @@ export default function App() {
     rendererRef.current?.setWalking(walking);
   }, [walking]);
 
+
   /*
    * Hold to walk forward.
    *
@@ -558,6 +560,25 @@ export default function App() {
     }
   };
 
+  /**
+   * One tile crossed while dragging with a digging tool held.
+   *
+   * Cutting the first corridor is ten tiles in a line, and ten taps for one
+   * intention makes the verb of the game feel like paperwork. Only the two
+   * tools that work a tile at a time - dragging a minion across the room
+   * would empty the purse in a gesture nobody meant to make.
+   */
+  const paintableRef = useRef(false);
+  paintableRef.current = tool.kind === "dig" || tool.kind === "fill";
+
+  const dragRef = useRef<(x: number, y: number) => void>(() => {});
+  dragRef.current = (x, y) => {
+    if (raid.raiding) return;
+    const ok =
+      tool.kind === "dig" ? save.dig(x, y) : tool.kind === "fill" ? save.fill(x, y) : false;
+    if (ok) audio.play("place");
+  };
+
   const altRef = useRef<(x: number, y: number, sx: number, sy: number) => void>(() => {});
   altRef.current = (x, y, sx, sy) => {
     if (raid.raiding) return;
@@ -603,6 +624,9 @@ export default function App() {
     const renderer = new DungeonRenderer(canvasRef.current, {
       onTileTap: (x, y) => tapRef.current(x, y),
       onTileAlt: (x, y, sx, sy) => altRef.current(x, y, sx, sy),
+      onTileDrag: (x, y) => dragRef.current(x, y),
+      // Digging and filling are the only tools a drag runs along.
+      isPaintable: () => paintableRef.current,
       onHoverChange: setHover,
     });
     rendererRef.current = renderer;
@@ -1107,6 +1131,7 @@ export default function App() {
     toolId,
     group,
     dug: dug.length,
+    connected,
   });
   // The tutorial is dismissed for good, finished, or out of the way while a
   // raid plays — there is nothing to do during one but watch.
@@ -1743,9 +1768,14 @@ export default function App() {
               audio.play("raidStart");
               void raid.startRaid();
             }}
-            disabled={raid.raidOpen || raid.starting}
+            // Nothing can walk in until the way in exists.
+            disabled={raid.raidOpen || raid.starting || !connected}
           >
-            {raid.starting ? t("preparing") : t("start_raid")}
+            {raid.starting
+              ? t("preparing")
+              : connected
+                ? t("start_raid")
+                : t("connect_first")}
 
             {/*
               * Who is about to walk in, on the button that lets them in.
@@ -1762,7 +1792,7 @@ export default function App() {
               * Numbers survive being small. The crown is a flat glyph rather
               * than a render, for the same reason.
               */}
-            {!raid.starting && nextParty.length > 0 && (
+            {connected && !raid.starting && nextParty.length > 0 && (
               <span className="go-sub">
                 {nextParty.some((m) => m.champion) && <Icon name="crown" size={13} />}
                 {t("party_summary", {

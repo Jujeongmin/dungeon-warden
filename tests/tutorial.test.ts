@@ -32,7 +32,9 @@ function followTheTutorial() {
 
   const context = (toolId: string, group = ""): TutorialContext => ({
     obstacles: [], minions, traps, entrance, core,
-    wavesRepelled: 0, coreBreaches: 0, toolId, group, dug: dug.length,
+    wavesRepelled: 0, coreBreaches: 0, toolId, group,
+    dug: dug.length,
+    connected: connects(arena, dug),
   });
 
   // Generous bound: a runaway guide should fail the test rather than hang it.
@@ -61,6 +63,7 @@ function followTheTutorial() {
 
 function spend({ dug, minions, traps }: ReturnType<typeof followTheTutorial>) {
   return (
+    // Everything past the two tiles a dungeon arrives with was paid for.
     (dug.length - startingDig(arena).length) * DIG_COST +
     minions.reduce((sum, m) => sum + MINION_COST[m.type], 0) +
     traps.reduce((sum, t) => sum + TRAP_COST[t.type], 0)

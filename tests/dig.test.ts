@@ -22,20 +22,34 @@ const arena = arenaFor([]);
 const entrance = entranceOf(arena);
 const core = coreOf(arena);
 
+/** The straight corridor a player cuts first, which the room no longer arrives with. */
+function straightCorridor() {
+  const tiles = [];
+  for (let y = entrance.y; y <= core.y; y++) tiles.push(dugTile(entrance.x, y));
+  return tiles;
+}
+
 describe("the room as carved rock", () => {
   it("charges what the server charges", () => {
     expect(server).toContain(`const DIG_COST = ${DIG_COST};`);
   });
 
-  it("starts as a straight corridor from the door to the core", () => {
+  it("starts as the door, the core, and rock between them", () => {
+    /*
+     * The room used to arrive with the whole corridor already cut, which
+     * handed the player the first and most defining move of the game - and
+     * handed them a straight line, which is the worst maze there is.
+     */
     const dug = startingDig(arena);
-    expect(dug).toHaveLength(core.y - entrance.y + 1);
-    expect(dug.every((tile) => tile.x === entrance.x)).toBe(true);
-    expect(connects(arena, dug)).toBe(true);
+    expect(dug).toHaveLength(2);
+    expect(connects(arena, dug)).toBe(false);
+    const open = dugSet(arena, dug);
+    expect(open.has(blockedKey(entrance.x, entrance.y, arena.w))).toBe(true);
+    expect(open.has(blockedKey(core.x, core.y, arena.w))).toBe(true);
   });
 
   it("makes everything it did not dig into rock", () => {
-    const dug = startingDig(arena);
+    const dug = straightCorridor();
     const rock = rockSet(arena, dug);
     expect(rock.size).toBe(arena.w * arena.h - dug.length);
     expect(rock.has(blockedKey(entrance.x, entrance.y, arena.w))) .toBe(false);
@@ -48,7 +62,7 @@ describe("the room as carved rock", () => {
      * through it, so the line the player is shown cannot bend for a reason
      * they cannot see — which is what it did across an open floor.
      */
-    const dug = startingDig(arena);
+    const dug = straightCorridor();
     const path = buildRaidPath(arena, entrance, core, [], rockSet(arena, dug));
     expect(path).not.toBeNull();
     expect(path!.every((step) => step.x === entrance.x)).toBe(true);
@@ -74,23 +88,23 @@ describe("the room as carved rock", () => {
 
 describe("connectedness", () => {
   it("holds while the corridor is one piece", () => {
-    expect(connects(arena, startingDig(arena))).toBe(true);
+    expect(connects(arena, straightCorridor())).toBe(true);
   });
 
   it("breaks the moment the corridor is cut in two", () => {
-    const dug = startingDig(arena).filter((tile) => tile.y !== 5);
+    const dug = straightCorridor().filter((tile) => tile.y !== 5);
     expect(connects(arena, dug)).toBe(false);
   });
 
   it("is false when the door or the core was never dug", () => {
-    expect(connects(arena, startingDig(arena).filter((t) => t.y !== entrance.y))).toBe(false);
-    expect(connects(arena, startingDig(arena).filter((t) => t.y !== core.y))).toBe(false);
+    expect(connects(arena, straightCorridor().filter((t) => t.y !== entrance.y))).toBe(false);
+    expect(connects(arena, straightCorridor().filter((t) => t.y !== core.y))).toBe(false);
     expect(connects(arena, [])).toBe(false);
   });
 
   it("does not care about tiles that are open but not joined on", () => {
     // A pocket off to one side: dug, but no part of the way through.
-    const dug = [...startingDig(arena), dugTile(0, 0), dugTile(1, 0)];
+    const dug = [...straightCorridor(), dugTile(0, 0), dugTile(1, 0)];
     expect(connects(arena, dug)).toBe(true);
   });
 });
@@ -124,7 +138,7 @@ describe("reading an older dungeon", () => {
   it("hands a dungeon that never built anything the straight corridor", () => {
     // digFromWalls on an empty wall list would open the entire room, which is
     // not a maze — the caller uses startingDig for that case instead.
-    expect(startingDig(arena).length).toBeLessThan(digFromWalls(arena, []).length);
+    expect(straightCorridor().length).toBeLessThan(digFromWalls(arena, []).length);
   });
 });
 
@@ -133,7 +147,7 @@ describe("how thin the garrison is spread", () => {
     // Every number measured against the old open-floor model was measured at
     // this end of the curve, so this end has to stay worth exactly 1.
     expect(garrisonScale(0)).toBe(1);
-    expect(garrisonScale(startingDig(arena).length)).toBe(1);
+    expect(garrisonScale(straightCorridor().length)).toBe(1);
     expect(garrisonScale(TIGHT_TILES)).toBe(1);
   });
 
@@ -162,6 +176,6 @@ describe("how thin the garrison is spread", () => {
   it("gives the tutorial's dungeon the strength it was measured with", () => {
     // The opening digs two nooks off the starting corridor. If that landed on
     // the slide, the balance the tutorial test pins would quietly move.
-    expect(garrisonScale(startingDig(arena).length + 2)).toBe(1);
+    expect(garrisonScale(straightCorridor().length + 2)).toBe(1);
   });
 });

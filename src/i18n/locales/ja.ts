@@ -266,8 +266,10 @@ export const ja: Record<StringKey, string> = {
   hint_fill: "通路を岩盤に戻します。",
   tut_dig_group: "掘削タブを開いて",
   tut_dig_pick: "掘るを選んで",
-  tut_dig_place: "通路の横を掘って場所を",
+  tut_dig_place: "入口からコアまでドラッグして掘る",
   hint_spread: "広く掘るほど手下が弱くなります ×{scale}",
   menu_walk: "ダンジョンを歩く",
   walk_exit: "戻る",
+  connect_first: "入口とコアを繋げて",
+  tut_nook_place: "通路の横を掘って場所を",
 };

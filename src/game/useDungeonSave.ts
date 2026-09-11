@@ -553,8 +553,16 @@ export function useDungeonSave() {
     if (!dugSet(arena, dugRef.current).has(key)) return false;
     if (occupantAt(x, y)) return false;
 
+    /*
+     * Refused only if it would break a way through that currently exists.
+     *
+     * A dungeon starts as two tiles with rock between them, so "not connected"
+     * is the normal state of one being built - testing the result alone would
+     * refuse every fill until the corridor was finished, including undoing a
+     * tile the player had just dug by mistake.
+     */
     const next = dugRef.current.filter((tile) => tile.id !== dugId(x, y));
-    if (!connects(arena, next)) return false;
+    if (connects(arena, dugRef.current) && !connects(arena, next)) return false;
 
     setDug(next);
     setGold((current) => current + Math.floor(DIG_COST * REFUND_RATE));
@@ -779,6 +787,8 @@ export function useDungeonSave() {
     placeRoom,
     placeObstacle,
     dig,
+    /** Whether the door can reach the core: what a raid needs. */
+    connected: connects(arena, dug),
     fill,
     dug,
     removeAt,

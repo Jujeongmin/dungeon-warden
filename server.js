@@ -255,7 +255,7 @@ const RAID_BREACH_REWARD_PER_KILL = 8;
  * The corridor has no cap of its own - what limits it is what it costs, and
  * that is the brake on digging a twenty-tile maze on day one.
  */
-const DIG_COST = 6;
+const DIG_COST = 5;
 
 const CHAMPION_THREAT = 9;
 
@@ -840,6 +840,30 @@ function dugOf(dungeon, arena) {
   return tiles;
 }
 
+/** Whether the door can reach the core through what has been dug. */
+function digConnects(dug, arena) {
+  const entrance = entranceOf(arena);
+  const core = coreOf(arena);
+  const open = {};
+  for (const tile of dug || []) open[tile.x + "," + tile.y] = true;
+  if (!open[entrance.x + "," + entrance.y] || !open[core.x + "," + core.y]) return false;
+
+  const reached = { [entrance.x + "," + entrance.y]: true };
+  const queue = [entrance];
+  while (queue.length > 0) {
+    const at = queue.pop();
+    for (const step of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = at.x + step[0];
+      const ny = at.y + step[1];
+      const key = nx + "," + ny;
+      if (reached[key] || !open[key]) continue;
+      reached[key] = true;
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  return Boolean(reached[core.x + "," + core.y]);
+}
+
 function priceDug(next, saved, arena) {
   const entrance = entranceOf(arena);
   const core = coreOf(arena);
@@ -861,24 +885,15 @@ function priceDug(next, saved, arena) {
     throw new Error("DIG_FIXED_TILE");
   }
 
-  // Flood fill from the door. Cheap, and it is the only check that matters:
-  // a corridor in two pieces is a dungeon that cannot be raided.
-  const reached = {};
-  const queue = [entrance];
-  reached[entrance.x + "," + entrance.y] = true;
-  while (queue.length > 0) {
-    const at = queue.pop();
-    const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (const step of steps) {
-      const nx = at.x + step[0];
-      const ny = at.y + step[1];
-      const key = nx + "," + ny;
-      if (reached[key] || !seen[key]) continue;
-      reached[key] = true;
-      queue.push({ x: nx, y: ny });
-    }
-  }
-  if (!reached[core.x + "," + core.y]) throw new Error("DIG_NOT_CONNECTED");
+  /*
+   * Connectedness is NOT checked here.
+   *
+   * A dungeon starts as two tiles with rock between them and the player cuts
+   * the way through one tile at a time - so a half-dug corridor is the normal
+   * state of a dungeon being built, and refusing to save one would refuse
+   * every save until the last tile landed. Whether the door reaches the core
+   * is a rule about starting a raid, and startRaid is where it is enforced.
+   */
 
   const had = {};
   for (const tile of saved || []) had[tile.x + "," + tile.y] = true;
@@ -1476,6 +1491,12 @@ class Server {
 
     // A raid left unresolved is settled as a loss before a new one opens.
     if (state.pendingRaid) abandonPendingRaid(dungeon, state.pendingRaid, now);
+
+    // Nothing can walk in until the way in exists. Checked before anything
+    // is spent or marked, so a refused raid costs the player nothing.
+    if (!digConnects(dugOf(dungeon, arenaFor(dungeon.research || [])), arenaFor(dungeon.research || []))) {
+      throw new Error("NOT_CONNECTED");
+    }
 
     const threat = decayThreat(dungeon, now);
     // Announced once, on the raid that first arrives at the tier. The save is

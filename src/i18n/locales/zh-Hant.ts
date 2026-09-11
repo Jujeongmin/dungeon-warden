@@ -261,8 +261,10 @@ export const zhHant: Record<StringKey, string> = {
   hint_fill: "將通道填回岩盤。",
   tut_dig_group: "打開挖掘分頁",
   tut_dig_pick: "選擇挖",
-  tut_dig_place: "挖出通道旁的小空間",
+  tut_dig_place: "從入口拖曳到核心",
   hint_spread: "挖得越廣，手下越弱 ×{scale}",
   menu_walk: "走進地牆",
   walk_exit: "離開",
+  connect_first: "先挖通入口與核心",
+  tut_nook_place: "挖出通道旁的小空間",
 };
