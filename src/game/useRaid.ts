@@ -3,6 +3,7 @@ import { useGameServer } from "@agent8/gameserver";
 import { RaidSim, SIM_DT, isRaidOver, type RaidState, type SimEvent } from "./sim/RaidSim";
 import { lureTiles } from "./rooms";
 import { previewParty, wavesFor } from "./party";
+import { garrisonScale, type DugTile } from "./dig";
 import { SKILL_STATS } from "./sim/traps";
 import type { Arena } from "./arena";
 import type { ResearchEffects } from "./research";
@@ -54,6 +55,8 @@ interface Options {
   traps: PlacedTrap[];
   rooms: PlacedRoom[];
   obstacles: PlacedObstacle[];
+  /** Every tile taken out of the rock: how far the garrison is spread. */
+  dug: DugTile[];
   /** The rock: every tile nobody dug out. */
   terrain: Set<number>;
   effects: RoomEffects;
@@ -85,6 +88,7 @@ export function useRaid({
   traps,
   rooms,
   obstacles,
+  dug,
   terrain,
   effects,
   jailFree,
@@ -322,8 +326,15 @@ export function useRaid({
         trapCooldownScale: effects.trapCooldownScale,
         jailFree: start.jailFree ?? jailFree,
         weaponTiers,
-        minionDamageScale: research.minionDamageScale,
-        minionHpScale: research.minionHpScale,
+        /*
+         * Research first, then how thin the dungeon is spread.
+         *
+         * Multiplied together rather than chosen between: what you have
+         * researched and how far you have dug are two different questions
+         * about the same garrison.
+         */
+        minionDamageScale: research.minionDamageScale * garrisonScale(dug.length),
+        minionHpScale: research.minionHpScale * garrisonScale(dug.length),
         trapDamageScale: research.trapDamageScale,
       });
       simRef.current = sim;

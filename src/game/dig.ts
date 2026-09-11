@@ -148,3 +148,40 @@ export function digFromWalls(
   }
   return tiles;
 }
+
+/**
+ * How far a corridor can sprawl before the garrison starts to thin out.
+ *
+ * Up to TIGHT tiles the dungeon is dense enough that nothing is lost; past
+ * LOOSE it is stretched as thin as it will go. Between the two it slides.
+ */
+export const TIGHT_TILES = 24;
+export const LOOSE_TILES = 72;
+
+/** What a stretched garrison is worth at its weakest. */
+export const THIN_GARRISON = 0.7;
+
+/**
+ * What the garrison is worth at this size of dungeon.
+ *
+ * Digging used to be free of consequence: a longer corridor meant more time
+ * under fire and cost nothing but gold, so there was never a reason to stop.
+ * A dungeon that sprawls now spreads the same garrison over more ground and
+ * each of them is weaker for it — which is the first time the shape of the
+ * maze has been a choice rather than a budget.
+ *
+ * One-sided on purpose. A tight dungeon is worth exactly what it was worth
+ * before this existed, so every number measured against the old model still
+ * holds; it is sprawl that costs. Making tightness a bonus instead is one
+ * constant away, and it is a balance decision rather than a design one.
+ *
+ * Bounded at both ends: a dungeon cannot be made arbitrarily strong by being
+ * small, and one that has grown large is weakened, not disarmed.
+ */
+export function garrisonScale(dugTiles: number): number {
+  if (dugTiles <= TIGHT_TILES) return 1;
+  if (dugTiles >= LOOSE_TILES) return THIN_GARRISON;
+
+  const across = (dugTiles - TIGHT_TILES) / (LOOSE_TILES - TIGHT_TILES);
+  return 1 - across * (1 - THIN_GARRISON);
+}

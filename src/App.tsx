@@ -32,7 +32,7 @@ import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
 import { previewParty } from "./game/party";
-import { DIG_COST, dugSet, rockSet } from "./game/dig";
+import { DIG_COST, dugSet, garrisonScale, rockSet } from "./game/dig";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
 import {
@@ -400,6 +400,7 @@ export default function App() {
     traps,
     rooms,
     obstacles,
+    dug,
     terrain,
     effects,
     jailFree,
@@ -1043,6 +1044,9 @@ export default function App() {
     room: { count: rooms.length, cap: MAX_ROOMS },
   };
 
+  /** What the garrison is worth at this size of dungeon. See garrisonScale. */
+  const spread = garrisonScale(dug.length);
+
   const guide = guideFor({
     obstacles,
     entrance,
@@ -1119,7 +1123,11 @@ export default function App() {
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
-    if (tool.kind === "dig") return t("hint_dig");
+    if (tool.kind === "dig") {
+      // Said on the tool that causes it as well as on the button that shows
+      // it, because this is the one rule a player has to feel while digging.
+      return spread < 1 ? `${t("hint_dig")} · ${t("hint_spread", { scale: spread.toFixed(2) })}` : t("hint_dig");
+    }
     if (tool.kind === "fill") {
       return HAS_MOUSE ? `${t("hint_fill")} · ${t("hint_remove_alt")}` : t("hint_fill");
     }
@@ -1129,7 +1137,12 @@ export default function App() {
     if (tool.kind === "remove") {
       return HAS_MOUSE ? `${t("hint_remove")} · ${t("hint_remove_alt")}` : t("hint_remove");
     }
-    if (tool.kind === "minion") return `${t("hint_minion")} ${minions.length}/${effects.minionCap}`;
+    if (tool.kind === "minion") {
+      const spent = `${minions.length}/${effects.minionCap}`;
+      return spread < 1
+        ? `${t("hint_minion")} ${spent} · ×${spread.toFixed(2)}`
+        : `${t("hint_minion")} ${spent}`;
+    }
     if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
     return `${t(ROOM_DESCRIPTION[tool.type] as StringKey)} ${t("hint_room")} ${rooms.length}/${MAX_ROOMS}`;
   })();
@@ -1422,7 +1435,14 @@ export default function App() {
                       disabled={raid.raiding}
                     >
                       <b>{t(entry.label)}</b>
-                      <i>{used.count}/{used.cap}</i>
+                      {/* The dig button carries what digging costs you rather
+                          than a cap it will never reach: a corridor is limited
+                          by gold and by this, not by a number of tiles. */}
+                      <i>
+                        {entry.id === "dig"
+                          ? `${used.count} · ×${spread.toFixed(2).replace(/0$/, "")}`
+                          : `${used.count}/${used.cap}`}
+                      </i>
                     </button>
                   );
                 })}

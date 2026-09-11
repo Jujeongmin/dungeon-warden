@@ -262,4 +262,5 @@ export const zhHans: Record<StringKey, string> = {
   tut_dig_group: "打开挖掘分页",
   tut_dig_pick: "选择挖",
   tut_dig_place: "挖出通道旁的小空间",
+  hint_spread: "挖得越广，手下越弱 ×{scale}",
 };
