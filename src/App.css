@@ -2119,25 +2119,95 @@ button.ad-gold {
   background: linear-gradient(180deg, rgba(90, 70, 40, 0.95), rgba(58, 46, 28, 0.95));
 }
 
-/* The verb for the tile ahead. Big like the walk button: it is pressed
-   while the other thumb is holding the view, by someone looking at a
-   wall rather than at their hands. */
-.walk-act {
-  flex: none;
-  min-width: 76px;
-  height: 76px;
-  padding: 0 16px;
-  border-radius: 38px;
+/* The crosshair: a small cross that takes no clicks, dead centre, with the
+   price of the block under it hung just below. Drawn in two colours so it
+   reads on a torch-lit wall and on a black one. */
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
   display: grid;
-  place-items: center;
-  gap: 2px;
-  border-color: rgba(232, 164, 76, 0.5);
-  background: linear-gradient(180deg, rgba(58, 46, 28, 0.92), rgba(36, 28, 18, 0.92));
-  color: var(--accent);
+  justify-items: center;
+  gap: 6px;
 }
 
-.walk-act b { font-size: var(--fs-base); }
-.walk-act i { font-size: var(--fs-2xs); font-style: normal; color: var(--muted); }
+.crosshair i {
+  width: 18px;
+  height: 18px;
+  background:
+    linear-gradient(#f2e9dc, #f2e9dc) center / 2px 100% no-repeat,
+    linear-gradient(#f2e9dc, #f2e9dc) center / 100% 2px no-repeat;
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  opacity: 0.9;
+}
+
+.crosshair b {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
+
+/* The bar of what can be put down, along the foot of the view. Slots are
+   squares with a number in the corner, the shape every player already
+   knows how to read. */
+.hotbar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 108px);
+  z-index: 2;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 96%;
+}
+
+.hotbar .slot {
+  position: relative;
+  flex: none;
+  width: 60px;
+  height: 62px;
+  padding: 4px 2px 2px;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  justify-items: center;
+  align-items: center;
+  border-radius: 6px;
+  background: rgba(20, 15, 11, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+.hotbar .slot.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(232, 164, 76, 0.35);
+}
+
+.hotbar .slot.locked { opacity: 0.4; }
+.hotbar .slot img { width: 26px; height: 26px; object-fit: contain; }
+.hotbar .slot b { font-size: var(--fs-2xs); line-height: 1.1; white-space: nowrap; }
+.hotbar .slot i { font-size: var(--fs-2xs); font-style: normal; color: var(--muted); }
+.hotbar .slot em {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  font-size: 9px;
+  font-style: normal;
+  color: var(--muted);
+}
+
+.hotbar-hint {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  text-shadow: 0 0 3px #000;
+}
 
 .walk-exit {
   flex: none;

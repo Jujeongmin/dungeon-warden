@@ -269,6 +269,7 @@ export const ko = {
   menu_walk: "던전 걸어보기",
   walk_exit: "나가기",
   walk_map: "지도",
+  hotbar_hint: "꾹 눌러 파기 · 탭해서 놓기 · 1~9로 바꾸기",
   connect_first: "입구와 코어를 이으세요",
   tut_nook_place: "통로 옆을 파 자리를 만드세요",
 };

@@ -256,6 +256,7 @@ export const en: Record<StringKey, string> = {
   menu_walk: "Walk the dungeon",
   walk_exit: "Come back up",
   walk_map: "Map",
+  hotbar_hint: "Hold to dig · tap to place · 1-9 to switch",
   connect_first: "Connect the door to the core",
   tut_nook_place: "Cut a nook beside the corridor",
 };

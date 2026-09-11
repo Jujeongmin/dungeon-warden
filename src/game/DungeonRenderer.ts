@@ -44,6 +44,16 @@ const BODY = 0.36;
 
 /** Radians of turn per pixel dragged. */
 const LOOK_SPEED = 0.0045;
+/** Tiles a second on foot. A tile is about two metres. */
+const WALK_SPEED = 2.2;
+/** How far a block can be from the eye and still be reached. */
+const REACH = 3.2;
+/** The crosshair, in normalised device coordinates. */
+const CENTRE = new THREE.Vector2(0, 0);
+/** A finger resting on a block this long is a hold, not a tap. */
+const HOLD_AFTER_MS = 320;
+/** A held primary fires again this often. */
+const HOLD_REPEAT_MS = 380;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -116,12 +126,27 @@ export interface RendererCallbacks {
   isPaintable?: () => boolean;
   onHoverChange: (tile: { x: number; y: number } | null) => void;
   /**
-   * The tile straight ahead while walking, or null facing nothing.
+   * The block under the crosshair while walking, or null facing nothing.
    *
    * Down in the corridor there is no cursor: what the player is looking at
-   * is what they act on, and this is that tile.
+   * is what they act on, and this is that block.
    */
-  onAimChange?: (tile: { x: number; y: number } | null) => void;
+  onAimChange?: (tile: AimTile | null) => void;
+  /**
+   * The player acted on the block under the crosshair.
+   *
+   * Primary is the left hand: it takes things out (rock). Secondary is the
+   * right: it puts things down (fill, or whatever is held). The renderer
+   * only reports the gesture; what either means is the game's to decide.
+   */
+  onAct?: (button: "primary" | "secondary", tile: AimTile) => void;
+}
+
+/** What the crosshair rests on: a block of rock, or a tile of floor. */
+export interface AimTile {
+  x: number;
+  y: number;
+  kind: "rock" | "floor";
 }
 
 /** One drawable unit. The renderer stays ignorant of raid rules. */
@@ -347,6 +372,9 @@ export class DungeonRenderer {
 
   private floorMesh: THREE.InstancedMesh | null = null;
   private rockMesh: THREE.InstancedMesh | null = null;
+  /** Which tile each instance is, so a raycast hit can be named. */
+  private floorTiles: Array<{ x: number; y: number }> = [];
+  private rockTiles: Array<{ x: number; y: number }> = [];
   /** Loaded once and shared; disposed with the renderer. */
   private stone = new Map<string, { color: THREE.Texture; normal: THREE.Texture }>();
   private highlight: THREE.Mesh;
@@ -508,12 +536,34 @@ export class DungeonRenderer {
     );
     this.highlight.visible = false;
     this.scene.add(this.highlight);
+
+    /*
+     * The crosshair outline: a thin dark box round the block being looked
+     * at, and a flat square on a floor tile. An outline rather than a tint
+     * because down here the block fills half the view, and tinting half the
+     * view is a colour cast, not a selection.
+     */
+    const outline = new THREE.LineBasicMaterial({
+      color: 0x0d0a08, transparent: true, opacity: 0.85, depthTest: true,
+    });
+    this.aimBox = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(TILE_SIZE * 0.985, ROCK_HEIGHT * 1.01, TILE_SIZE * 0.985)),
+      outline,
+    );
+    this.aimPlate = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(TILE_SIZE * 0.96, 0.02, TILE_SIZE * 0.96)),
+      outline,
+    );
+    this.aimBox.visible = false;
+    this.aimPlate.visible = false;
+    this.scene.add(this.aimBox, this.aimPlate);
     this.scene.add(this.unitGroup);
     this.scene.add(this.markerGroup);
     this.scene.add(this.aftermathGroup);
 
     this.attachPointerEvents();
     window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
 
     // Models arrive asynchronously; anything already on screen is swapped in
     // place once they land, so the game is playable while they load.
@@ -1177,6 +1227,7 @@ export class DungeonRenderer {
     }
 
     this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, "floor");
+    this.floorTiles = floorPositions.map((p) => ({ x: p.x, y: p.y }));
     if (this.floorMesh) {
       // Real stone over the pack's flat flagstone. The per-instance tint that
       // marks the door and the core rides on top of it unchanged.
@@ -1211,6 +1262,7 @@ export class DungeonRenderer {
       }
     }
     this.rockMesh = this.buildInstanced(rockPositions, ROCK_HEIGHT, null);
+    this.rockTiles = rockPositions.map((p) => ({ x: p.x, y: p.y }));
     if (this.rockMesh) {
       /*
        * Standard rather than Lambert, here and on the floor only.
@@ -1937,8 +1989,19 @@ export class DungeonRenderer {
    * cannot pass through is still read per tile.
    */
   private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
-  /** The tile the walker is facing, so a change can be reported once. */
-  private aim: { x: number; y: number } | null = null;
+  /** The block under the crosshair, so a change can be reported once. */
+  private aim: AimTile | null = null;
+  /** The thin dark box round the block the crosshair is on. */
+  private aimBox: THREE.LineSegments;
+  private aimPlate: THREE.LineSegments;
+  /** Keys held, for walking on a keyboard. */
+  private keys = new Set<string>();
+  /** A stick or pad, -1..1 on each axis. Overrides the keys while pushed. */
+  private moveInput = { forward: 0, strafe: 0 };
+  /** Holding the primary button repeats it, the way a pick keeps swinging. */
+  private holdTimer = 0;
+  /** A touch that has not moved yet may still turn into a tap or a hold. */
+  private touchPending: { id: number; timer: number } | null = null;
 
   /** True while the camera is down in the corridor. */
   get walking(): boolean {
@@ -1956,6 +2019,11 @@ export class DungeonRenderer {
     if (!on) {
       this.walk = null;
       this.setAim(null);
+      this.stopHold();
+      this.keys.clear();
+      this.moveInput.forward = 0;
+      this.moveInput.strafe = 0;
+      if (document.pointerLockElement === this.canvas) document.exitPointerLock();
       return;
     }
     if (!this.entrance || !this.core) return;
@@ -1985,16 +2053,44 @@ export class DungeonRenderer {
    * along it rather than stopping dead, which is the difference between a
    * corridor that feels walkable and one that feels like a bug.
    */
-  step(amount: number): void {
+  step(amount: number, sideways = 0): void {
     const walk = this.walk;
     const arena = this.arena;
     if (!walk || !arena) return;
 
-    const dx = Math.sin(walk.yaw) * amount;
-    const dz = Math.cos(walk.yaw) * amount;
+    const dx = Math.sin(walk.yaw) * amount + Math.cos(walk.yaw) * sideways;
+    const dz = Math.cos(walk.yaw) * amount - Math.sin(walk.yaw) * sideways;
 
     if (this.standable(walk.at.x + dx, walk.at.z)) walk.at.x += dx;
     if (this.standable(walk.at.x, walk.at.z + dz)) walk.at.z += dz;
+  }
+
+  /**
+   * A stick, held. -1..1 on each axis; zero on both lets the keys speak.
+   *
+   * Applied per frame in the loop rather than on the event, so the speed is
+   * the same on every device however often the stick reports.
+   */
+  setMoveInput(forward: number, strafe: number): void {
+    this.moveInput.forward = THREE.MathUtils.clamp(forward, -1, 1);
+    this.moveInput.strafe = THREE.MathUtils.clamp(strafe, -1, 1);
+  }
+
+  /** One frame of walking, from whichever input is live. */
+  private updateWalk(delta: number): void {
+    if (!this.walk) return;
+    let forward = this.moveInput.forward;
+    let strafe = this.moveInput.strafe;
+    if (forward === 0 && strafe === 0) {
+      const k = this.keys;
+      forward = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
+      strafe = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
+    }
+    if (forward === 0 && strafe === 0) return;
+    // Diagonals are not faster: the two axes share one speed.
+    const length = Math.hypot(forward, strafe);
+    const scale = (WALK_SPEED * delta) / Math.max(1, length);
+    this.step(forward * scale, strafe * scale);
   }
 
   /**
@@ -2025,36 +2121,69 @@ export class DungeonRenderer {
    * would make it - a ray at a corner hits the tile beside the one they
    * meant, and a dig that lands one over is a hole nobody wanted.
    */
-  private aimTile(): { x: number; y: number } | null {
+  private aimTile(): AimTile | null {
     const walk = this.walk;
     const arena = this.arena;
     if (!walk || !arena) return null;
 
-    const sx = Math.sin(walk.yaw);
-    const sz = Math.cos(walk.yaw);
-    const dx = Math.abs(sx) >= Math.abs(sz) ? Math.sign(sx) : 0;
-    const dz = dx === 0 ? Math.sign(sz) : 0;
-    const x = Math.round(walk.at.x) + dx;
-    const y = Math.round(walk.at.z) + dz;
-    return inArena(arena, x, y) ? { x, y } : null;
+    const targets: THREE.Object3D[] = [];
+    if (this.rockMesh) targets.push(this.rockMesh);
+    if (this.floorMesh) targets.push(this.floorMesh);
+    if (targets.length === 0) return null;
+
+    this.raycaster.setFromCamera(CENTRE, this.camera);
+    this.raycaster.far = REACH;
+    const hit = this.raycaster.intersectObjects(targets, false)[0];
+    // Shared with the cursor above, which expects it unbounded.
+    this.raycaster.far = Infinity;
+    if (!hit || hit.instanceId === undefined) return null;
+
+    const rock = hit.object === this.rockMesh;
+    const tile = (rock ? this.rockTiles : this.floorTiles)[hit.instanceId];
+    if (!tile || !inArena(arena, tile.x, tile.y)) return null;
+    return { x: tile.x, y: tile.y, kind: rock ? "rock" : "floor" };
   }
 
-  /** Marks the tile ahead and tells the screen when it changes. */
-  private setAim(tile: { x: number; y: number } | null): void {
+  /** Outlines the block under the crosshair and tells the screen when it changes. */
+  private setAim(tile: AimTile | null): void {
     const same =
       (tile === null && this.aim === null) ||
-      (tile !== null && this.aim !== null && tile.x === this.aim.x && tile.y === this.aim.y);
+      (tile !== null &&
+        this.aim !== null &&
+        tile.x === this.aim.x &&
+        tile.y === this.aim.y &&
+        tile.kind === this.aim.kind);
     if (same) return;
 
     this.aim = tile;
-    // The same box the cursor uses above: down here the head is the cursor.
+    this.aimBox.visible = tile?.kind === "rock";
+    this.aimPlate.visible = tile?.kind === "floor";
     if (tile) {
-      this.highlight.position.set(tile.x, WALL_HEIGHT / 2, tile.y);
-      this.highlight.visible = true;
-    } else {
-      this.highlight.visible = false;
+      this.aimBox.position.set(tile.x, ROCK_HEIGHT / 2, tile.y);
+      this.aimPlate.position.set(tile.x, FLOOR_HEIGHT + 0.012, tile.y);
     }
     this.callbacks.onAimChange?.(tile);
+  }
+
+  /** Fires the gesture at whatever the crosshair is on right now. */
+  private act(button: "primary" | "secondary"): void {
+    const aim = this.aimTile();
+    this.setAim(aim);
+    if (aim) this.callbacks.onAct?.(button, aim);
+  }
+
+  /** Primary now, and again every so often while the button stays down. */
+  private startHold(): void {
+    this.stopHold();
+    this.act("primary");
+    this.holdTimer = window.setInterval(() => this.act("primary"), HOLD_REPEAT_MS);
+  }
+
+  private stopHold(): void {
+    if (this.holdTimer !== 0) window.clearInterval(this.holdTimer);
+    this.holdTimer = 0;
+    if (this.touchPending) window.clearTimeout(this.touchPending.timer);
+    this.touchPending = null;
   }
 
   private updateCamera(): void {
@@ -2354,6 +2483,61 @@ export class DungeonRenderer {
   }
 
   private onPointerDown = (e: PointerEvent): void => {
+    /*
+     * Down in the corridor the pointer is a hand, not a cursor.
+     *
+     * Mouse: the first click takes the pointer (the view follows the mouse
+     * from then on, the way it does in any first-person game); after that,
+     * left takes out and right puts down. Touch: a drag turns the head, a
+     * tap puts down, and holding still on a block takes it out - which is
+     * the split every pocket edition of this kind of game settled on.
+     */
+    if (this.walk) {
+      if (e.pointerType === "mouse") {
+        /*
+         * The pointer is asked for but not waited on. Inside an iframe that
+         * was not given the permission (which is where this game is played)
+         * the request fails silently, and a click that only asked would be a
+         * click that did nothing. So the mouse always works the way a finger
+         * does - drag to look, buttons to act - and the lock, when granted,
+         * only makes looking around not need the button held.
+         */
+        if (document.pointerLockElement !== this.canvas) {
+          try {
+            const request = this.canvas.requestPointerLock?.() as unknown;
+            if (request instanceof Promise) request.catch(() => undefined);
+          } catch {
+            /* not available here; the drag still turns the head */
+          }
+        }
+        // Capture is refused while a lock request is in flight, and it is not
+        // needed to act - only to keep a drag that leaves the canvas.
+        try {
+          this.canvas.setPointerCapture(e.pointerId);
+        } catch {
+          /* the lock will hold the pointer instead */
+        }
+        this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
+        if (e.button === 0) this.startHold();
+        else if (e.button === 2) this.act("secondary");
+        return;
+      }
+
+      this.canvas.setPointerCapture(e.pointerId);
+      this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
+      this.dragStart = new THREE.Vector2(e.clientX, e.clientY);
+      this.dragMoved = false;
+      this.stopHold();
+      this.touchPending = {
+        id: e.pointerId,
+        timer: window.setTimeout(() => {
+          this.touchPending = null;
+          if (!this.dragMoved) this.startHold();
+        }, HOLD_AFTER_MS),
+      };
+      return;
+    }
+
     this.canvas.setPointerCapture(e.pointerId);
     this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
 
@@ -2385,8 +2569,18 @@ export class DungeonRenderer {
     // Down in the corridor a drag is the head turning, and there is no tile
     // under the cursor to hover - the cursor is the player's eyes.
     if (this.walk) {
+      if (document.pointerLockElement === this.canvas) {
+        this.look(e.movementX * LOOK_SPEED, e.movementY * LOOK_SPEED);
+        return;
+      }
       if (!previous) return;
       const current = new THREE.Vector2(e.clientX, e.clientY);
+      // A finger that has travelled is turning the head, not resting on a
+      // block: the tap and the hold both stand down.
+      if (!this.dragMoved && this.dragStart && current.distanceTo(this.dragStart) > TAP_SLOP) {
+        this.dragMoved = true;
+        this.stopHold();
+      }
       this.look(
         (current.x - previous.x) * LOOK_SPEED,
         (current.y - previous.y) * LOOK_SPEED,
@@ -2446,6 +2640,26 @@ export class DungeonRenderer {
   };
 
   private onPointerUp = (e: PointerEvent): void => {
+    if (this.walk) {
+      if (e.pointerType === "mouse") {
+        if (e.button === 0) this.stopHold();
+        this.activePointers.delete(e.pointerId);
+        if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
+      // A finger lifted before the hold fired and without moving: a tap.
+      const tap = this.touchPending?.id === e.pointerId && !this.dragMoved;
+      this.stopHold();
+      this.activePointers.delete(e.pointerId);
+      if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
+      if (this.activePointers.size === 0) {
+        this.dragStart = null;
+        this.dragMoved = false;
+      }
+      if (tap) this.act("secondary");
+      return;
+    }
+
     const wasSingle = this.activePointers.size === 1;
     this.activePointers.delete(e.pointerId);
     if (this.canvas.hasPointerCapture(e.pointerId)) {
@@ -2483,8 +2697,16 @@ export class DungeonRenderer {
   };
 
   private onKeyDown = (e: KeyboardEvent): void => {
+    if (this.walk) {
+      this.keys.add(e.key.toLowerCase());
+      return;
+    }
     if (e.key === "q" || e.key === "Q") this.rotate(-1);
     if (e.key === "e" || e.key === "E") this.rotate(1);
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    this.keys.delete(e.key.toLowerCase());
   };
 
   private loop = (): void => {
@@ -2506,6 +2728,7 @@ export class DungeonRenderer {
     this.updatePathFlow();
     this.updateHealthBars();
     this.updateShake(delta);
+    this.updateWalk(delta);
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
@@ -2570,6 +2793,8 @@ export class DungeonRenderer {
     cancelAnimationFrame(this.resizeFrame);
     this.resizeObserver.disconnect();
     window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+    this.stopHold();
 
     const c = this.canvas;
     c.removeEventListener("pointerdown", this.onPointerDown);

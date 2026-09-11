@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DungeonRenderer,
+  type AimTile,
   type MarkerView,
   type UnitView,
 } from "./game/DungeonRenderer";
@@ -198,8 +199,16 @@ export default function App() {
   const hudRef = useRef<HTMLElement>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
-  /** The tile straight ahead while walking the corridor. */
-  const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
+  /** The block under the crosshair while walking the corridor. */
+  const [aim, setAim] = useState<AimTile | null>(null);
+  /**
+   * Which slot of the hotbar is in hand down in the corridor.
+   *
+   * An index rather than a tool id, because the bar is what the player
+   * sees: the number keys pick by position, and a slot that changes what
+   * it holds (a trap unlocked by research) keeps its place in the row.
+   */
+  const [held, setHeld] = useState(0);
   /** Baked from the tool models once the pack loads; empty until then. */
   const [toolIcons, setToolIcons] = useState<Record<string, string>>({});
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
@@ -500,26 +509,68 @@ export default function App() {
    * fill side is offered only for bare floor - anything standing there is
    * cleared from above, where it can be seen for what it is.
    */
-  const aimAction = ((): "dig" | "fill" | null => {
-    if (!aim || !walking || !meta) return null;
-    const key = blockedKey(aim.x, aim.y, arena.w);
-    if (terrain.has(key)) return "dig";
-    if (aim.x === entrance.x && aim.y === entrance.y) return null;
-    if (aim.x === core.x && aim.y === core.y) return null;
-    const busy =
-      minions.some((m) => m.x === aim.x && m.y === aim.y) ||
-      traps.some((tr) => tr.x === aim.x && tr.y === aim.y) ||
-      rooms.some((r) => roomCovers(r, aim.x, aim.y));
-    return busy ? null : "fill";
-  })();
+  /*
+   * The hotbar: what can be put down from inside the corridor.
+   *
+   * Filling first, then the garrison, then the traps - the order they come
+   * up in the tutorial. Rooms are not here: a room is a two-by-two block
+   * anchored at a corner, which is a thing you place looking at the whole
+   * board, not at one tile of it. Locked entries stay in the row, greyed,
+   * so the row keeps its shape as research fills it in.
+   */
+  const hotbar = TOOLS.filter((entry) => entry.tool.kind !== "room" && entry.id !== "dig" && entry.id !== "remove");
+  const heldEntry = hotbar[Math.min(held, hotbar.length - 1)] ?? null;
+  const heldLocked = (entry: (typeof TOOLS)[number]): boolean =>
+    (entry.tool.kind === "minion" && !unlocked.unlockedMinions.includes(entry.tool.type)) ||
+    (entry.tool.kind === "trap" && !unlocked.unlockedTraps.includes(entry.tool.type));
 
-  const actOnAim = () => {
-    if (!aim || !aimAction || raid.raiding) return;
-    const ok = aimAction === "dig" ? save.dig(aim.x, aim.y) : save.fill(aim.x, aim.y);
-    audio.play(ok ? "dig" : "error");
+  /*
+   * Left hand takes out, right hand puts down.
+   *
+   * Primary on rock digs it. Secondary on floor puts down whatever is in
+   * hand - or fills the tile back in when that is what is held. Anything
+   * else (primary on floor, secondary on rock) is a swing at nothing, and
+   * says so with the same sound a refused placement makes above.
+   */
+  const actRef = useRef<(button: "primary" | "secondary", tile: AimTile) => void>(() => {});
+  actRef.current = (button, tile) => {
+    if (raid.raiding || !meta) return;
+
+    let ok = false;
+    if (button === "primary") {
+      if (tile.kind !== "rock") return;
+      ok = save.dig(tile.x, tile.y);
+    } else {
+      if (tile.kind !== "floor" || !heldEntry || heldLocked(heldEntry)) return;
+      const tool = heldEntry.tool;
+      if (tool.kind === "fill") ok = save.fill(tile.x, tile.y);
+      else if (tool.kind === "minion") ok = save.placeMinion(tool.type, tile.x, tile.y);
+      else if (tool.kind === "trap") ok = save.placeTrap(tool.type, tile.x, tile.y);
+    }
+
+    if (!ok) {
+      audio.play("error");
+      return;
+    }
+    audio.play(button === "primary" || heldEntry?.tool.kind === "fill" ? "dig" : "place");
     // Rock coming out in front of your face is felt, not just seen.
-    if (ok) rendererRef.current?.shake(0.16);
+    if (button === "primary") rendererRef.current?.shake(0.16);
+    if (showAftermath) {
+      setShowAftermath(false);
+      rendererRef.current?.setAftermath(null);
+    }
   };
+
+  // Number keys pick a slot, the way every game with a bar does it.
+  useEffect(() => {
+    if (!walking) return;
+    const onKey = (e: KeyboardEvent) => {
+      const n = Number(e.key);
+      if (Number.isInteger(n) && n >= 1 && n <= hotbar.length) setHeld(n - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walking, hotbar.length]);
   useEffect(() => {
     if (!walkingForward || !walking) return;
     let frame = 0;
@@ -650,6 +701,7 @@ export default function App() {
       isPaintable: () => paintableRef.current,
       onHoverChange: setHover,
       onAimChange: setAim,
+      onAct: (button, tile) => actRef.current(button, tile),
     });
     rendererRef.current = renderer;
 
@@ -1889,15 +1941,42 @@ export default function App() {
           <button className="walk-exit" onClick={() => { audio.play("click"); setWalking(false); }}>
             {t("walk_map")}
           </button>
-          {/* Sits beside the walk button, under the other thumb: face the rock,
-              press, and it is gone. The label is the verb the tile ahead
-              allows, or nothing when it allows none. */}
-          {aimAction && (
-            <button className="walk-act" onClick={actOnAim} disabled={raid.raiding}>
-              <b>{aimAction === "dig" ? t("tool_dig") : t("tool_fill")}</b>
-              <i>{aimAction === "dig" ? `${DIG_COST}G` : t("free")}</i>
-            </button>
-          )}
+        </div>
+      )}
+
+      {/* The crosshair, and under it what the block it rests on will take:
+          the dig price on rock, nothing on floor - the bar says what goes
+          there. Both take no clicks; the canvas underneath is the hand. */}
+      {walking && (
+        <div className="crosshair" aria-hidden="true">
+          <i />
+          {aim?.kind === "rock" && <b>{DIG_COST}G</b>}
+        </div>
+      )}
+
+      {walking && (
+        <div className="hotbar">
+          {hotbar.map((entry, i) => {
+            const locked = heldLocked(entry);
+            return (
+              <button
+                key={entry.id}
+                className={i === held ? "slot active" : locked ? "slot locked" : "slot"}
+                onClick={() => { audio.play("click"); setHeld(i); }}
+                title={locked ? t("locked_hint") : undefined}
+              >
+                <em>{i + 1}</em>
+                {(() => {
+                  const modelKey = TOOL_MODEL[entry.id];
+                  const icon = modelKey ? toolIcons[modelKey] : undefined;
+                  return icon ? <img src={icon} alt="" /> : null;
+                })()}
+                <b>{t(entry.label)}</b>
+                <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
+              </button>
+            );
+          })}
+          <p className="hotbar-hint">{t("hotbar_hint")}</p>
         </div>
       )}
 

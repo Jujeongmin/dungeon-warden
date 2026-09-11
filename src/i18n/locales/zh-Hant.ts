@@ -257,6 +257,7 @@ export const zhHant: Record<StringKey, string> = {
   menu_walk: "走進地牆",
   walk_exit: "離開",
   walk_map: "地圖",
+  hotbar_hint: "長按挖掘 · 點按放置 · 1~9 切換",
   connect_first: "先挖通入口與核心",
   tut_nook_place: "挖出通道旁的小空間",
 };
