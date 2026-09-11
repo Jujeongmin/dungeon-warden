@@ -1993,3 +1993,56 @@ button.ad-gold {
   border-color: rgba(232, 164, 76, 0.6);
   color: var(--accent);
 }
+
+/* ---------------------------------------------------------------------------
+   Walking the dungeon.
+
+   Two controls and nothing else. The room is the point, so the screen gives
+   it everything except one thumb's worth of corner.
+   --------------------------------------------------------------------------- */
+/* The panel sets its own display, which beats the browser default for
+   [hidden] - so hiding it has to be said out loud. */
+.hud[hidden] { display: none; }
+
+.walkbar {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  pointer-events: none;
+}
+
+.walkbar > * { pointer-events: auto; }
+
+/* Deliberately large: it is held down, not tapped, and it is held with a
+   thumb while the other hand is dragging the view. */
+.walk-forward {
+  /* flex:none or the row stretches a circle into an ellipse. */
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  border-color: rgba(232, 164, 76, 0.5);
+  background: linear-gradient(180deg, rgba(58, 46, 28, 0.92), rgba(36, 28, 18, 0.92));
+  color: var(--accent);
+  touch-action: none;
+}
+
+.walk-forward:active {
+  background: linear-gradient(180deg, rgba(90, 70, 40, 0.95), rgba(58, 46, 28, 0.95));
+}
+
+.walk-exit {
+  flex: none;
+  order: -1;
+  padding: 8px 14px;
+  font-size: var(--fs-2xs);
+  border-radius: 99px;
+}

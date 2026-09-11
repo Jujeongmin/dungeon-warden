@@ -29,6 +29,21 @@ const FLOOR_HEIGHT = 0.12;
  * and a steeper angle also hides less of the corridor behind the rock.
  */
 const PITCH = THREE.MathUtils.degToRad(68);
+
+/**
+ * Eye height and body width of whatever is walking the corridor, in tiles.
+ *
+ * The body is wide on purpose. At a quarter tile the camera could get its
+ * nose within a fifth of a tile of the rock, and a wall that close fills the
+ * screen with one texel of stone - the corridor stops reading as a corridor.
+ * A third of a tile keeps a shoulder's width of dark between the eye and
+ * the wall, which is what makes it feel like a passage rather than a scan.
+ */
+const EYE_HEIGHT = 0.6;
+const BODY = 0.36;
+
+/** Radians of turn per pixel dragged. */
+const LOOK_SPEED = 0.0045;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -1419,11 +1434,18 @@ export class DungeonRenderer {
 
         const torch = this.spawnModel("prop_torch", 0.5);
         if (!torch) break;
-        // Just inside the panel, or it floats outside the room.
+        /*
+         * Tight against the panel.
+         *
+         * It used to sit further in, which nobody could tell from above and
+         * everybody can tell from inside: at eye height in a one-tile
+         * corridor a bracket that reaches a third of a tile out is a thing
+         * you walk through the middle of.
+         */
         torch.position.set(
-          floor.x + dx * 0.38,
+          floor.x + dx * 0.46,
           FLOOR_HEIGHT + torch.position.y,
-          floor.y + dy * 0.38,
+          floor.y + dy * 0.46,
         );
         torch.rotation.y = Math.atan2(-dx, -dy);
         this.scene.add(torch);
@@ -2136,7 +2158,120 @@ export class DungeonRenderer {
    * zero (the offset is `f(trauma, time)`, not integrated, so it can't
    * drift).
    */
+  /**
+   * Standing in the corridor rather than looking down at it.
+   *
+   * Not a way to play - the board above is where a maze gets built, because
+   * planning one is a thing you do by looking at it. This is for the other
+   * half of building a dungeon, which is wanting to see what you made from
+   * inside it, at the height of the things that have to walk through it.
+   *
+   * Held in world units rather than tiles so the walk is smooth; the rock it
+   * cannot pass through is still read per tile.
+   */
+  private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
+
+  /** True while the camera is down in the corridor. */
+  get walking(): boolean {
+    return this.walk !== null;
+  }
+
+  /**
+   * Drops into the dungeon, or climbs back out.
+   *
+   * Entering puts the camera on the doorway looking the way the raiders walk,
+   * because that is the view the whole room is designed around and the one
+   * the player has never actually had.
+   */
+  setWalking(on: boolean): void {
+    if (!on) {
+      this.walk = null;
+      return;
+    }
+    if (!this.entrance || !this.core) return;
+
+    this.walk = {
+      at: new THREE.Vector3(this.entrance.x, FLOOR_HEIGHT + EYE_HEIGHT, this.entrance.y),
+      // Facing the core: the room runs down a column, so that is straight
+      // along +z, and atan2 of the difference keeps it honest if that changes.
+      yaw: Math.atan2(this.core.x - this.entrance.x, this.core.y - this.entrance.y),
+      pitch: 0,
+    };
+  }
+
+  /** Turns the head. Radians, from a drag. */
+  look(dYaw: number, dPitch: number): void {
+    if (!this.walk) return;
+    this.walk.yaw -= dYaw;
+    // Stopped short of straight up and straight down, where the horizon rolls
+    // over and the controls appear to invert.
+    this.walk.pitch = THREE.MathUtils.clamp(this.walk.pitch - dPitch, -1.2, 1.2);
+  }
+
+  /**
+   * Walks forward, stopped by rock.
+   *
+   * The two axes are tried separately so a wall taken at an angle slides
+   * along it rather than stopping dead, which is the difference between a
+   * corridor that feels walkable and one that feels like a bug.
+   */
+  step(amount: number): void {
+    const walk = this.walk;
+    const arena = this.arena;
+    if (!walk || !arena) return;
+
+    const dx = Math.sin(walk.yaw) * amount;
+    const dz = Math.cos(walk.yaw) * amount;
+
+    if (this.standable(walk.at.x + dx, walk.at.z)) walk.at.x += dx;
+    if (this.standable(walk.at.x, walk.at.z + dz)) walk.at.z += dz;
+  }
+
+  /**
+   * Whether a point is far enough from the rock to stand on.
+   *
+   * Kept a body-width clear of the edge, or the camera pushes its nose
+   * through the wall and the corridor turns inside out.
+   */
+  private standable(x: number, z: number): boolean {
+    const arena = this.arena;
+    if (!arena) return false;
+
+    for (const [ox, oz] of [[BODY, 0], [-BODY, 0], [0, BODY], [0, -BODY]]) {
+      const tx = Math.round(x + ox);
+      const tz = Math.round(z + oz);
+      if (!inArena(arena, tx, tz)) return false;
+      if (!this.dug.has(tx + tz * arena.w)) return false;
+    }
+    return true;
+  }
+
   private updateCamera(): void {
+    /*
+     * Down in the corridor: the camera is the player, so it is a position and
+     * a heading rather than something orbiting a point on the floor.
+     */
+    if (this.walk) {
+      this.camera.position.copy(this.walk.at);
+      const cosPitch = Math.cos(this.walk.pitch);
+      this.camera.lookAt(
+        this.walk.at.x + Math.sin(this.walk.yaw) * cosPitch,
+        this.walk.at.y + Math.sin(this.walk.pitch),
+        this.walk.at.z + Math.cos(this.walk.yaw) * cosPitch,
+      );
+      const closeFog = this.scene.fog as THREE.Fog | null;
+      // Much tighter than the overview: down here the dark is the point.
+      if (closeFog) {
+        closeFog.near = 1.5;
+        closeFog.far = 11;
+      }
+      return;
+    }
+
+    return this.updateOrbitCamera();
+  }
+
+  private updateOrbitCamera(): void {
     const y = this.yaw;
     const horizontal = Math.cos(PITCH) * this.distance;
     this.camera.position.set(
@@ -2385,6 +2520,19 @@ export class DungeonRenderer {
   private onPointerMove = (e: PointerEvent): void => {
     const previous = this.activePointers.get(e.pointerId);
 
+    // Down in the corridor a drag is the head turning, and there is no tile
+    // under the cursor to hover - the cursor is the player's eyes.
+    if (this.walk) {
+      if (!previous) return;
+      const current = new THREE.Vector2(e.clientX, e.clientY);
+      this.look(
+        (current.x - previous.x) * LOOK_SPEED,
+        (current.y - previous.y) * LOOK_SPEED,
+      );
+      this.activePointers.set(e.pointerId, current);
+      return;
+    }
+
     if (!previous) {
       // Mouse hover with no button held.
       this.setHovered(this.pointerToTile(e.clientX, e.clientY));
@@ -2435,7 +2583,9 @@ export class DungeonRenderer {
       this.canvas.releasePointerCapture(e.pointerId);
     }
 
-    if (wasSingle && !this.dragMoved) {
+    // No placing from inside the dungeon: this is a look around, not a
+    // second way to build, and a tap down here has no tile to mean.
+    if (wasSingle && !this.dragMoved && !this.walk) {
       const tile = this.pointerToTile(e.clientX, e.clientY);
       if (tile && e.button === 2) {
         this.callbacks.onTileAlt?.(tile.x, tile.y, e.clientX, e.clientY);

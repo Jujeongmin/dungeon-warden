@@ -262,4 +262,6 @@ export const en: Record<StringKey, string> = {
   tut_dig_pick: "Take the pick",
   tut_dig_place: "Cut a nook beside the corridor",
   hint_spread: "A sprawling dungeon thins the garrison ×{scale}",
+  menu_walk: "Walk the dungeon",
+  walk_exit: "Come back up",
 };

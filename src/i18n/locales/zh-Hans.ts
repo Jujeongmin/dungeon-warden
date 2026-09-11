@@ -263,4 +263,6 @@ export const zhHans: Record<StringKey, string> = {
   tut_dig_pick: "选择挖",
   tut_dig_place: "挖出通道旁的小空间",
   hint_spread: "挖得越广，手下越弱 ×{scale}",
+  menu_walk: "走进地牢",
+  walk_exit: "离开",
 };

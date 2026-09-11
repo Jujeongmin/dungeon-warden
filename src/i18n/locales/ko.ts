@@ -275,4 +275,6 @@ export const ko = {
   tut_dig_pick: "파기를 고르세요",
   tut_dig_place: "통로 옆을 파 자리를 만드세요",
   hint_spread: "넓게 파면 부하가 약해집니다 ×{scale}",
+  menu_walk: "던전 걸어보기",
+  walk_exit: "나가기",
 };

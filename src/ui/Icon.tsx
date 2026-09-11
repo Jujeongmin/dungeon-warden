@@ -21,6 +21,8 @@ export type IconName =
   | "home"
   | "lock"
   | "crown"
+  | "eye"
+  | "walk"
   | "chevronDown"
   | "chevronUp";
 
@@ -42,6 +44,10 @@ const PATHS: Record<IconName, string> = {
   // Three peaks on a band. The party leader, at a size where a photograph
   // of the model itself is a smudge: a flat glyph still reads at 12px.
   crown: "M3 8l4 3 5-6 5 6 4-3-2 11H5L3 8zm2.6 13h12.8v2H5.6v-2z",
+  // An open eye: what the dungeon looks like from inside it.
+  eye: "M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7c-1.2-2.8-5-7-10.5-7zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z",
+  // A chevron pointing up, for the hold-to-walk control.
+  walk: "M12 5l8 9h-5v5H9v-5H4l8-9z",
   chevronDown: "M6 9l6 6 6-6H6z",
   chevronUp: "M6 15l6-6 6 6H6z",
 };

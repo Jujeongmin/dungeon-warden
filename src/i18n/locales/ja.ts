@@ -268,4 +268,6 @@ export const ja: Record<StringKey, string> = {
   tut_dig_pick: "掘るを選んで",
   tut_dig_place: "通路の横を掘って場所を",
   hint_spread: "広く掘るほど手下が弱くなります ×{scale}",
+  menu_walk: "ダンジョンを歩く",
+  walk_exit: "戻る",
 };

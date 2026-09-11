@@ -190,6 +190,9 @@ const GROUPS: Array<{ id: ToolGroup; label: StringKey }> = [
 ];
 
 const SKILLS: WardenSkill[] = ["blessing", "rally", "detonate"];
+
+/** Tiles a second, walking the corridor. A tile is about two metres. */
+const WALK_SPEED = 2.2;
 type Tab = "build" | "manage" | "research";
 
 export default function App() {
@@ -460,6 +463,52 @@ export default function App() {
    * Nothing here fires on a phone: no touch generates button 2, so the
    * toolbar remove tool stays the way it is done there.
    */
+  /**
+   * Whether the camera is down in the corridor.
+   *
+   * Mirrored in React as well as in the renderer because the panel has to
+   * step out of the way and the walk control has to appear - the renderer
+   * owns the camera, this owns the screen around it.
+   */
+  const [walking, setWalking] = useState(false);
+
+  /*
+   * Walking is for between raids. During one the camera has somewhere else to
+   * be, and the board is not the player's to stand in while it is being
+   * fought over.
+   */
+  useEffect(() => {
+    if (!raid.raidOpen) return;
+    setWalking(false);
+  }, [raid.raidOpen]);
+
+  useEffect(() => {
+    rendererRef.current?.setWalking(walking);
+  }, [walking]);
+
+  /*
+   * Hold to walk forward.
+   *
+   * One thumb drags to look and one holds this, which is the pattern that
+   * works in portrait without putting two virtual sticks on a phone. The step
+   * is per frame rather than per press, so the speed is the same on every
+   * device.
+   */
+  const [walkingForward, setWalkingForward] = useState(false);
+  useEffect(() => {
+    if (!walkingForward || !walking) return;
+    let frame = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const delta = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      rendererRef.current?.step(delta * WALK_SPEED);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [walkingForward, walking]);
+
   const [removePrompt, setRemovePrompt] = useState<
     { x: number; y: number; sx: number; sy: number; label: string } | null
   >(null);
@@ -1225,6 +1274,19 @@ export default function App() {
           </button>
           {/* Icons, not labels. These are somewhere to go once in a while;
               the gold beside them is the thing being played for. */}
+          {/* The one button that changes where you are rather than what is
+              on top of the screen. Hidden while a raid is on: the camera has
+              somewhere else to be. */}
+          {!raid.raidOpen && (
+            <button
+              className={walking ? "icon-toggle walking" : "icon-toggle"}
+              onClick={() => { audio.play("click"); setWalking(!walking); }}
+              title={walking ? t("walk_exit") : t("menu_walk")}
+              aria-label={walking ? t("walk_exit") : t("menu_walk")}
+            >
+              <Icon name="eye" />
+            </button>
+          )}
           <button
             className="icon-toggle"
             onClick={() => { audio.play("click"); setBoardOpen(true); }}
@@ -1405,7 +1467,13 @@ export default function App() {
 
       {raid.result && <ResultDialog result={raid.result} onClose={raid.dismissResult} />}
 
-      <aside ref={hudRef} className={hudOpen ? "hud" : "hud collapsed"}>
+      <aside
+        ref={hudRef}
+        className={hudOpen ? "hud" : "hud collapsed"}
+        // Hidden rather than unmounted: it keeps its scroll position and its
+        // open tab for when the player climbs back out.
+        hidden={walking}
+      >
         <div className="hud-tabs">
           <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>{t("tab_build")}</button>
           <button className={tab === "manage" ? "active" : ""} onClick={() => { audio.play("click"); setTab("manage"); }}>{t("tab_manage")}</button>
@@ -1706,6 +1774,31 @@ export default function App() {
           </button>
         </div>
       </aside>
+
+      {/*
+        * Down in the corridor the screen is the corridor.
+        *
+        * The build panel is hidden rather than disabled: there is nothing to
+        * build from in here, and a panel covering a third of the view would
+        * undo the only thing this mode is for.
+        */}
+      {walking && (
+        <div className="walkbar">
+          <button
+            className="walk-forward"
+            onPointerDown={() => setWalkingForward(true)}
+            onPointerUp={() => setWalkingForward(false)}
+            onPointerLeave={() => setWalkingForward(false)}
+            onPointerCancel={() => setWalkingForward(false)}
+            aria-label={t("menu_walk")}
+          >
+            <Icon name="walk" size={22} />
+          </button>
+          <button className="walk-exit" onClick={() => { audio.play("click"); setWalking(false); }}>
+            {t("walk_exit")}
+          </button>
+        </div>
+      )}
 
       {/* Anchored where the click landed, and clamped so it cannot hang off
           the stage. A backdrop takes the next click anywhere else, which is
