@@ -268,6 +268,7 @@ export const ko = {
   hint_spread: "넓게 파면 부하가 약해집니다 ×{scale}",
   menu_walk: "던전 걸어보기",
   walk_exit: "나가기",
+  walk_map: "지도",
   connect_first: "입구와 코어를 이으세요",
   tut_nook_place: "통로 옆을 파 자리를 만드세요",
 };

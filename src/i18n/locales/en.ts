@@ -255,6 +255,7 @@ export const en: Record<StringKey, string> = {
   hint_spread: "A sprawling dungeon thins the garrison ×{scale}",
   menu_walk: "Walk the dungeon",
   walk_exit: "Come back up",
+  walk_map: "Map",
   connect_first: "Connect the door to the core",
   tut_nook_place: "Cut a nook beside the corridor",
 };

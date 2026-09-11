@@ -2119,6 +2119,26 @@ button.ad-gold {
   background: linear-gradient(180deg, rgba(90, 70, 40, 0.95), rgba(58, 46, 28, 0.95));
 }
 
+/* The verb for the tile ahead. Big like the walk button: it is pressed
+   while the other thumb is holding the view, by someone looking at a
+   wall rather than at their hands. */
+.walk-act {
+  flex: none;
+  min-width: 76px;
+  height: 76px;
+  padding: 0 16px;
+  border-radius: 38px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border-color: rgba(232, 164, 76, 0.5);
+  background: linear-gradient(180deg, rgba(58, 46, 28, 0.92), rgba(36, 28, 18, 0.92));
+  color: var(--accent);
+}
+
+.walk-act b { font-size: var(--fs-base); }
+.walk-act i { font-size: var(--fs-2xs); font-style: normal; color: var(--muted); }
+
 .walk-exit {
   flex: none;
   order: -1;

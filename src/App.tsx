@@ -198,6 +198,8 @@ export default function App() {
   const hudRef = useRef<HTMLElement>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  /** The tile straight ahead while walking the corridor. */
+  const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
   /** Baked from the tool models once the pack loads; empty until then. */
   const [toolIcons, setToolIcons] = useState<Record<string, string>>({});
   const [showOfflineBanner, setShowOfflineBanner] = useState(true);
@@ -488,6 +490,36 @@ export default function App() {
    * device.
    */
   const [walkingForward, setWalkingForward] = useState(false);
+
+  /*
+   * What the tile ahead would take: rock comes out, floor goes back in.
+   *
+   * One button rather than a tool in hand. Down here the player is not
+   * choosing between tools, they are facing a wall or facing a floor, and
+   * the wall or the floor already says which of the two makes sense. The
+   * fill side is offered only for bare floor - anything standing there is
+   * cleared from above, where it can be seen for what it is.
+   */
+  const aimAction = ((): "dig" | "fill" | null => {
+    if (!aim || !walking || !meta) return null;
+    const key = blockedKey(aim.x, aim.y, arena.w);
+    if (terrain.has(key)) return "dig";
+    if (aim.x === entrance.x && aim.y === entrance.y) return null;
+    if (aim.x === core.x && aim.y === core.y) return null;
+    const busy =
+      minions.some((m) => m.x === aim.x && m.y === aim.y) ||
+      traps.some((tr) => tr.x === aim.x && tr.y === aim.y) ||
+      rooms.some((r) => roomCovers(r, aim.x, aim.y));
+    return busy ? null : "fill";
+  })();
+
+  const actOnAim = () => {
+    if (!aim || !aimAction || raid.raiding) return;
+    const ok = aimAction === "dig" ? save.dig(aim.x, aim.y) : save.fill(aim.x, aim.y);
+    audio.play(ok ? "dig" : "error");
+    // Rock coming out in front of your face is felt, not just seen.
+    if (ok) rendererRef.current?.shake(0.16);
+  };
   useEffect(() => {
     if (!walkingForward || !walking) return;
     let frame = 0;
@@ -617,6 +649,7 @@ export default function App() {
       // Digging and filling are the only tools a drag runs along.
       isPaintable: () => paintableRef.current,
       onHoverChange: setHover,
+      onAimChange: setAim,
     });
     rendererRef.current = renderer;
 
@@ -1854,8 +1887,17 @@ export default function App() {
             <Icon name="walk" size={22} />
           </button>
           <button className="walk-exit" onClick={() => { audio.play("click"); setWalking(false); }}>
-            {t("walk_exit")}
+            {t("walk_map")}
           </button>
+          {/* Sits beside the walk button, under the other thumb: face the rock,
+              press, and it is gone. The label is the verb the tile ahead
+              allows, or nothing when it allows none. */}
+          {aimAction && (
+            <button className="walk-act" onClick={actOnAim} disabled={raid.raiding}>
+              <b>{aimAction === "dig" ? t("tool_dig") : t("tool_fill")}</b>
+              <i>{aimAction === "dig" ? `${DIG_COST}G` : t("free")}</i>
+            </button>
+          )}
         </div>
       )}
 

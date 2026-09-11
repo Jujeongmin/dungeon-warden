@@ -261,6 +261,7 @@ export const ja: Record<StringKey, string> = {
   hint_spread: "広く掘るほど手下が弱くなります ×{scale}",
   menu_walk: "ダンジョンを歩く",
   walk_exit: "戻る",
+  walk_map: "地図",
   connect_first: "入口とコアを繋げて",
   tut_nook_place: "通路の横を掘って場所を",
 };

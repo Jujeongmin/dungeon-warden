@@ -115,6 +115,13 @@ export interface RendererCallbacks {
    */
   isPaintable?: () => boolean;
   onHoverChange: (tile: { x: number; y: number } | null) => void;
+  /**
+   * The tile straight ahead while walking, or null facing nothing.
+   *
+   * Down in the corridor there is no cursor: what the player is looking at
+   * is what they act on, and this is that tile.
+   */
+  onAimChange?: (tile: { x: number; y: number } | null) => void;
 }
 
 /** One drawable unit. The renderer stays ignorant of raid rules. */
@@ -1930,6 +1937,8 @@ export class DungeonRenderer {
    * cannot pass through is still read per tile.
    */
   private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
+  /** The tile the walker is facing, so a change can be reported once. */
+  private aim: { x: number; y: number } | null = null;
 
   /** True while the camera is down in the corridor. */
   get walking(): boolean {
@@ -1946,6 +1955,7 @@ export class DungeonRenderer {
   setWalking(on: boolean): void {
     if (!on) {
       this.walk = null;
+      this.setAim(null);
       return;
     }
     if (!this.entrance || !this.core) return;
@@ -2006,12 +2016,54 @@ export class DungeonRenderer {
     return true;
   }
 
+  /**
+   * The tile straight ahead of the walker.
+   *
+   * One tile, in whichever of the four directions the head is turned most
+   * towards. Digging is per tile and the corridor is one tile wide, so the
+   * rock a player is facing is never ambiguous the way a free-aimed ray
+   * would make it - a ray at a corner hits the tile beside the one they
+   * meant, and a dig that lands one over is a hole nobody wanted.
+   */
+  private aimTile(): { x: number; y: number } | null {
+    const walk = this.walk;
+    const arena = this.arena;
+    if (!walk || !arena) return null;
+
+    const sx = Math.sin(walk.yaw);
+    const sz = Math.cos(walk.yaw);
+    const dx = Math.abs(sx) >= Math.abs(sz) ? Math.sign(sx) : 0;
+    const dz = dx === 0 ? Math.sign(sz) : 0;
+    const x = Math.round(walk.at.x) + dx;
+    const y = Math.round(walk.at.z) + dz;
+    return inArena(arena, x, y) ? { x, y } : null;
+  }
+
+  /** Marks the tile ahead and tells the screen when it changes. */
+  private setAim(tile: { x: number; y: number } | null): void {
+    const same =
+      (tile === null && this.aim === null) ||
+      (tile !== null && this.aim !== null && tile.x === this.aim.x && tile.y === this.aim.y);
+    if (same) return;
+
+    this.aim = tile;
+    // The same box the cursor uses above: down here the head is the cursor.
+    if (tile) {
+      this.highlight.position.set(tile.x, WALL_HEIGHT / 2, tile.y);
+      this.highlight.visible = true;
+    } else {
+      this.highlight.visible = false;
+    }
+    this.callbacks.onAimChange?.(tile);
+  }
+
   private updateCamera(): void {
     /*
      * Down in the corridor: the camera is the player, so it is a position and
      * a heading rather than something orbiting a point on the floor.
      */
     if (this.walk) {
+      this.setAim(this.aimTile());
       this.camera.position.copy(this.walk.at);
       const cosPitch = Math.cos(this.walk.pitch);
       this.camera.lookAt(
