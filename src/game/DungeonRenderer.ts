@@ -2203,8 +2203,10 @@ export class DungeonRenderer {
     const arena = this.arena;
     if (!walk || !arena) return;
 
-    const dx = Math.sin(walk.yaw) * amount + Math.cos(walk.yaw) * sideways;
-    const dz = Math.cos(walk.yaw) * amount - Math.sin(walk.yaw) * sideways;
+    // Right is forward crossed with up: for a heading (sin, cos) that is
+    // (-cos, sin). It was written the other way round, and D walked left.
+    const dx = Math.sin(walk.yaw) * amount - Math.cos(walk.yaw) * sideways;
+    const dz = Math.cos(walk.yaw) * amount + Math.sin(walk.yaw) * sideways;
 
     if (this.standable(walk.at.x + dx, walk.at.z)) walk.at.x += dx;
     if (this.standable(walk.at.x, walk.at.z + dz)) walk.at.z += dz;
