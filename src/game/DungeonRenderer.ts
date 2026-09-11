@@ -56,14 +56,19 @@ const HOLD_AFTER_MS = 320;
 const HOLD_REPEAT_MS = 380;
 /** How long one dig swing owns the arms before idle or walk take over. */
 const SWING_SECONDS = 0.42;
-/** How far in front of the eye the warden is drawn, in tiles. */
-const VIEW_AHEAD = 2.0;
-/** And how far to one side, so it does not stand on the crosshair. */
-const VIEW_ASIDE = -0.5;
-/** Scratch for the holder's transform, so the frame loop allocates nothing. */
-const VIEW_SPIN = new THREE.Quaternion();
-const UP = new THREE.Vector3(0, 1, 0);
-const ONE = new THREE.Vector3(1, 1, 1);
+/** Where the copy hangs off the lens, in tiles: back, aside, and down. */
+const VIEW_BACK = -0.85;
+const VIEW_ASIDE = 0;
+const VIEW_DROP = -0.14;
+/** How far the shoulders, arms and elbows are turned into view. */
+const VIEW_SHOULDER = 0;
+const VIEW_UPPER = -0.8;
+const VIEW_ELBOW = -0.5;
+/** And how far apart, so the two of them frame the view. */
+const VIEW_SPREAD = 0.05;
+/** Scratch for the pose, so the frame loop allocates nothing. */
+const VIEW_TURN = new THREE.Quaternion();
+const VIEW_EULER = new THREE.Euler();
 /** How much taller the rock stands while the camera is down among it. */
 const ROCK_STRETCH = 2.1;
 /** How wide across the shoulders the warden is, in tiles. */
@@ -2102,6 +2107,8 @@ export class DungeonRenderer {
   private warden: THREE.Object3D | null = null;
   /** The same body again, cut down to two arms and hung off the camera. */
   private viewArms: THREE.Object3D | null = null;
+  /** Shoulders, arms and elbows of that copy, turned into view every frame. */
+  private viewBones: Array<[string, THREE.Object3D]> = [];
   private viewHolder = new THREE.Group();
   private viewScene = new THREE.Scene();
   /** Eye height of that body, measured from its own head rather than assumed. */
@@ -2253,24 +2260,28 @@ export class DungeonRenderer {
   }
 
   /**
-   * The warden the player actually sees, standing in front of the camera.
+   * The warden's own arms, seen down its own nose.
    *
-   * A second copy of the same body, hung off the camera at a fixed offset
-   * and turned away, so the player watches their own monster from just
-   * behind its shoulders: both arms, the mace, the whole swing.
+   * A second copy of the body, wrapped round the lens: head and legs held
+   * at nothing, shoulders turned forward so the arms and the mace hang in
+   * the lower frame the way they do in any game played from inside a
+   * head. It runs the same clips as the body in the room, so a swing here
+   * is the swing the room sees.
    *
-   * It is a copy rather than the body itself because a camera that really
-   * stood back there would be inside the rock. The corridor is one tile
-   * wide and the room is solid stone: there is nowhere behind a warden to
-   * put a lens. So the eye stays in its head - which is what draws the
-   * corridor correctly - and the body is drawn in front of that eye, in a
-   * pass of its own over a cleared depth buffer, where no wall can eat it.
-   *
-   * Both copies run the same clips, so what the room sees and what the
-   * player sees are the same movement.
+   * A copy rather than the body itself, and drawn in a pass of its own
+   * over a cleared depth buffer: an arm a hand's width from the lens is
+   * inside whatever wall the warden is standing at, and the room would
+   * eat it.
    */
   private buildViewArms(clips: THREE.AnimationClip[], body: THREE.Object3D): void {
-    const model = this.loaded.get("warden");
+    /*
+     * Arms if the bake made them, the whole body if it did not.
+     *
+     * scripts/bake-warden.mjs cuts the arms out of the body by bone weight,
+     * because no free pack ships a monster's. Falling back to the body keeps
+     * the view working on a checkout where that file was never built.
+     */
+    const model = this.loaded.get("warden_arms") ?? this.loaded.get("warden");
     if (!model) return;
 
     const arms = this.models.instantiate(model);
@@ -2293,26 +2304,26 @@ export class DungeonRenderer {
      * its shoulders land where shoulders belong.
      */
     /*
-     * Sized against the body it is a copy of, and stood on the floor.
+     * Sized against the body it is a copy of, and hung by the eyes.
      *
      * The library hands out the model at the scale its author used - a
      * giant, here - so the copy borrows the scale the room body was fitted
-     * to. Dropping it by the height of that body's eyes puts its feet at
-     * the same floor the player is standing on, whatever body is in the
-     * slot.
+     * to. Dropping it by the height of that body's eyes puts the copy's own
+     * eyes at the lens, whatever body ends up in the slot; turning it to
+     * face away from the viewer is what makes this the inside of a head
+     * rather than a mirror.
      */
     const eyeAboveFeet = this.wardenEye - FLOOR_HEIGHT;
     arms.scale.copy(body.scale);
-    /*
-     * Ahead of the eye, facing the same way as the eye.
-     *
-     * The holder carries the camera's place and heading but not its pitch,
-     * and a warden at yaw zero faces world +z - so forward here is +z, and
-     * no turn of its own is needed. Getting this backwards puts the body
-     * behind the lens, which looks exactly like no body at all.
-     */
-    arms.position.set(VIEW_ASIDE, -eyeAboveFeet, VIEW_AHEAD);
-    arms.rotation.set(0, 0, 0);
+    arms.position.set(VIEW_ASIDE, -eyeAboveFeet + VIEW_DROP, VIEW_BACK);
+    arms.rotation.set(0, Math.PI, 0);
+
+    this.viewBones = [];
+    arms.traverse((child) => {
+      if (/^(clavicle|upperarm|lowerarm)_[lr]$/.test(child.name)) {
+        this.viewBones.push([child.name, child]);
+      }
+    });
 
     this.viewArms = arms;
     this.viewHolder.add(arms);
@@ -2325,6 +2336,7 @@ export class DungeonRenderer {
       this.mixers.delete("view-arms");
       this.disposeObject(this.viewHolder, this.viewArms);
       this.viewArms = null;
+      this.viewBones = [];
     }
     if (!this.warden) return;
     this.mixers.delete("warden");
@@ -2362,6 +2374,39 @@ export class DungeonRenderer {
     view.current = state;
   }
 
+  /**
+   * Turns the copy's shoulders forward and folds away what is not an arm.
+   *
+   * Applied after the mixer and before the frame, on top of whatever the
+   * clip did: the clip decides how the arm swings, this decides where it
+   * swings from. Both have to be redone every frame - the clips carry
+   * rotation and scale tracks, so a pose set once is gone by the next one,
+   * which is how the head grew back mid-swing the first time.
+   */
+  private poseViewArms(): void {
+    if (!this.viewArms) return;
+
+    for (const [name, bone] of this.viewBones) {
+      const side = name.endsWith("_l") ? 1 : -1;
+      const pitch = name.startsWith("upperarm")
+        ? VIEW_UPPER
+        : name.startsWith("lowerarm")
+          ? VIEW_ELBOW
+          : VIEW_SHOULDER;
+      /*
+       * Turned in the shoulder's own frame, not the bone's.
+       *
+       * An arm bone points down its own length, so turning it about its
+       * local axes mostly twists the limb - the hand barely moves. Applied
+       * from the parent side instead, the same angle swings the whole arm
+       * forward, which is what puts it in the picture.
+       */
+      VIEW_EULER.set(pitch, VIEW_SPREAD * side, 0);
+      VIEW_TURN.setFromEuler(VIEW_EULER);
+      bone.quaternion.premultiply(VIEW_TURN);
+    }
+  }
+
   /** Keeps the body under the camera and in the right clip. */
   private updateWarden(delta: number): void {
     const walk = this.walk;
@@ -2372,6 +2417,7 @@ export class DungeonRenderer {
     body.position.x = walk.at.x;
     body.position.z = walk.at.z;
     body.rotation.y = walk.yaw;
+    this.poseViewArms();
 
     if (this.wardenSwing > 0) {
       this.wardenSwing -= delta;
@@ -3111,17 +3157,15 @@ export class DungeonRenderer {
     this.renderer.render(this.scene, this.camera);
     if (this.viewArms) {
       /*
-       * Where the warden stands, and which way it faces - but not where it
-       * is looking. Copying the camera whole tipped the body forward and
-       * back with the head every time the player glanced up or down.
+       * The arms go where the head goes, pitch and all: they are part of
+       * the view, not part of the room.
        *
        * The flag has to be raised by hand because this holder keeps a
        * matrix rather than a position and a rotation; without it three
-       * leaves the matrix where it was built and the body hangs at the
-       * origin, in the corner of the room, which looks like no body at all.
+       * leaves the matrix where it was built and the arms hang at the
+       * origin, in the corner of the room, which looks like no arms at all.
        */
-      VIEW_SPIN.setFromAxisAngle(UP, this.walk?.yaw ?? 0);
-      this.viewHolder.matrix.compose(this.camera.position, VIEW_SPIN, ONE);
+      this.viewHolder.matrix.copy(this.camera.matrixWorld);
       this.viewHolder.matrixWorldNeedsUpdate = true;
       // Over the room, never instead of it: this pass clears depth only.
       this.renderer.autoClear = false;

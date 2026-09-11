@@ -217,6 +217,12 @@
       "bytes": 526932
     },
     {
+      "url": "/assets/warden/warden-arms.glb",
+      "name": "warden-arms",
+      "group": "warden",
+      "bytes": 484280
+    },
+    {
       "url": "/assets/warden/warden-clips.glb",
       "name": "warden-clips",
       "group": "warden",

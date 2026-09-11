@@ -1958,7 +1958,10 @@ button.ad-gold {
    --------------------------------------------------------------------------- */
 .rotate-guard { display: none; }
 
-@media (orientation: portrait) and (max-width: 600px) {
+/* Any portrait window, not only a phone's: the game is played sideways,
+   and a tall desktop window gets the same tall keyhole a held-upright
+   phone does. */
+@media (orientation: portrait) {
   .rotate-guard {
     position: fixed;
     inset: 0;
