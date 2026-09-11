@@ -79,6 +79,9 @@ const MS_PER_MINUTE = 60_000;
 /** How long the red frame holds after the ridden body dies. */
 const BODY_LOST_MS = 1800;
 
+/** How far a blow has to reach before it is worth drawing the reach, in tiles. */
+const BOLT_MIN_SPAN = 1.6;
+
 function remaining(at: number, t: Translate): string {
   const minutes = Math.max(0, Math.ceil((at - Date.now()) / MS_PER_MINUTE));
   return minutes <= 0 ? t("soon") : t("minutes", { n: minutes });
@@ -327,6 +330,29 @@ export default function App() {
       if (event.kind === "damage") {
         renderer.flashUnit(`a:${event.targetId}`);
 
+        /*
+         * A line from whatever struck, when it struck from a distance.
+         *
+         * An arrow slit and a mage both landed as a number over the victim
+         * and nothing else, so the thing the player had paid for never
+         * appeared to do anything - the adventurer simply lost health on
+         * the way past. Anything that reached across real ground now draws
+         * the ground it reached across. A blow from the next tile is a
+         * swing and keeps its silence.
+         */
+        if (event.from) {
+          const span = Math.hypot(event.from.x - event.x, event.from.y - event.y);
+          if (span > BOLT_MIN_SPAN) {
+            renderer.spawnBolt(
+              event.from.x,
+              event.from.y,
+              event.x,
+              event.y,
+              event.source === "trap" ? 0xffc27a : 0xc9b6ff,
+            );
+          }
+        }
+
         // Burn ticks every frame; showing each one would be a wall of 1s.
         if (event.source === "burn" || event.amount < 1) continue;
 
@@ -405,7 +431,18 @@ export default function App() {
   /** The minion the warden is riding this frame, if any. */
   const possessed = raid.possessed;
   const possessedId = possessed?.id ?? null;
-  const possessedType = possessed?.type ?? null;
+  /*
+   * Which model the ridden body wears, not which kind of unit it is.
+   *
+   * The same answer the board uses to draw it - see `units` - because the
+   * arms in front of the camera have to be the arms on the thing everyone
+   * else can see. A convert wears whatever class it was caught as.
+   */
+  const possessedType = possessed
+    ? possessed.type === "convert"
+      ? `a_${minions.find((p) => p.id === possessed.id)?.cls ?? "knight"}`
+      : `m_${possessed.type}`
+    : null;
 
   const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "remove" as const };
 

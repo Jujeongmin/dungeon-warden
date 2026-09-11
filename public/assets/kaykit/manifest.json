@@ -1,6 +1,12 @@
 {
   "models": [
     {
+      "url": "/assets/arms/advmage-arms.glb",
+      "name": "advmage-arms",
+      "group": "arms",
+      "bytes": 68588
+    },
+    {
       "url": "/assets/kaykit/adventurers/arrow_crossbow.gltf",
       "name": "arrow_crossbow",
       "group": "kaykit/adventurers",
@@ -23,6 +29,12 @@
       "name": "barbarian",
       "group": "kaykit/adventurers",
       "bytes": 386648
+    },
+    {
+      "url": "/assets/arms/barbarian-arms.glb",
+      "name": "barbarian-arms",
+      "group": "arms",
+      "bytes": 100844
     },
     {
       "url": "/assets/kaykit/dungeon/barrel_large.gltf",
@@ -91,6 +103,12 @@
       "bytes": 341688
     },
     {
+      "url": "/assets/arms/knight-arms.glb",
+      "name": "knight-arms",
+      "group": "arms",
+      "bytes": 89668
+    },
+    {
       "url": "/assets/kaykit/adventurers/Mage.glb",
       "name": "mage",
       "group": "kaykit/adventurers",
@@ -115,6 +133,12 @@
       "bytes": 484712
     },
     {
+      "url": "/assets/arms/ranger-arms.glb",
+      "name": "ranger-arms",
+      "group": "arms",
+      "bytes": 110724
+    },
+    {
       "url": "/assets/kaykit/animations/Rig_Medium_General.glb",
       "name": "rig_medium_general",
       "group": "kaykit/animations",
@@ -131,6 +155,12 @@
       "name": "rogue",
       "group": "kaykit/adventurers",
       "bytes": 409188
+    },
+    {
+      "url": "/assets/arms/rogue-arms.glb",
+      "name": "rogue-arms",
+      "group": "arms",
+      "bytes": 110132
     },
     {
       "url": "/assets/kaykit/dungeon/rubble_half.gltf",

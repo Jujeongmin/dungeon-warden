@@ -196,3 +196,44 @@ describe("losing a body", () => {
     expect(sim.state.possessedId).toBe(null);
   });
 });
+
+describe("where a blow came from", () => {
+  it("is carried on a minion's damage, so the reach can be drawn", () => {
+    const sim = bodyBesideTheRoad();
+    sim.requestAttack();
+    sim.step();
+
+    const hit = sim.drainEvents().find((e) => e.kind === "damage");
+    expect(hit).toBeDefined();
+    // The body is beside the road; the adventurer is on it. A blow that
+    // crossed that gap is one the renderer draws a line for.
+    expect(hit).toMatchObject({
+      from: { x: entrance.x + 1, y: entrance.y + 5 },
+    });
+  });
+
+  it("is the trap's own tile when a trap fires", () => {
+    const sim = new RaidSim({
+      minions: [],
+      traps: [{ id: "t1", type: "arrow", x: entrance.x + 1, y: entrance.y + 5 }],
+      terrain: new Set<number>(),
+      party,
+      arena,
+      entrance,
+      core,
+      lures: [],
+      seed: 1,
+    });
+
+    for (let i = 0; i < 20 * 30; i++) {
+      sim.step();
+      const shot = sim.drainEvents().find((e) => e.kind === "damage" && e.source === "trap");
+      if (shot) {
+        expect(shot).toMatchObject({ from: { x: entrance.x + 1, y: entrance.y + 5 } });
+        return;
+      }
+      if (sim.state.status !== "running") break;
+    }
+    throw new Error("the trap never fired");
+  });
+});

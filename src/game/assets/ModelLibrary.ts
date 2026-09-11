@@ -101,6 +101,17 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   m_warrior_arms: [/^warrior-arms$/],
   m_mage_arms: [/^mage-arms$/],
 
+  /*
+   * And the adventurers', because a convert keeps the body it was caught
+   * in - a turned knight is a knight, and looking down at a skeleton's
+   * hands while wearing plate is the wrong answer.
+   */
+  a_knight_arms: [/^knight-arms$/],
+  a_barbarian_arms: [/^barbarian-arms$/],
+  a_rogue_arms: [/^rogue-arms$/],
+  a_ranger_arms: [/^ranger-arms$/],
+  a_mage_arms: [/^advmage-arms$/],
+
   // Adventurers, also used for converts. Each class has its own model.
   a_knight: [/^knight$/],
   a_barbarian: [/^barbarian$/],

@@ -46,25 +46,6 @@ const BODY = 0.36;
 const LOOK_SPEED = 0.0045;
 /** Tiles a second on foot. A tile is about two metres. */
 const WALK_SPEED = 2.2;
-/**
- * Which arms each kind of ridden body shows.
- *
- * A convert wears an adventurer's model on the board but has no arms baked of
- * its own, so it borrows the warrior's - a pair of skeletal arms on something
- * that used to be a knight is odd, but far less odd than no hands.
- */
-const ARMS_FOR: Record<string, string> = {
-  warrior: "m_warrior_arms",
-  mage: "m_mage_arms",
-  convert: "m_warrior_arms",
-};
-
-/** And which whole body those arms were cut out of, for sizing them. */
-const BODY_FOR: Record<string, string> = {
-  warrior: "m_warrior",
-  mage: "m_mage",
-  convert: "m_warrior",
-};
 
 /** How long one swing owns the arms, in milliseconds. */
 const SWING_MS = 450;
@@ -83,8 +64,8 @@ const VIEW_TUNING = {
   back: -0.85,
   aside: 0,
   drop: -0.14,
-  upper: new THREE.Vector3(0.62, -0.9, 0.45),
-  lower: new THREE.Vector3(0.1, 0.3, 1),
+  upper: new THREE.Vector3(0.78, -1, 0.4),
+  lower: new THREE.Vector3(0.1, 0.45, 1),
 };
 
 /**
@@ -97,9 +78,10 @@ const VIEW_TUNING = {
  */
 const VIEW_PLACE: Record<string, { back: number; drop: number }> = {
   warden_arms: { back: -0.85, drop: -0.14 },
-  m_warrior_arms: { back: -0.95, drop: -0.05 },
-  m_mage_arms: { back: -0.95, drop: -0.05 },
 };
+
+/** Everything else in the game is on KayKit's rig, and wants the same spot. */
+const VIEW_PLACE_DEFAULT = { back: -0.78, drop: 0 };
 /** How far the mannequin rig's arms are swung forward, and how far apart. */
 const VIEW_UPPER = -0.8;
 const VIEW_ELBOW = -0.5;
@@ -362,6 +344,12 @@ const STONE = {
  * it never hides the corridor from this camera angle.
  */
 const ROCK_HEIGHT = 0.85;
+
+/** How high off the floor a shot is drawn, and how thick. Chest height. */
+const BOLT_HEIGHT = 0.42;
+const BOLT_WIDTH = 0.13;
+/** How long one lasts, in seconds. Long enough to be seen, short enough to read as a shot. */
+const BOLT_SECONDS = 0.16;
 /*
  * A tint over the stone, not a replacement for it.
  *
@@ -473,6 +461,10 @@ export class DungeonRenderer {
   /** Transient combat effects: hit flashes and trap rings. */
   private flashes = new Map<string, number>();
   private rings: Array<{ mesh: THREE.Mesh; life: number }> = [];
+  /** Streaks from a shooter to what it hit, fading out over a few frames. */
+  private bolts: Array<{ mesh: THREE.Mesh; life: number }> = [];
+  /** A unit-length bar down +z, stretched to whatever span it has to cover. */
+  private boltGeometry = new THREE.BoxGeometry(BOLT_WIDTH, BOLT_WIDTH, 1);
   private ringGeometry = new THREE.RingGeometry(0.2, 0.34, 20);
 
   /** Per-unit scale punch (on every hit) and knockback nudge (on a kill). */
@@ -1203,6 +1195,41 @@ export class DungeonRenderer {
   }
 
   /** Expanding ring on a tile, used when a trap fires. */
+  /**
+   * A streak from whatever struck to whatever it struck.
+   *
+   * Short-lived and thin, because it is punctuation rather than a projectile:
+   * by the time it is drawn the simulation has already decided the blow
+   * landed, and what the player needs is the line between the two ends, not a
+   * thing in flight. Only drawn for blows that crossed real ground - see the
+   * caller - so a minion hitting what is in front of it stays a swing.
+   */
+  spawnBolt(fromX: number, fromY: number, toX: number, toY: number, color = 0xffd39a): void {
+    const from = new THREE.Vector3(fromX, FLOOR_HEIGHT + BOLT_HEIGHT, fromY);
+    const to = new THREE.Vector3(toX, FLOOR_HEIGHT + BOLT_HEIGHT, toY);
+    const span = from.distanceTo(to);
+    if (span < 0.01) return;
+
+    const mesh = new THREE.Mesh(
+      this.boltGeometry,
+      // Additive, so it reads as light crossing the room rather than as a
+      // stick lying in it - and so it survives being drawn over dark rock.
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    mesh.renderOrder = 40;
+    mesh.scale.set(1, 1, span);
+    mesh.position.copy(from).lerp(to, 0.5);
+    mesh.lookAt(to);
+    this.scene.add(mesh);
+    this.bolts.push({ mesh, life: 1 });
+  }
+
   spawnRing(x: number, y: number, color = 0xe8a44c): void {
     const mesh = new THREE.Mesh(
       this.ringGeometry,
@@ -2366,7 +2393,7 @@ export class DungeonRenderer {
     const factor = fit ? WARDEN_HEIGHT / fit.tall : 1;
     const eyeAboveFeet = fit ? fit.eye * factor : this.wardenEye - FLOOR_HEIGHT;
     arms.scale.multiplyScalar(factor);
-    const place = VIEW_PLACE[key] ?? VIEW_TUNING;
+    const place = VIEW_PLACE[key] ?? VIEW_PLACE_DEFAULT;
     VIEW_TUNING.back = place.back;
     VIEW_TUNING.drop = place.drop;
     arms.position.set(VIEW_TUNING.aside, -eyeAboveFeet + place.drop, place.back);
@@ -2375,14 +2402,17 @@ export class DungeonRenderer {
 
     this.viewBones = [];
     arms.traverse((child) => {
-      if (/^(upperarm|lowerarm)[_.][lr]$/i.test(child.name)) {
+      // Three naming conventions, because the packs disagree and three.js
+      // strips the dot out of the ones that use one: upperarm_l on the
+      // mannequin, upperarm.l in KayKit files, upperarml once loaded.
+      if (/^(upperarm|lowerarm)[_.]?[lr]$/i.test(child.name)) {
         this.viewBones.push([child.name, child]);
       }
     });
-    // KayKit joins its bone names with a dot, the Unreal mannequin with an
-    // underscore. Which one this is decides how the arms are posed - see
-    // poseViewArms.
-    this.viewAimed = this.viewBones.some(([name]) => name.includes("."));
+    // Only the Unreal mannequin keeps a separator by the time three is done
+    // with it, and only the mannequin has a pose that was found by hand. See
+    // poseViewArms for the two ways.
+    this.viewAimed = !this.viewBones.some(([name]) => /_[lr]$/i.test(name));
 
     this.viewArms = arms;
     this.viewHolder.add(arms);
@@ -2461,7 +2491,7 @@ export class DungeonRenderer {
 
       // The models are mirrored down the middle, so the left arm wants the
       // same aim with its sideways component flipped.
-      const side = /[_.]l$/i.test(name) ? 1 : -1;
+      const side = /[_.]?l$/i.test(name) ? 1 : -1;
       const aim = name.toLowerCase().startsWith("upperarm") ? VIEW_TUNING.upper : VIEW_TUNING.lower;
       VIEW_WANT.set(aim.x * side, aim.y, aim.z).normalize().applyQuaternion(VIEW_ROOT);
 
@@ -2510,12 +2540,11 @@ export class DungeonRenderer {
    *
    * Passing null hands the view back to the warden's own arms.
    */
-  setPossessed(type: string | null): void {
-    if (this.possessedType === type) return;
-    this.possessedType = type;
+  setPossessed(key: string | null): void {
+    if (this.possessedType === key) return;
+    this.possessedType = key;
 
-    const body = this.warden;
-    if (!body) return;
+    if (!this.warden) return;
 
     if (this.viewArms) {
       this.mixers.delete("view-arms");
@@ -2524,10 +2553,10 @@ export class DungeonRenderer {
       this.viewBones = [];
     }
 
-    if (type) {
+    if (key) {
       // The skeletons carry no clips of their own; the pack ships one rig's
       // worth for everything built on it, which is what sharedClips holds.
-      this.buildViewArms(this.sharedClips, ARMS_FOR[type] ?? "warden_arms", BODY_FOR[type] ?? "warden");
+      this.buildViewArms(this.sharedClips, `${key}_arms`, key);
       return;
     }
 
@@ -3288,6 +3317,20 @@ export class DungeonRenderer {
     }
     this.updateCorpses(delta);
 
+    // Streaks go out faster than rings, and only fade: a shot that also
+    // grew would read as an explosion.
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const bolt = this.bolts[i];
+      bolt.life -= delta / BOLT_SECONDS;
+      if (bolt.life <= 0) {
+        this.scene.remove(bolt.mesh);
+        (bolt.mesh.material as THREE.Material).dispose();
+        this.bolts.splice(i, 1);
+        continue;
+      }
+      (bolt.mesh.material as THREE.MeshBasicMaterial).opacity = bolt.life * 0.85;
+    }
+
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const ring = this.rings[i];
       ring.life -= delta * 1.6;
@@ -3334,6 +3377,13 @@ export class DungeonRenderer {
     }
     this.rings = [];
     this.ringGeometry.dispose();
+
+    for (const bolt of this.bolts) {
+      this.scene.remove(bolt.mesh);
+      (bolt.mesh.material as THREE.Material).dispose();
+    }
+    this.bolts = [];
+    this.boltGeometry.dispose();
 
     this.setPathPreview(null);
     for (const maps of this.stone.values()) {

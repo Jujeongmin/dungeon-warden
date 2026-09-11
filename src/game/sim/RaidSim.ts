@@ -90,7 +90,23 @@ export type SimAction = "idle" | "walk" | "attack" | "down";
  * sound. Drained every frame so the list never grows.
  */
 export type SimEvent =
-  | { kind: "damage"; targetId: string; amount: number; x: number; y: number; source: "melee" | "trap" | "burn" }
+  | {
+      kind: "damage";
+      targetId: string;
+      amount: number;
+      x: number;
+      y: number;
+      source: "melee" | "trap" | "burn";
+      /**
+       * Where the blow came from, when it came from somewhere.
+       *
+       * Everything that hurts at a distance - an arrow slit, a mage, a
+       * warden riding one - landed as a number over the victim with nothing
+       * to say what had shot them. Carrying the other end of the line lets
+       * the renderer draw it. Absent for burn, which comes from the victim.
+       */
+      from?: { x: number; y: number };
+    }
   | { kind: "trap"; trapId: string; x: number; y: number }
   | { kind: "down"; targetId: string; x: number; y: number }
   | { kind: "killed"; targetId: string; x: number; y: number }
@@ -891,7 +907,10 @@ export class RaidSim {
         : [primary];
 
     for (const victim of victims) {
-      this.damageAdventurer(victim, stats.damage * this.trapDamageScale, "trap");
+      this.damageAdventurer(victim, stats.damage * this.trapDamageScale, "trap", undefined, {
+        x: trap.x,
+        y: trap.y,
+      });
       if (stats.burn && victim.alive) {
         victim.burn = {
           dps: stats.burn.dps * this.trapDamageScale,
@@ -906,6 +925,7 @@ export class RaidSim {
     amount: number,
     source: "melee" | "trap" | "burn",
     from?: SimMinion,
+    at?: { x: number; y: number },
   ): void {
     if (!target.alive || target.downed > 0) return;
 
@@ -926,6 +946,7 @@ export class RaidSim {
       x: target.x,
       y: target.y,
       source,
+      from: from ? { x: from.x, y: from.y } : at,
     });
 
     if (target.hp <= 0) {

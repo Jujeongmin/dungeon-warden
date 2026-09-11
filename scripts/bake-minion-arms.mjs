@@ -21,7 +21,7 @@ import { cutArmsAndPrune } from "./lib/cut-arms.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const skeletons = join(root, "public/assets/kaykit/skeletons");
+const packs = join(root, "public/assets/kaykit");
 const out = join(root, "public/assets/arms");
 
 /**
@@ -30,8 +30,14 @@ const out = join(root, "public/assets/arms");
  * always resolved to it, because the free pack ships no warrior.
  */
 const BODIES = {
-  "warrior-arms": "Skeleton_Rogue.glb",
-  "mage-arms": "Skeleton_Mage.glb",
+  "warrior-arms": "skeletons/Skeleton_Rogue.glb",
+  "mage-arms": "skeletons/Skeleton_Mage.glb",
+  // A convert keeps the body it was caught in, so those are rideable too.
+  "knight-arms": "adventurers/Knight.glb",
+  "barbarian-arms": "adventurers/Barbarian.glb",
+  "rogue-arms": "adventurers/Rogue.glb",
+  "ranger-arms": "adventurers/Ranger.glb",
+  "advmage-arms": "adventurers/Mage.glb",
 };
 
 async function main() {
@@ -39,9 +45,9 @@ async function main() {
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 
   for (const [name, file] of Object.entries(BODIES)) {
-    const source = join(skeletons, file);
+    const source = join(packs, file);
     if (!existsSync(source)) {
-      console.error(`missing ${source} - unzip the Skeletons pack first`);
+      console.error(`missing ${source} - unzip the KayKit packs first`);
       process.exitCode = 1;
       return;
     }
