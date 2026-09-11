@@ -260,6 +260,7 @@ export const zhHans: Record<StringKey, string> = {
   walk_map: "地图",
   walk_attack: "攻击",
   possess_pick: "点击手下附身",
+  strike_hint: "空格或点击画面攻击",
   connect_first: "先挖通入口与核心",
   tut_nook_place: "挖出通道旁的小空间",
 };

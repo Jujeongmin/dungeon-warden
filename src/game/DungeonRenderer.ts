@@ -59,22 +59,62 @@ const ARMS_FOR: Record<string, string> = {
   convert: "m_warrior_arms",
 };
 
+/** And which whole body those arms were cut out of, for sizing them. */
+const BODY_FOR: Record<string, string> = {
+  warrior: "m_warrior",
+  mage: "m_mage",
+  convert: "m_warrior",
+};
+
 /** How long one swing owns the arms, in milliseconds. */
 const SWING_MS = 450;
 
-/** Where the copy hangs off the lens, in tiles: back, aside, and down. */
-const VIEW_BACK = -0.85;
-const VIEW_ASIDE = 0;
-const VIEW_DROP = -0.14;
-/** How far the shoulders, arms and elbows are turned into view. */
-const VIEW_SHOULDER = 0;
+/**
+ * Where the arms sit and where they point.
+ *
+ * One object rather than a handful of constants because every one of these
+ * was found by looking at the screen and moving it, and they have to be
+ * movable while looking at the screen - see debugViewTuning. `back`,
+ * `aside` and `drop` hang the body off the lens in tiles; `upper` and
+ * `lower` are the directions the two arm bones are aimed in, in the view
+ * model's own frame, where +z is out into the corridor and -y is down.
+ */
+const VIEW_TUNING = {
+  back: -0.85,
+  aside: 0,
+  drop: -0.14,
+  upper: new THREE.Vector3(0.62, -0.9, 0.45),
+  lower: new THREE.Vector3(0.1, 0.3, 1),
+};
+
+/**
+ * And where each body's arms hang, because they are different animals.
+ *
+ * The imp's arms are short and thick and want to be close; the skeletons'
+ * are long and thin and only read as arms from further back. There is no
+ * formula in this - the numbers came from putting each one on the screen and
+ * moving it until it looked like a pair of arms.
+ */
+const VIEW_PLACE: Record<string, { back: number; drop: number }> = {
+  warden_arms: { back: -0.85, drop: -0.14 },
+  m_warrior_arms: { back: -0.95, drop: -0.05 },
+  m_mage_arms: { back: -0.95, drop: -0.05 },
+};
+/** How far the mannequin rig's arms are swung forward, and how far apart. */
 const VIEW_UPPER = -0.8;
 const VIEW_ELBOW = -0.5;
-/** And how far apart, so the two of them frame the view. */
 const VIEW_SPREAD = 0.05;
 /** Scratch for the pose, so the frame loop allocates nothing. */
 const VIEW_TURN = new THREE.Quaternion();
 const VIEW_EULER = new THREE.Euler();
+const VIEW_ROOT = new THREE.Quaternion();
+const VIEW_WORLD = new THREE.Quaternion();
+const VIEW_PARENT = new THREE.Quaternion();
+const VIEW_DELTA = new THREE.Quaternion();
+const VIEW_WANT = new THREE.Vector3();
+const VIEW_HAVE = new THREE.Vector3();
+const VIEW_A = new THREE.Vector3();
+const VIEW_B = new THREE.Vector3();
 /** How much taller the rock stands while the camera is down among it. */
 const ROCK_STRETCH = 2.1;
 /** How wide across the shoulders the warden is, in tiles. */
@@ -123,6 +163,8 @@ const COLORS: Record<TileId, number> = {
 
 export interface RendererCallbacks {
   onTileTap: (x: number, y: number) => void;
+  /** A tap that was not a drag, while walking: down there it means hit. */
+  onWalkTap?: () => void;
   /**
    * A secondary click on a tile - right mouse button only, so it exists on a
    * desktop and simply never fires on a phone, where the toolbar's remove
@@ -2060,6 +2102,10 @@ export class DungeonRenderer {
   private viewArms: THREE.Object3D | null = null;
   /** Which kind of body is being ridden, or null for the warden's own. */
   private possessedType: string | null = null;
+  /** How far the view model's own eyes sit above its feet, at its drawn size. */
+  private viewEye = 0;
+  /** Whether this rig wants its arms aimed rather than turned by a fixed angle. */
+  private viewAimed = false;
   /** Wall-clock time the current swing ends at. */
   private swingUntil = 0;
   /** Shoulders, arms and elbows of that copy, turned into view every frame. */
@@ -2202,7 +2248,7 @@ export class DungeonRenderer {
     body.visible = false;
     this.warden = body;
     this.scene.add(body);
-    this.buildViewArms(clips, body);
+    this.buildViewArms(clips);
   }
 
   /**
@@ -2219,10 +2265,38 @@ export class DungeonRenderer {
    * inside whatever wall the warden is standing at, and the room would
    * eat it.
    */
+  /**
+   * How tall a creature stands and how high its eyes sit, in its own units.
+   *
+   * Read off the whole body even when what gets drawn is a pair of arms: the
+   * arms were cut out of that body and carry no head to measure, and the two
+   * numbers the view needs - how much to shrink it, and how far to drop it so
+   * the eyes land on the lens - are both about the whole animal.
+   */
+  private measureBody(key: string): { tall: number; eye: number } | null {
+    const model = this.loaded.get(key);
+    if (!model) return null;
+
+    const scene = model.scene;
+    scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(scene);
+    const tall = box.max.y - box.min.y;
+    if (tall < 0.01) return null;
+
+    // Top of the head as a fallback, for a rig that names its skull something
+    // this does not know.
+    let eye = box.max.y;
+    const at = new THREE.Vector3();
+    scene.traverse((child) => {
+      if (/^head$/i.test(child.name)) eye = child.getWorldPosition(at).y;
+    });
+    return { tall, eye: eye - box.min.y };
+  }
+
   private buildViewArms(
     clips: THREE.AnimationClip[],
-    body: THREE.Object3D,
     key = "warden_arms",
+    sourceKey = "warden",
   ): void {
     /*
      * Arms if the bake made them, the whole body if it did not.
@@ -2245,7 +2319,7 @@ export class DungeonRenderer {
     });
 
     /*
-     * Sized and hung off the eye the body itself was sized to.
+     * Sized and hung off its own eyes.
      *
      * The copy comes out of the library at whatever scale the file was
      * authored in - which for this one is a giant - so it borrows the scale
@@ -2263,17 +2337,35 @@ export class DungeonRenderer {
      * face away from the viewer is what makes this the inside of a head
      * rather than a mirror.
      */
-    const eyeAboveFeet = this.wardenEye - FLOOR_HEIGHT;
-    arms.scale.copy(body.scale);
-    arms.position.set(VIEW_ASIDE, -eyeAboveFeet + VIEW_DROP, VIEW_BACK);
+    /*
+     * Measured from the body these arms came out of, not from the warden.
+     *
+     * Borrowing the warden's scale worked while the only arms in the game
+     * were the warden's. A ridden skeleton is a different model at a
+     * different authored size, and wearing the imp's shrink factor made it
+     * either a pair of girders across the screen or nothing at all.
+     */
+    const fit = this.measureBody(sourceKey);
+    const factor = fit ? WARDEN_HEIGHT / fit.tall : 1;
+    const eyeAboveFeet = fit ? fit.eye * factor : this.wardenEye - FLOOR_HEIGHT;
+    arms.scale.multiplyScalar(factor);
+    const place = VIEW_PLACE[key] ?? VIEW_TUNING;
+    VIEW_TUNING.back = place.back;
+    VIEW_TUNING.drop = place.drop;
+    arms.position.set(VIEW_TUNING.aside, -eyeAboveFeet + place.drop, place.back);
+    this.viewEye = eyeAboveFeet;
     arms.rotation.set(0, Math.PI, 0);
 
     this.viewBones = [];
     arms.traverse((child) => {
-      if (/^(clavicle|upperarm|lowerarm)_[lr]$/.test(child.name)) {
+      if (/^(upperarm|lowerarm)[_.][lr]$/i.test(child.name)) {
         this.viewBones.push([child.name, child]);
       }
     });
+    // KayKit joins its bone names with a dot, the Unreal mannequin with an
+    // underscore. Which one this is decides how the arms are posed - see
+    // poseViewArms.
+    this.viewAimed = this.viewBones.some(([name]) => name.includes("."));
 
     this.viewArms = arms;
     this.viewHolder.add(arms);
@@ -2305,26 +2397,70 @@ export class DungeonRenderer {
    * which is how the head grew back mid-swing the first time.
    */
   private poseViewArms(): void {
-    if (!this.viewArms) return;
+    const arms = this.viewArms;
+    if (!arms) return;
+
+    /*
+     * Each arm is aimed rather than rotated by a fixed angle.
+     *
+     * A fixed Euler only works for one skeleton. The imp is rigged to the
+     * Unreal mannequin and the minions to KayKit's, and the same numbers that
+     * put an imp's claws in the frame left a skeleton's arms splayed out
+     * sideways, because the two rigs do not agree on which way an arm bone
+     * lies in its parent. So this asks the only question that transfers:
+     * where does this bone currently point, and where should it point? The
+     * turn that carries one onto the other is the pose, whatever the rig.
+     *
+     * Re-done every frame on top of whatever the clip did - the clips carry
+     * rotation tracks for these bones, so a pose set once is gone by the next
+     * frame - and the clip still owns the swing. This only decides where the
+     * arm swings from.
+     */
+    if (!this.viewAimed) {
+      /*
+       * The mannequin rig, turned by a fixed angle at the shoulder.
+       *
+       * An arm bone points down its own length, so turning it about its own
+       * axes only twists the limb. Applied from the parent side instead, the
+       * same angle swings the whole arm forward, which is what puts it in the
+       * picture. These numbers were found on the imp and they fit it.
+       */
+      for (const [name, bone] of this.viewBones) {
+        const side = name.endsWith("_l") ? 1 : -1;
+        const pitch = name.startsWith("upperarm") ? VIEW_UPPER : VIEW_ELBOW;
+        VIEW_EULER.set(pitch, VIEW_SPREAD * side, 0);
+        VIEW_TURN.setFromEuler(VIEW_EULER);
+        bone.quaternion.premultiply(VIEW_TURN);
+      }
+      return;
+    }
+
+    arms.updateMatrixWorld(true);
+    arms.getWorldQuaternion(VIEW_ROOT);
 
     for (const [name, bone] of this.viewBones) {
-      const side = name.endsWith("_l") ? 1 : -1;
-      const pitch = name.startsWith("upperarm")
-        ? VIEW_UPPER
-        : name.startsWith("lowerarm")
-          ? VIEW_ELBOW
-          : VIEW_SHOULDER;
-      /*
-       * Turned in the shoulder's own frame, not the bone's.
-       *
-       * An arm bone points down its own length, so turning it about its
-       * local axes mostly twists the limb - the hand barely moves. Applied
-       * from the parent side instead, the same angle swings the whole arm
-       * forward, which is what puts it in the picture.
-       */
-      VIEW_EULER.set(pitch, VIEW_SPREAD * side, 0);
-      VIEW_TURN.setFromEuler(VIEW_EULER);
-      bone.quaternion.premultiply(VIEW_TURN);
+      const child = bone.children.find((c) => (c as THREE.Bone).isBone) ?? bone.children[0];
+      if (!child) continue;
+
+      // The models are mirrored down the middle, so the left arm wants the
+      // same aim with its sideways component flipped.
+      const side = /[_.]l$/i.test(name) ? 1 : -1;
+      const aim = name.toLowerCase().startsWith("upperarm") ? VIEW_TUNING.upper : VIEW_TUNING.lower;
+      VIEW_WANT.set(aim.x * side, aim.y, aim.z).normalize().applyQuaternion(VIEW_ROOT);
+
+      bone.updateMatrixWorld(true);
+      child.updateMatrixWorld(true);
+      VIEW_HAVE.copy(child.getWorldPosition(VIEW_A)).sub(bone.getWorldPosition(VIEW_B));
+      if (VIEW_HAVE.lengthSq() < 1e-8) continue;
+      VIEW_HAVE.normalize();
+
+      // Turn in world terms, then written back into the parent's frame, which
+      // is the only frame a bone's own rotation is allowed to speak in.
+      VIEW_DELTA.setFromUnitVectors(VIEW_HAVE, VIEW_WANT);
+      bone.getWorldQuaternion(VIEW_WORLD);
+      bone.parent?.getWorldQuaternion(VIEW_PARENT);
+      bone.quaternion.copy(VIEW_PARENT.invert().multiply(VIEW_DELTA).multiply(VIEW_WORLD));
+      bone.updateMatrixWorld(true);
     }
   }
 
@@ -2374,13 +2510,13 @@ export class DungeonRenderer {
     if (type) {
       // The skeletons carry no clips of their own; the pack ships one rig's
       // worth for everything built on it, which is what sharedClips holds.
-      this.buildViewArms(this.sharedClips, body, ARMS_FOR[type] ?? "warden_arms");
+      this.buildViewArms(this.sharedClips, ARMS_FOR[type] ?? "warden_arms", BODY_FOR[type] ?? "warden");
       return;
     }
 
     const own = this.loaded.get("warden")?.animations ?? [];
     const rigged = this.loaded.get("warden_clips")?.animations ?? [];
-    this.buildViewArms(own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips, body);
+    this.buildViewArms(own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips);
   }
 
   /**
@@ -2427,6 +2563,27 @@ export class DungeonRenderer {
     this.swingUntil = performance.now() + SWING_MS;
     this.playClip("warden", "attack");
     this.playClip("view-arms", "attack");
+  }
+
+  /**
+   * The view model's placement, live.
+   *
+   * Every number in it was arrived at by moving it and looking, so it is
+   * handed out rather than hidden: change a field and the next frame shows
+   * it. Used from the console during development; nothing in the game writes
+   * to it.
+   */
+  debugViewTuning(): typeof VIEW_TUNING & { apply: () => void } {
+    return Object.assign(VIEW_TUNING, {
+      apply: () => {
+        if (!this.viewArms) return;
+        this.viewArms.position.set(
+          VIEW_TUNING.aside,
+          -this.viewEye + VIEW_TUNING.drop,
+          VIEW_TUNING.back,
+        );
+      },
+    });
   }
 
   /** Turns the head. Radians, from a drag. */
@@ -2969,12 +3126,15 @@ export class DungeonRenderer {
   private onPointerUp = (e: PointerEvent): void => {
     if (this.walk) {
       if (e.pointerType === "mouse" && document.pointerLockElement === this.canvas) {
+        if (!this.dragMoved) this.callbacks.onWalkTap?.();
         this.activePointers.clear();
         this.dragStart = null;
         this.dragMoved = false;
         return;
       }
+      const single = this.activePointers.size === 1;
       this.activePointers.delete(e.pointerId);
+      if (single && !this.dragMoved) this.callbacks.onWalkTap?.();
       if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
       if (this.activePointers.size === 0) {
         this.dragStart = null;

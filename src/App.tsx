@@ -503,18 +503,37 @@ export default function App() {
     rendererRef.current?.setPossessedAt(possessed.x, possessed.y);
   }, [walking, possessed, possessed?.x, possessed?.y]);
 
-  /** Space swings, the same as the button, for anyone on a keyboard. */
+  /**
+   * One swing, however it was asked for.
+   *
+   * Three ways in - the button, the space bar, a tap on the view - because
+   * this is played on a phone held sideways and on a desktop with a mouse,
+   * and neither of them should have to learn the other one's control. Held
+   * in a ref so the listeners below are attached once rather than rebuilt on
+   * every frame of a running raid.
+   */
+  const strikeRef = useRef<() => void>(() => {});
+  strikeRef.current = () => {
+    if (!possessedId) return;
+    audio.play("hit");
+    raid.attack();
+    rendererRef.current?.swing();
+    if (!settings.strikeSeen) patchSettings({ strikeSeen: true });
+  };
+
   useEffect(() => {
     if (!possessedId) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.code !== "Space" && event.key !== " ") return;
+      // Space is the swing; F because half of everyone reaches for it.
+      if (event.code !== "Space" && event.key !== " " && event.key.toLowerCase() !== "f") return;
+      if (event.repeat) return;
+      // Space scrolls a page and presses whatever button was last focused.
       event.preventDefault();
-      raid.attack();
-      rendererRef.current?.swing();
+      strikeRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [possessedId, raid]);
+  }, [possessedId]);
 
 
   /*
@@ -586,7 +605,10 @@ export default function App() {
       const body = raid.raidState?.minions.find(
         (m) => m.alive && Math.round(m.x) === x && Math.round(m.y) === y,
       );
-      if (body && raid.possess(body.id)) audio.play("skill");
+      if (body && raid.possess(body.id)) {
+        audio.play("skill");
+        if (!settings.possessSeen) patchSettings({ possessSeen: true });
+      }
       else if (body) audio.play("error");
       return;
     }
@@ -687,6 +709,7 @@ export default function App() {
     if (!canvasRef.current) return;
     const renderer = new DungeonRenderer(canvasRef.current, {
       onTileTap: (x, y) => tapRef.current(x, y),
+      onWalkTap: () => strikeRef.current(),
       onTileAlt: (x, y, sx, sy) => altRef.current(x, y, sx, sy),
       onTileDrag: (x, y) => dragRef.current(x, y),
       // Digging and filling are the only tools a drag runs along.
@@ -1131,6 +1154,9 @@ export default function App() {
       buyResearch: save.buyResearch,
 
       startRaid: raid.startRaid,
+      possess: raid.possess,
+      release: raid.release,
+      attack: () => strikeRef.current(),
       useSkill: raid.useSkill,
       stepRaid: raid.stepRaid,
       raidState: raid.raidState,
@@ -1536,9 +1562,11 @@ export default function App() {
         )}
       </div>
 
+      </div>
+
       {/* The way in, said once where the board is. Only while there is
           still a body to take, and never while the player is already in one. */}
-      {raid.raiding && !walking && !possessedId && (
+      {raid.raiding && !walking && !possessedId && !settings.possessSeen && (
         <div className="possess-hint">{t("possess_pick")}</div>
       )}
 
@@ -1585,7 +1613,6 @@ export default function App() {
           )}
         </div>
       )}
-      </div>
 
       {/* Drawn over the control the tutorial is talking about, measured from
           outside it — see useSpotlight. Takes no clicks, so the thing it is
@@ -1947,6 +1974,10 @@ export default function App() {
         * build from in here, and a panel covering a third of the view would
         * undo the only thing this mode is for.
         */}
+      {possessed && !settings.strikeSeen && (
+        <div className="possess-hint strike-hint">{t("strike_hint")}</div>
+      )}
+
       {possessed && (
         <div className="walk-life">
           <div
@@ -1977,14 +2008,7 @@ export default function App() {
             <div ref={knobRef} className="knob" />
           </div>
           {possessed && (
-            <button
-              className="walk-strike"
-              onClick={() => {
-                audio.play("hit");
-                raid.attack();
-                rendererRef.current?.swing();
-              }}
-            >
+            <button className="walk-strike" onClick={() => strikeRef.current()}>
               {t("walk_attack")}
             </button>
           )}

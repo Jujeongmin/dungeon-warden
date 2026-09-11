@@ -272,6 +272,7 @@ export const ko = {
   walk_map: "지도",
   walk_attack: "공격",
   possess_pick: "부하를 눌러 그 몸에 들어가세요",
+  strike_hint: "스페이스 또는 화면을 눌러 공격",
   connect_first: "입구와 코어를 이으세요",
   tut_nook_place: "통로 옆을 파 자리를 만드세요",
 };

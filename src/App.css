@@ -1214,6 +1214,32 @@ button.primary {
   width: 116px;
 }
 
+/*
+   The skills go along the foot of the board, not down the right.
+
+   The panel is a full-height column on the right, and a second column of
+   cards beside it had nowhere to be: they overlapped it. The board keeps the
+   left of a sideways stage, so its bottom edge is the one piece of screen
+   nothing else claims - and a row there is where a thumb already is.
+*/
+.skillbar {
+  position: absolute;
+  left: 12px;
+  right: calc(min(42%, 360px) + 20px);
+  bottom: 12px;
+  z-index: 2;
+  flex-direction: row;
+  align-self: auto;
+  width: auto;
+  margin-right: 0;
+  gap: 8px;
+}
+
+.skillbar .skill {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .raid-bar {
   align-self: stretch;
   /* What doesn't fit scrolls; it is already overflow-x. */
@@ -2168,9 +2194,9 @@ button.ad-gold {
      not reach the foot of the screen, and this belongs at the foot. */
   position: fixed;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
   transform: translateX(-50%);
-  z-index: 2;
+  z-index: 3;
   padding: 6px 14px;
   border-radius: 99px;
   font-size: var(--fs-2xs);
@@ -2178,6 +2204,12 @@ button.ad-gold {
   border: 1px solid rgba(232, 164, 76, 0.22);
   background: rgba(20, 15, 11, 0.55);
   pointer-events: none;
+}
+
+/* Said down in the corridor instead, where the skills are not drawn and the
+   bar along the foot is the stick and the swing. */
+.strike-hint {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 158px);
 }
 
 /* The swing, opposite the stick: one thumb walks the body, the other hits
@@ -2209,10 +2241,12 @@ button.ad-gold {
 .walk-life {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 132px);
+  /* Down in the gap between the stick and the swing, rather than across
+     the middle of the arms. */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
   transform: translateX(-50%);
   z-index: 3;
-  width: min(44%, 300px);
+  width: min(34%, 240px);
   height: 15px;
   display: grid;
   place-items: center;
@@ -2239,7 +2273,8 @@ button.ad-gold {
 
 @media (max-height: 520px) {
   .walk-strike { width: 74px; height: 74px; }
-  .walk-life { bottom: calc(env(safe-area-inset-bottom, 0px) + 104px); }
+  .walk-life { bottom: calc(env(safe-area-inset-bottom, 0px) + 44px); }
+  .strike-hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 128px); }
 }
 
 .walk-exit {

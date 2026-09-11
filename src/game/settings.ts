@@ -41,6 +41,16 @@ export interface Settings {
   introSeen: boolean;
   /** Set when the player dismisses the step-by-step hints. */
   tutorialDone: boolean;
+  /**
+   * Set the first time the warden climbs into a minion, and the first time it
+   * swings while in one.
+   *
+   * Two lines of coaching that only make sense mid-raid, so they cannot be
+   * steps in the opening tutorial - it is finished long before the player has
+   * a garrison to climb into. They show until the thing has been done once.
+   */
+  possessSeen: boolean;
+  strikeSeen: boolean;
 }
 
 const KEY = "dw.settings";
@@ -53,6 +63,8 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: "en",
   introSeen: false,
   tutorialDone: false,
+  possessSeen: false,
+  strikeSeen: false,
 };
 
 export function loadSettings(): Settings {

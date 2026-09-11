@@ -265,6 +265,7 @@ export const ja: Record<StringKey, string> = {
   walk_map: "地図",
   walk_attack: "攻撃",
   possess_pick: "手下をタップして憑依",
+  strike_hint: "スペースか画面タップで攻撃",
   connect_first: "入口とコアを繋げて",
   tut_nook_place: "通路の横を掘って場所を",
 };
