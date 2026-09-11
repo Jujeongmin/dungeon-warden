@@ -1381,33 +1381,18 @@ export class DungeonRenderer {
         if (inArena(arena, nx, ny) && this.dug.has(nx + ny * arena.w)) continue;
         if (tileNoise(nx * 2 + dx, ny * 2 + dy, 3) > TORCH_CHANCE) continue;
 
-        const torch = this.spawnModel("prop_torch", 0.5);
-        if (!torch) break;
         /*
-         * Tight against the panel.
+         * Light, and no torch to hold it.
          *
-         * It used to sit further in, which nobody could tell from above and
-         * everybody can tell from inside: at eye height in a one-tile
-         * corridor a bracket that reaches a third of a tile out is a thing
-         * you walk through the middle of.
+         * The bracket model went: at eye height it was a cartoon prop bolted
+         * to a photograph of stone, and the room reads as lit from somewhere
+         * without it. What stays is the pool of warm light on the wall and
+         * floor where a torch would have been - tight against the rock, at
+         * about head height. Point lights are the expensive kind, so only
+         * the first few burn; the eye reads pooled light long before it
+         * counts sources.
          */
-        torch.position.set(
-          floor.x + dx * 0.46,
-          FLOOR_HEIGHT + torch.position.y,
-          floor.y + dy * 0.46,
-        );
-        torch.rotation.y = Math.atan2(-dx, -dy);
-        this.scene.add(torch);
-        this.decor.push(torch);
-
-        /*
-         * Light the torch.
-         *
-         * A wall of torch models that emit nothing is the difference between a
-         * dungeon and a diorama of one. Point lights are the expensive kind,
-         * so only the first few get a flame and the rest stay props — the eye
-         * reads pooled warm light on the floor long before it counts sources.
-         */
+        const torch = { position: { x: floor.x + dx * 0.46, z: floor.y + dy * 0.46 } };
         if (litTorches < MAX_TORCH_LIGHTS) {
           litTorches += 1;
           const flame = new THREE.PointLight(0xffa542, 4.2, 9, 1.5);
