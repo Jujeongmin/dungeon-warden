@@ -189,8 +189,6 @@ const GROUPS: Array<{ id: ToolGroup; label: StringKey }> = [
 
 const SKILLS: WardenSkill[] = ["blessing", "rally", "detonate"];
 
-/** Tiles a second, walking the corridor. A tile is about two metres. */
-const WALK_SPEED = 2.2;
 type Tab = "build" | "manage" | "research";
 
 export default function App() {
@@ -481,11 +479,6 @@ export default function App() {
    * fought over.
    */
   useEffect(() => {
-    if (!raid.raidOpen) return;
-    setWalking(false);
-  }, [raid.raidOpen]);
-
-  useEffect(() => {
     rendererRef.current?.setWalking(walking);
   }, [walking]);
 
@@ -498,17 +491,44 @@ export default function App() {
    * is per frame rather than per press, so the speed is the same on every
    * device.
    */
-  const [walkingForward, setWalkingForward] = useState(false);
-
   /*
-   * What the tile ahead would take: rock comes out, floor goes back in.
+   * A stick for the left thumb.
    *
-   * One button rather than a tool in hand. Down here the player is not
-   * choosing between tools, they are facing a wall or facing a floor, and
-   * the wall or the floor already says which of the two makes sense. The
-   * fill side is offered only for bare floor - anything standing there is
-   * cleared from above, where it can be seen for what it is.
+   * One finger drags a knob out of a ring; how far and which way it went
+   * is the walk. It reports straight into the renderer rather than into
+   * React state, because it changes every frame the thumb moves and the
+   * screen has nothing to redraw about it - the knob itself is moved by
+   * hand here for the same reason.
    */
+  const stickRef = useRef<HTMLDivElement | null>(null);
+  const knobRef = useRef<HTMLDivElement | null>(null);
+  const stickPointer = useRef<number | null>(null);
+  const stickAt = (e: React.PointerEvent) => {
+    const ring = stickRef.current;
+    const knob = knobRef.current;
+    if (!ring || !knob) return;
+    const rect = ring.getBoundingClientRect();
+    const radius = rect.width / 2;
+    let dx = e.clientX - (rect.left + radius);
+    let dy = e.clientY - (rect.top + radius);
+    const length = Math.hypot(dx, dy);
+    // The knob stays inside the ring; past its edge the stick is simply
+    // all the way over.
+    const reach = radius * 0.7;
+    if (length > reach) {
+      dx = (dx / length) * reach;
+      dy = (dy / length) * reach;
+    }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    // Up on the screen is forward; right is right.
+    rendererRef.current?.setMoveInput(-dy / reach, dx / reach);
+  };
+  const stickRelease = () => {
+    stickPointer.current = null;
+    if (knobRef.current) knobRef.current.style.transform = "";
+    rendererRef.current?.setMoveInput(0, 0);
+  };
+
   /*
    * The hotbar: what can be put down from inside the corridor.
    *
@@ -571,19 +591,6 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [walking, hotbar.length]);
-  useEffect(() => {
-    if (!walkingForward || !walking) return;
-    let frame = 0;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const delta = Math.min((now - last) / 1000, 0.1);
-      last = now;
-      rendererRef.current?.step(delta * WALK_SPEED);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [walkingForward, walking]);
 
   const [removePrompt, setRemovePrompt] = useState<
     { x: number; y: number; sx: number; sy: number; label: string } | null
@@ -1169,6 +1176,7 @@ export default function App() {
   const enterGame = useCallback(() => {
     audio.play("click");
     setScreen("game");
+    setWalking(true);
     if (!settings.introSeen) {
       setIntroOpen(true);
       patchSettings({ introSeen: true });
@@ -1928,16 +1936,23 @@ export default function App() {
         */}
       {walking && (
         <div className="walkbar">
-          <button
-            className="walk-forward"
-            onPointerDown={() => setWalkingForward(true)}
-            onPointerUp={() => setWalkingForward(false)}
-            onPointerLeave={() => setWalkingForward(false)}
-            onPointerCancel={() => setWalkingForward(false)}
+          <div
+            ref={stickRef}
+            className="stick"
             aria-label={t("menu_walk")}
+            onPointerDown={(e) => {
+              stickPointer.current = e.pointerId;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              stickAt(e);
+            }}
+            onPointerMove={(e) => {
+              if (stickPointer.current === e.pointerId) stickAt(e);
+            }}
+            onPointerUp={stickRelease}
+            onPointerCancel={stickRelease}
           >
-            <Icon name="walk" size={22} />
-          </button>
+            <div ref={knobRef} className="knob" />
+          </div>
           <button className="walk-exit" onClick={() => { audio.play("click"); setWalking(false); }}>
             {t("walk_map")}
           </button>

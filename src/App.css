@@ -2098,25 +2098,30 @@ button.ad-gold {
 
 .walkbar > * { pointer-events: auto; }
 
-/* Deliberately large: it is held down, not tapped, and it is held with a
-   thumb while the other hand is dragging the view. */
-.walk-forward {
-  /* flex:none or the row stretches a circle into an ellipse. */
+/* The stick: a ring the left thumb rests in, a knob it drags. Deliberately
+   large - it is held, not tapped, by a thumb that is not being looked at. */
+.stick {
   flex: none;
-  width: 76px;
-  height: 76px;
+  width: 112px;
+  height: 112px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  margin-left: auto;
-  border-color: rgba(232, 164, 76, 0.5);
-  background: linear-gradient(180deg, rgba(58, 46, 28, 0.92), rgba(36, 28, 18, 0.92));
-  color: var(--accent);
+  border: 1px solid rgba(232, 164, 76, 0.35);
+  background: rgba(20, 15, 11, 0.4);
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.walk-forward:active {
-  background: linear-gradient(180deg, rgba(90, 70, 40, 0.95), rgba(58, 46, 28, 0.95));
+.stick .knob {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid rgba(232, 164, 76, 0.5);
+  background: linear-gradient(180deg, rgba(58, 46, 28, 0.92), rgba(36, 28, 18, 0.92));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 
 /* The crosshair: a small cross that takes no clicks, dead centre, with the
@@ -2211,7 +2216,8 @@ button.ad-gold {
 
 .walk-exit {
   flex: none;
-  order: -1;
+  margin-left: auto;
+  align-self: flex-end;
   padding: 8px 14px;
   font-size: var(--fs-2xs);
   border-radius: 99px;
