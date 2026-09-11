@@ -253,4 +253,12 @@ export const en: Record<StringKey, string> = {
   tut_obstacle_group: "Open the Walls tab",
   tut_minion_group: "Open the Minions tab",
   tut_trap_group: "Open the Traps tab",
+  group_dig: "Dig",
+  tool_dig: "Dig",
+  tool_fill: "Fill",
+  hint_dig: "Cuts a corridor out of the rock. Next to what is already open.",
+  hint_fill: "Puts the rock back.",
+  tut_dig_group: "Open the Dig tab",
+  tut_dig_pick: "Take the pick",
+  tut_dig_place: "Cut a nook beside the corridor",
 };

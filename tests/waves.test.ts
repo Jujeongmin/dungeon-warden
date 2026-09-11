@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { wavesFor } from "../src/game/party";
 import { INTERMISSION_SECONDS, RaidSim, SIM_DT, isRaidOver } from "../src/game/sim/RaidSim";
 import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
 import type { PartyMember, PlacedMinion, PlacedObstacle } from "../src/game/types";
@@ -180,5 +182,28 @@ describe("the build window's clock", () => {
     const start = sim.state.intermissionLeft;
     sim.step();
     expect(sim.state.intermissionLeft).toBeCloseTo(start - SIM_DT, 5);
+  });
+});
+
+describe("how many waves a raid is", () => {
+  it("grows with threat the way the party does", () => {
+    expect(wavesFor(0)).toBe(1);
+    expect(wavesFor(2)).toBe(1);
+    expect(wavesFor(3)).toBe(2);
+    expect(wavesFor(8)).toBe(2);
+    expect(wavesFor(9)).toBe(3);
+    expect(wavesFor(40)).toBe(3);
+  });
+
+  it("agrees with the server about where the steps are", () => {
+    const server = readFileSync(new URL("../server.js", import.meta.url), "utf8");
+    expect(server).toContain("if (threat < 3) return 1;");
+    expect(server).toContain("if (threat < CHAMPION_THREAT) return 2;");
+  });
+
+  it("opens a new dungeon with one wave, so the first raid is one fight", () => {
+    // The opening teaches a build and then fights a raid with it. Measured in
+    // tests/tutorial.test.ts: two archers hold one wave and lose to three.
+    expect(wavesFor(0)).toBe(1);
   });
 });

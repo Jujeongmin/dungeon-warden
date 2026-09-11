@@ -40,6 +40,21 @@ export const ADVENTURER_NAMES = [
 /** Mirrored from `MAX_ROSTER` in server.js. */
 export const MAX_ROSTER = 12;
 
+/**
+ * How many waves one raid is made of. Mirrored from `wavesFor` in server.js.
+ *
+ * It grows the way the party does, and for the same reason: three escalating
+ * waves is the shape a dungeon earns, not the one it opens with. A brand new
+ * keeper meeting all three loses their first raid to a rule they have not
+ * been taught yet - measured, in tests/tutorial.test.ts, which builds exactly
+ * what the opening teaches and then fights the real raid with it.
+ */
+export function wavesFor(threat: number): number {
+  if (threat < 3) return 1;
+  if (threat < CHAMPION_THREAT) return 2;
+  return 3;
+}
+
 /** Mirrored from `pickParty` in server.js. */
 export function partySize(threat: number): number {
   return 1 + Math.min(4, Math.floor(threat / 3));

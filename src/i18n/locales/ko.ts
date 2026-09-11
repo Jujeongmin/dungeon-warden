@@ -266,4 +266,12 @@ export const ko = {
   tut_obstacle_group: "벽 탭을 여세요",
   tut_minion_group: "부하 탭을 여세요",
   tut_trap_group: "함정 탭을 여세요",
+  group_dig: "굴착",
+  tool_dig: "파기",
+  tool_fill: "메우기",
+  hint_dig: "암반을 파 통로를 냅니다. 이어진 칸에만.",
+  hint_fill: "통로를 다시 암반으로 메웁니다.",
+  tut_dig_group: "굴착 탭을 여세요",
+  tut_dig_pick: "파기를 고르세요",
+  tut_dig_place: "통로 옆을 파 자리를 만드세요",
 };

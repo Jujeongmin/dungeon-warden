@@ -1,4 +1,5 @@
 import type { StringKey } from "../i18n/strings";
+import type { DugTile } from "./dig";
 
 export const TILE = {
   FLOOR: 1,
@@ -180,6 +181,11 @@ export interface PartyMember {
 
 export interface Dungeon {
   version: number;
+  /**
+   * Every tile taken out of the rock. Absent on a dungeon saved before the
+   * room was carved rather than built, and derived from `obstacles` then.
+   */
+  dug?: DugTile[];
   obstacles: PlacedObstacle[];
   minions: PlacedMinion[];
   traps: PlacedTrap[];

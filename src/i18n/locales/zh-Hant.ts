@@ -254,4 +254,12 @@ export const zhHant: Record<StringKey, string> = {
   tut_obstacle_group: "打開牆分頁",
   tut_minion_group: "打開手下分頁",
   tut_trap_group: "打開陷阱分頁",
+  group_dig: "挖掘",
+  tool_dig: "挖",
+  tool_fill: "填回",
+  hint_dig: "挖開岩盤作為通道。僅限相鄰格。",
+  hint_fill: "將通道填回岩盤。",
+  tut_dig_group: "打開挖掘分頁",
+  tut_dig_pick: "選擇挖",
+  tut_dig_place: "挖出通道旁的小空間",
 };

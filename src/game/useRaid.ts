@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { RaidSim, SIM_DT, isRaidOver, type RaidState, type SimEvent } from "./sim/RaidSim";
 import { lureTiles } from "./rooms";
-import { previewParty } from "./party";
+import { previewParty, wavesFor } from "./party";
 import { SKILL_STATS } from "./sim/traps";
 import type { Arena } from "./arena";
 import type { ResearchEffects } from "./research";
@@ -54,6 +54,8 @@ interface Options {
   traps: PlacedTrap[];
   rooms: PlacedRoom[];
   obstacles: PlacedObstacle[];
+  /** The rock: every tile nobody dug out. */
+  terrain: Set<number>;
   effects: RoomEffects;
   jailFree: number;
   weaponTiers: Record<string, number>;
@@ -83,6 +85,7 @@ export function useRaid({
   traps,
   rooms,
   obstacles,
+  terrain,
   effects,
   jailFree,
   weaponTiers,
@@ -285,7 +288,7 @@ export function useRaid({
            * roster, and two adventurers sharing an id in one simulation is a
            * hunt that follows the wrong one and a kill counted twice.
            */
-          waves: [0, 2, 4].map((step, wave) =>
+          waves: [0, 2, 4].slice(0, wavesFor(meta.threat)).map((step, wave) =>
             previewParty([], meta.threat + step, Date.now()).map((member) => ({
               ...member,
               id: `w${wave}-${member.id}`,
@@ -314,6 +317,7 @@ export function useRaid({
         entrance: meta.entrance,
         core: meta.core,
         lures: lureTiles(rooms),
+        terrain,
         seed: start.seed,
         trapCooldownScale: effects.trapCooldownScale,
         jailFree: start.jailFree ?? jailFree,

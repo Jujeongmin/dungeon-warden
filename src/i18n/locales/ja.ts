@@ -259,4 +259,12 @@ export const ja: Record<StringKey, string> = {
   tut_obstacle_group: "壁タブを開いて",
   tut_minion_group: "手下タブを開いて",
   tut_trap_group: "罠タブを開いて",
+  group_dig: "掘削",
+  tool_dig: "掘る",
+  tool_fill: "埋める",
+  hint_dig: "岩盤を掘って通路を作ります。繋がったマスのみ。",
+  hint_fill: "通路を岩盤に戻します。",
+  tut_dig_group: "掘削タブを開いて",
+  tut_dig_pick: "掘るを選んで",
+  tut_dig_place: "通路の横を掘って場所を",
 };

@@ -11,8 +11,7 @@ import { minionStatsFor } from "./game/sim/units";
 import { OBSTACLE_STATS } from "./game/sim/obstacles";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
-import { blockedKey, blockedSet, coreOf, entranceOf, inArena } from "./game/arena";
-import { decorBlocked } from "./game/decor";
+import { blockedKey, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
 import { tierFor } from "./game/milestones";
@@ -33,6 +32,7 @@ import { useSpotlight } from "./ui/useSpotlight";
 import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game/settings";
 import { LocaleProvider, type Translate } from "./i18n";
 import { previewParty } from "./game/party";
+import { DIG_COST, dugSet, rockSet } from "./game/dig";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
 import {
@@ -43,7 +43,6 @@ import {
   MAX_TRAPS,
   MINION_COST,
   MINION_LABEL,
-  OBSTACLE_COST,
   OBSTACLE_LABEL,
   ROOM_COST,
   ROOM_DESCRIPTION,
@@ -52,9 +51,7 @@ import {
   SKILL_NOTE,
   TRAP_COST,
   TRAP_LABEL,
-  maxObstaclesFor,
   type MinionType,
-  type ObstacleType,
   type RoomType,
   type TrapType,
   type WardenSkill,
@@ -89,7 +86,9 @@ function remaining(at: number, t: Translate): string {
 }
 
 type Tool =
-  | { kind: "obstacle"; type: ObstacleType }
+  // Two halves of one verb: take rock out, put rock back.
+  | { kind: "dig" }
+  | { kind: "fill" }
   | { kind: "remove" }
   | { kind: "minion"; type: MinionType }
   | { kind: "trap"; type: TrapType }
@@ -103,8 +102,8 @@ type Tool =
  * it. `remove` has no model because it places nothing.
  */
 const TOOL_MODEL: Record<string, string | null> = {
-  barricade: "obstacle_barricade",
-  wall: "obstacle_wall",
+  dig: null,
+  fill: null,
   remove: null,
   warrior: "m_warrior",
   mage: "m_mage",
@@ -142,22 +141,35 @@ const HAS_MOUSE =
  */
 const PARTY_MODEL_KEYS = ADVENTURER_CLASSES.map((cls) => `a_${cls}`);
 
-const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | null }> = [
-  { id: "barricade", tool: { kind: "obstacle", type: "barricade" }, label: OBSTACLE_LABEL.barricade, cost: OBSTACLE_COST.barricade },
-  { id: "wall", tool: { kind: "obstacle", type: "wall" }, label: OBSTACLE_LABEL.wall, cost: OBSTACLE_COST.wall },
-  { id: "remove", tool: { kind: "remove" }, label: "tool_remove", cost: null },
-  { id: "warrior", tool: { kind: "minion", type: "warrior" }, label: MINION_LABEL.warrior, cost: MINION_COST.warrior },
-  { id: "mage", tool: { kind: "minion", type: "mage" }, label: MINION_LABEL.mage, cost: MINION_COST.mage },
-  { id: "spike", tool: { kind: "trap", type: "spike" }, label: TRAP_LABEL.spike, cost: TRAP_COST.spike },
-  { id: "arrow", tool: { kind: "trap", type: "arrow" }, label: TRAP_LABEL.arrow, cost: TRAP_COST.arrow },
-  { id: "rockfall", tool: { kind: "trap", type: "rockfall" }, label: TRAP_LABEL.rockfall, cost: TRAP_COST.rockfall },
-  { id: "flame", tool: { kind: "trap", type: "flame" }, label: TRAP_LABEL.flame, cost: TRAP_COST.flame },
-  { id: "treasury", tool: { kind: "room", type: "treasury" }, label: ROOM_LABEL.treasury, cost: ROOM_COST.treasury },
-  { id: "vault", tool: { kind: "room", type: "vault" }, label: ROOM_LABEL.vault, cost: ROOM_COST.vault },
-  { id: "barracks", tool: { kind: "room", type: "barracks" }, label: ROOM_LABEL.barracks, cost: ROOM_COST.barracks },
-  { id: "altar", tool: { kind: "room", type: "altar" }, label: ROOM_LABEL.altar, cost: ROOM_COST.altar },
-  { id: "workshop", tool: { kind: "room", type: "workshop" }, label: ROOM_LABEL.workshop, cost: ROOM_COST.workshop },
-  { id: "jail", tool: { kind: "room", type: "jail" }, label: ROOM_LABEL.jail, cost: ROOM_COST.jail },
+/**
+ * Which drawer each tool lives in.
+ *
+ * Named rather than derived from the tool's kind, which is what it used to
+ * be: digging and filling are two halves of one verb and belong in the same
+ * drawer, but they cannot be the same kind because they do opposite things.
+ */
+const TOOLS: Array<{
+  id: string;
+  tool: Tool;
+  group: ToolGroup;
+  label: StringKey;
+  cost: number | null;
+}> = [
+  { id: "dig", tool: { kind: "dig" }, group: "dig", label: "tool_dig", cost: DIG_COST },
+  { id: "fill", tool: { kind: "fill" }, group: "dig", label: "tool_fill", cost: null },
+  { id: "remove", tool: { kind: "remove" }, group: "dig", label: "tool_remove", cost: null },
+  { id: "warrior", tool: { kind: "minion", type: "warrior" }, group: "minion", label: MINION_LABEL.warrior, cost: MINION_COST.warrior },
+  { id: "mage", tool: { kind: "minion", type: "mage" }, group: "minion", label: MINION_LABEL.mage, cost: MINION_COST.mage },
+  { id: "spike", tool: { kind: "trap", type: "spike" }, group: "trap", label: TRAP_LABEL.spike, cost: TRAP_COST.spike },
+  { id: "arrow", tool: { kind: "trap", type: "arrow" }, group: "trap", label: TRAP_LABEL.arrow, cost: TRAP_COST.arrow },
+  { id: "rockfall", tool: { kind: "trap", type: "rockfall" }, group: "trap", label: TRAP_LABEL.rockfall, cost: TRAP_COST.rockfall },
+  { id: "flame", tool: { kind: "trap", type: "flame" }, group: "trap", label: TRAP_LABEL.flame, cost: TRAP_COST.flame },
+  { id: "treasury", tool: { kind: "room", type: "treasury" }, group: "room", label: ROOM_LABEL.treasury, cost: ROOM_COST.treasury },
+  { id: "vault", tool: { kind: "room", type: "vault" }, group: "room", label: ROOM_LABEL.vault, cost: ROOM_COST.vault },
+  { id: "barracks", tool: { kind: "room", type: "barracks" }, group: "room", label: ROOM_LABEL.barracks, cost: ROOM_COST.barracks },
+  { id: "altar", tool: { kind: "room", type: "altar" }, group: "room", label: ROOM_LABEL.altar, cost: ROOM_COST.altar },
+  { id: "workshop", tool: { kind: "room", type: "workshop" }, group: "room", label: ROOM_LABEL.workshop, cost: ROOM_COST.workshop },
+  { id: "jail", tool: { kind: "room", type: "jail" }, group: "room", label: ROOM_LABEL.jail, cost: ROOM_COST.jail },
 ];
 
 /**
@@ -168,10 +180,10 @@ const TOOLS: Array<{ id: string; tool: Tool; label: StringKey; cost: number | nu
  * actually starts the game ends up below the fold. Picking a kind first cuts
  * the visible set to at most six and gives the panel a shape.
  */
-type ToolGroup = "obstacle" | "minion" | "trap" | "room";
+type ToolGroup = "dig" | "minion" | "trap" | "room";
 
 const GROUPS: Array<{ id: ToolGroup; label: StringKey }> = [
-  { id: "obstacle", label: "group_obstacle" },
+  { id: "dig", label: "group_dig" },
   { id: "minion", label: "group_minion" },
   { id: "trap", label: "group_trap" },
   { id: "room", label: "group_room" },
@@ -192,8 +204,8 @@ export default function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
   const [adNotice, setAdNotice] = useState<string | null>(null);
-  const [toolId, setToolId] = useState("barricade");
-  const [group, setGroup] = useState<ToolGroup>("obstacle");
+  const [toolId, setToolId] = useState("dig");
+  const [group, setGroup] = useState<ToolGroup>("dig");
   /** The level to come back to when the quick mute is switched off again. */
   const lastVolume = useRef(1);
   const [researchError, setResearchError] = useState<string | null>(null);
@@ -225,6 +237,7 @@ export default function App() {
   const {
     arena,
     obstacles,
+    dug,
     gold,
     entitlements,
     minions,
@@ -259,11 +272,16 @@ export default function App() {
   const entrance = useMemo(() => entranceOf(arena), [arena]);
   const core = useMemo(() => coreOf(arena), [arena]);
 
-  /** The rubble the room came with — see src/game/decor.ts. */
-  const terrain = useMemo(
-    () => decorBlocked(arena, entrance, core),
-    [arena, entrance, core],
-  );
+  /** The rubble the room came with — see src/game/noise.ts. */
+  /*
+   * What a walker cannot enter: the rock nobody has dug through.
+   *
+   * This used to be scattered scenery - a barrel here, a pillar there, picked
+   * by noise. The rock replaces all of it, and it is better at the job for
+   * one reason: the player can see exactly where it is, because they are the
+   * one who left it there.
+   */
+  const terrain = useMemo(() => rockSet(arena, dug), [arena, dug]);
 
   /**
    * Floating damage numbers.
@@ -382,6 +400,7 @@ export default function App() {
     traps,
     rooms,
     obstacles,
+    terrain,
     effects,
     jailFree,
     weaponTiers,
@@ -470,7 +489,8 @@ export default function App() {
     }
 
     let ok = false;
-    if (tool.kind === "obstacle") ok = save.placeObstacle(tool.type, x, y);
+    if (tool.kind === "dig") ok = save.dig(x, y);
+    else if (tool.kind === "fill") ok = save.fill(x, y);
     else if (tool.kind === "remove") ok = save.removeAt(x, y);
     else if (tool.kind === "minion") ok = save.placeMinion(tool.type, x, y);
     else if (tool.kind === "trap") ok = save.placeTrap(tool.type, x, y);
@@ -556,6 +576,13 @@ export default function App() {
   useEffect(() => {
     rendererRef.current?.setArena(arena, entrance, core);
   }, [arena, entrance, core]);
+
+  /** The shape of the room, which is the shape of what has been dug. */
+  const open = useMemo(() => dugSet(arena, dug), [arena, dug]);
+
+  useEffect(() => {
+    rendererRef.current?.setDug(open);
+  }, [open]);
 
   /*
    * Who is coming, ticked rather than read during render.
@@ -702,13 +729,31 @@ export default function App() {
       if (x === core.x && y === core.y) return false;
 
       const taken = (tx: number, ty: number) =>
-        // The rubble the room came with. It is terrain, so it is occupied by
-        // something the player never placed and cannot remove.
+        // Rock counts as taken for everything except the tool that removes
+        // rock, which is handled on its own below.
         terrain.has(blockedKey(tx, ty, arena.w)) ||
-        obstacles.some((o) => o.x === tx && o.y === ty) ||
         minions.some((m) => m.x === tx && m.y === ty) ||
         traps.some((tr) => tr.x === tx && tr.y === ty) ||
         rooms.some((r) => roomCovers(r, tx, ty));
+
+      /*
+       * Digging is the one tool whose legal tile is rock, not floor - and it
+       * has to touch something already open, because a sealed pocket in the
+       * middle of the rock is a room no raid can ever reach.
+       */
+      if (tool.kind === "dig") {
+        if (!terrain.has(blockedKey(x, y, arena.w))) return false;
+        return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(
+          ([dx, dy]) =>
+            inArena(arena, x + dx, y + dy) &&
+            !terrain.has(blockedKey(x + dx, y + dy, arena.w)),
+        );
+      }
+
+      // Filling wants open floor with nothing standing on it.
+      if (tool.kind === "fill") {
+        return !taken(x, y);
+      }
 
       // A room claims a 2x2 block anchored here, so every tile of it must be
       // clear and inside the room — not just the one under the cursor.
@@ -808,7 +853,7 @@ export default function App() {
         entrance,
         core,
         lureTiles(rooms),
-        new Set([...terrain, ...blockedSet(arena, obstacles)]),
+        new Set(terrain),
       ),
     );
   }, [arena, entrance, core, terrain, obstacles, meta, rooms, raid.raiding, showAftermath]);
@@ -833,11 +878,11 @@ export default function App() {
     const lures = lureTiles(rooms);
     const now = buildRaidPath(
       arena, entrance, core, lures,
-      new Set([...terrain, ...blockedSet(arena, obstacles)]),
+      new Set(terrain),
     );
     const after = buildRaidPath(
       arena, entrance, core, lures,
-      new Set([...terrain, ...blockedSet(arena, [...obstacles, { x: hover.x, y: hover.y }])]),
+      new Set([...terrain, blockedKey(hover.x, hover.y, arena.w)]),
     );
 
     /*
@@ -991,7 +1036,8 @@ export default function App() {
 
   /** How full each kind is, shown on the kind button rather than in a row of counters. */
   const groupUsage: Record<ToolGroup, { count: number; cap: number }> = {
-    obstacle: { count: obstacles.length, cap: maxObstaclesFor(research, entitlements) },
+    // The corridor has no cap of its own: what limits it is what it costs.
+    dig: { count: dug.length, cap: arena.w * arena.h },
     minion: { count: minions.length, cap: effects.minionCap },
     trap: { count: traps.length, cap: MAX_TRAPS },
     room: { count: rooms.length, cap: MAX_ROOMS },
@@ -1007,6 +1053,7 @@ export default function App() {
     coreBreaches: meta?.coreBreaches ?? 0,
     toolId,
     group,
+    dug: dug.length,
   });
   // The tutorial is dismissed for good, finished, or out of the way while a
   // raid plays — there is nothing to do during one but watch.
@@ -1072,7 +1119,10 @@ export default function App() {
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
-    if (tool.kind === "obstacle") return `${t("hint_obstacle")} ${obstacles.length}/${maxObstaclesFor(research, entitlements)}`;
+    if (tool.kind === "dig") return t("hint_dig");
+    if (tool.kind === "fill") {
+      return HAS_MOUSE ? `${t("hint_fill")} · ${t("hint_remove_alt")}` : t("hint_fill");
+    }
     // The right-click shortcut is mentioned exactly where it applies, and
     // only on a machine that has a right button to click. A phone is told
     // about a gesture it cannot make otherwise.
@@ -1387,7 +1437,7 @@ export default function App() {
               </div>
 
               <div className="toolbar">
-                {TOOLS.filter((e) => e.tool.kind === group).map((entry) => {
+                {TOOLS.filter((e) => e.group === group && e.id !== "remove").map((entry) => {
                   const locked =
                     (entry.tool.kind === "minion" && !unlocked.unlockedMinions.includes(entry.tool.type)) ||
                     (entry.tool.kind === "trap" && !unlocked.unlockedTraps.includes(entry.tool.type)) ||

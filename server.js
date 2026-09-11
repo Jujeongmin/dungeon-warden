@@ -249,6 +249,14 @@ const RAID_BREACH_REWARD_PER_KILL = 8;
  * champion actually fights at live client-side with the rest of the combat
  * numbers; only the payout is decided here, where it cannot be invented.
  */
+/**
+ * What one tile of rock costs to take out. Mirrored in src/game/dig.ts.
+ *
+ * The corridor has no cap of its own - what limits it is what it costs, and
+ * that is the brake on digging a twenty-tile maze on day one.
+ */
+const DIG_COST = 6;
+
 const CHAMPION_THREAT = 9;
 
 /**
@@ -264,6 +272,19 @@ const CHAMPION_THREAT = 9;
  * send, the raid is however many waves it managed to fill.
  */
 const WAVES_PER_RAID = 3;
+
+/**
+ * How many of them this dungeon has earned.
+ *
+ * Mirrored in src/game/party.ts. Three waves is the shape a dungeon grows
+ * into, not the one it opens with: a new keeper meeting all three loses the
+ * first raid to a rule nobody has taught them.
+ */
+function wavesFor(threat) {
+  if (threat < 3) return 1;
+  if (threat < CHAMPION_THREAT) return 2;
+  return WAVES_PER_RAID;
+}
 const RAID_CHAMPION_REWARD = 60;
 const RAID_PLUNDER_RATE = 0.15;
 const RAID_PLUNDER_CAP = 120;
@@ -767,6 +788,107 @@ const REFUND_RATE = 1;
  * refund is for what the server already believes is standing there, so a
  * client cannot claim to have removed a vault it never built.
  */
+/**
+ * Validates and prices the corridor.
+ *
+ * The rules are the ones the client enforces as you tap, restated here
+ * because the client is not to be believed: every tile is inside the room,
+ * no tile appears twice, the door and the core are always open, and the two
+ * are joined - a dungeon whose core cannot be reached is one where no raid
+ * can ever resolve, and it would be a free win forever.
+ */
+/**
+ * The corridor a dungeon has, deriving it if it predates carving.
+ *
+ * Mirrors digFromWalls/startingDig in src/game/dig.ts, and it has to: the
+ * client migrates an old save the same way and then sends the result back.
+ * If this returned an empty corridor instead, the first save after the
+ * change would read every tile as newly dug and bill for the whole room.
+ */
+/** The straight corridor a brand new dungeon is handed. */
+function startingDig(arena) {
+  const entrance = entranceOf(arena);
+  const core = coreOf(arena);
+  const tiles = [];
+  for (let y = entrance.y; y <= core.y; y++) {
+    tiles.push({ id: "d" + entrance.x + "," + y, type: "dig", x: entrance.x, y: y });
+  }
+  return tiles;
+}
+
+function dugOf(dungeon, arena) {
+  if (Array.isArray(dungeon.dug)) return dungeon.dug;
+
+  const walls = {};
+  for (const wall of dungeon.obstacles || []) walls[wall.x + "," + wall.y] = true;
+  const tiles = [];
+
+  if ((dungeon.obstacles || []).length > 0) {
+    for (let y = 0; y < arena.h; y++) {
+      for (let x = 0; x < arena.w; x++) {
+        if (!walls[x + "," + y]) tiles.push({ id: "d" + x + "," + y, type: "dig", x: x, y: y });
+      }
+    }
+    return tiles;
+  }
+
+  const entrance = entranceOf(arena);
+  const core = coreOf(arena);
+  for (let y = entrance.y; y <= core.y; y++) {
+    tiles.push({ id: "d" + entrance.x + "," + y, type: "dig", x: entrance.x, y: y });
+  }
+  return tiles;
+}
+
+function priceDug(next, saved, arena) {
+  const entrance = entranceOf(arena);
+  const core = coreOf(arena);
+
+  const seen = {};
+  for (const tile of next) {
+    if (!tile || typeof tile.x !== "number" || typeof tile.y !== "number") {
+      throw new Error("BAD_DIG");
+    }
+    if (tile.x < 0 || tile.y < 0 || tile.x >= arena.w || tile.y >= arena.h) {
+      throw new Error("DIG_OUT_OF_BOUNDS");
+    }
+    const key = tile.x + "," + tile.y;
+    if (seen[key]) throw new Error("DIG_DUPLICATE");
+    seen[key] = true;
+  }
+
+  if (!seen[entrance.x + "," + entrance.y] || !seen[core.x + "," + core.y]) {
+    throw new Error("DIG_FIXED_TILE");
+  }
+
+  // Flood fill from the door. Cheap, and it is the only check that matters:
+  // a corridor in two pieces is a dungeon that cannot be raided.
+  const reached = {};
+  const queue = [entrance];
+  reached[entrance.x + "," + entrance.y] = true;
+  while (queue.length > 0) {
+    const at = queue.pop();
+    const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const step of steps) {
+      const nx = at.x + step[0];
+      const ny = at.y + step[1];
+      const key = nx + "," + ny;
+      if (reached[key] || !seen[key]) continue;
+      reached[key] = true;
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  if (!reached[core.x + "," + core.y]) throw new Error("DIG_NOT_CONNECTED");
+
+  const had = {};
+  for (const tile of saved || []) had[tile.x + "," + tile.y] = true;
+  let cost = 0;
+  for (const tile of next) {
+    if (!had[tile.x + "," + tile.y]) cost += DIG_COST;
+  }
+  return cost;
+}
+
 function refundFor(next, saved, prices) {
   const byId = {};
   for (const item of next || []) {
@@ -1041,6 +1163,7 @@ function createDefaultDungeon() {
 
   return {
     version: SAVE_VERSION,
+    dug: startingDig(arenaFor([])),
     obstacles: [],
     milestonesSeen: [],
     minions: [],
@@ -1209,6 +1332,7 @@ class Server {
     const nextTraps = payload.traps || prev.traps || [];
     const nextMinions = payload.minions || prev.minions || [];
     const nextObstacles = payload.obstacles || prev.obstacles || [];
+    const nextDug = payload.dug || dugOf(prev, arena);
 
     // Locked content cannot be placed, whatever the client sends.
     const unlocked = researchEffects(research);
@@ -1259,6 +1383,8 @@ class Server {
       owned,
     );
 
+    const digCost = priceDug(nextDug, dugOf(prev, arena), arena);
+
     // What the player cleared since the last save comes back in full. The
     // two are settled against each other rather than paid separately, so a
     // save that swaps one wall for another moves the difference and nothing
@@ -1267,9 +1393,20 @@ class Server {
       refundFor(nextRooms, prev.rooms || [], ROOM_COST) +
       refundFor(nextTraps, prev.traps || [], TRAP_COST) +
       refundFor(nextMinions, prev.minions || [], MINION_COST) +
-      refundFor(nextObstacles, prev.obstacles || [], OBSTACLE_COST);
+      refundFor(nextObstacles, prev.obstacles || [], OBSTACLE_COST) +
+      // Rock put back pays the same way anything else cleared does. Keyed on
+      // the tile, since a dug tile has no type to price by.
+      (function () {
+        const kept = {};
+        for (const tile of nextDug) kept[tile.x + "," + tile.y] = true;
+        let back = 0;
+        for (const tile of dugOf(prev, arena)) {
+          if (!kept[tile.x + "," + tile.y]) back += DIG_COST;
+        }
+        return Math.floor(back * REFUND_RATE);
+      })();
 
-    const cost = roomCost + trapCost + minionCost + obstacleCost - refund;
+    const cost = roomCost + trapCost + minionCost + obstacleCost + digCost - refund;
     if (cost > 0) {
       const affordable = await $asset.has("gold", cost);
       if (!affordable) throw new Error("INSUFFICIENT_GOLD");
@@ -1281,6 +1418,7 @@ class Server {
     const now = Date.now();
     const dungeon = {
       version: SAVE_VERSION,
+      dug: nextDug,
       obstacles: nextObstacles,
       minions: sanitizeMinions(nextMinions, prev.minions || [], prev.loot || []),
       traps: nextTraps,
@@ -1352,7 +1490,8 @@ class Server {
      * per wave for the same reason.
      */
     const waves = [];
-    for (let i = 0; i < WAVES_PER_RAID; i++) {
+    const waveCount = wavesFor(threat);
+    for (let i = 0; i < waveCount; i++) {
       const wave = pickParty(dungeon, threat + i * 2, now);
       if (wave.length === 0) break;
       waves.push(wave);

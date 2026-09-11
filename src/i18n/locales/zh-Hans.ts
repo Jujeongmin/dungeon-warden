@@ -254,4 +254,12 @@ export const zhHans: Record<StringKey, string> = {
   tut_obstacle_group: "打开墙分页",
   tut_minion_group: "打开手下分页",
   tut_trap_group: "打开陷阱分页",
+  group_dig: "挖掘",
+  tool_dig: "挖",
+  tool_fill: "填回",
+  hint_dig: "挖开岩盘作为通道。仅限相邻格。",
+  hint_fill: "将通道填回岩盘。",
+  tut_dig_group: "打开挖掘分页",
+  tut_dig_pick: "选择挖",
+  tut_dig_place: "挖出通道旁的小空间",
 };

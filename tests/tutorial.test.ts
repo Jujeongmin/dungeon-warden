@@ -1,16 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { RaidSim } from "../src/game/sim/RaidSim";
+import { RaidSim, isRaidOver } from "../src/game/sim/RaidSim";
 import { TUTORIAL, guideFor, type TutorialContext } from "../src/game/tutorial";
 import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
-import { decorBlocked } from "../src/game/decor";
-import { previewParty } from "../src/game/party";
+import { DIG_COST, connects, dugTile, rockSet, startingDig, type DugTile } from "../src/game/dig";
+import { previewParty, wavesFor } from "../src/game/party";
 import {
   MINION_COST,
-  OBSTACLE_COST,
   TRAP_COST,
   type PartyMember,
   type PlacedMinion,
-  type PlacedObstacle,
   type PlacedTrap,
 } from "../src/game/types";
 
@@ -22,105 +20,119 @@ const core = coreOf(arena);
 const START_GOLD = 200;
 
 /**
- * Plays the opening exactly as it is taught: take the tool each step names,
- * put it on the tile the ring points at, repeat until the tutorial stops
- * asking. Nothing is placed that the guide did not ask for.
+ * Plays the opening exactly as it is taught: open the drawer the step names,
+ * take the tool it names, and put it where the ring points. Nothing happens
+ * that the guide did not ask for.
  */
 function followTheTutorial() {
-  const obstacles: PlacedObstacle[] = [];
+  const dug: DugTile[] = startingDig(arena);
   const minions: PlacedMinion[] = [];
   const traps: PlacedTrap[] = [];
   let seq = 0;
 
-  // The drawer the step asks for is treated as already open: this test is
-  // about what the tutorial teaches you to build, not about the taps that
-  // get you to the button.
   const context = (toolId: string, group = ""): TutorialContext => ({
-    obstacles, minions, traps, entrance, core,
-    wavesRepelled: 0, coreBreaches: 0, toolId, group,
+    obstacles: [], minions, traps, entrance, core,
+    wavesRepelled: 0, coreBreaches: 0, toolId, group, dug: dug.length,
   });
 
-  // Generous bound: every step places at most a handful of things, and a
-  // runaway guide should fail the test rather than hang it.
+  // Generous bound: a runaway guide should fail the test rather than hang it.
   for (let i = 0; i < 40; i++) {
     const guide = guideFor(context(""));
     if (!guide || !guide.step.tool) break;
 
-    // The player opens the drawer, then picks up the tool the step names,
-    // which is what makes the guide point at a tile rather than at a button.
     const held = guideFor(context(guide.step.tool, guide.step.group ?? ""));
     const target = held?.target;
     if (!target || target.kind !== "tile") break;
 
     seq += 1;
-    if (guide.step.tool === "barricade") {
-      obstacles.push({ id: `o${seq}`, type: "barricade", x: target.x, y: target.y });
+    if (guide.step.tool === "dig") {
+      dug.push(dugTile(target.x, target.y));
     } else if (guide.step.tool === "warrior") {
       minions.push({ id: `m${seq}`, type: "warrior", x: target.x, y: target.y });
     } else if (guide.step.tool === "spike") {
       traps.push({ id: `t${seq}`, type: "spike", x: target.x, y: target.y });
     } else {
-      throw new Error(`the tutorial teaches a tool this test cannot place: ${guide.step.tool}`);
+      throw new Error(`the tutorial teaches a tool this test cannot use: ${guide.step.tool}`);
     }
   }
 
-  return { obstacles, minions, traps };
+  return { dug, minions, traps };
 }
 
-function spend({ obstacles, minions, traps }: ReturnType<typeof followTheTutorial>) {
+function spend({ dug, minions, traps }: ReturnType<typeof followTheTutorial>) {
   return (
-    obstacles.reduce((sum, o) => sum + OBSTACLE_COST[o.type], 0) +
+    (dug.length - startingDig(arena).length) * DIG_COST +
     minions.reduce((sum, m) => sum + MINION_COST[m.type], 0) +
     traps.reduce((sum, t) => sum + TRAP_COST[t.type], 0)
   );
 }
 
+/**
+ * The raid the tutorial actually ends with: three waves, built the way
+ * useRaid builds them offline.
+ *
+ * This used to send one party, and that is how a tutorial that loses in the
+ * game kept passing here - the opening was measured against a third of the
+ * raid it opens.
+ */
+function raid(built: ReturnType<typeof followTheTutorial>) {
+  const waves = [0, 2, 4].slice(0, wavesFor(0)).map((step, wave) =>
+    (previewParty([], step, 0) as PartyMember[]).map((member) => ({
+      ...member,
+      id: `w${wave}-${member.id}`,
+    })),
+  );
+  const sim = new RaidSim({
+    minions: built.minions,
+    traps: built.traps,
+    obstacles: [],
+    party: waves[0],
+    waves,
+    arena, entrance, core, lures: [], seed: 1,
+    terrain: rockSet(arena, built.dug),
+  });
+  // Long enough for three waves and two build windows between them.
+  for (let i = 0; i < 30000 && !isRaidOver(sim.state.status); i++) sim.step();
+  return sim;
+}
+
 describe("the opening it teaches", () => {
-  it("places something for every step that names a tool", () => {
+  it("does something for every step that names a tool", () => {
     const built = followTheTutorial();
     const toolSteps = TUTORIAL.filter((step) => step.tool).length;
-    expect(built.obstacles.length + built.minions.length + built.traps.length)
-      .toBeGreaterThanOrEqual(toolSteps);
+    const done =
+      built.dug.length - startingDig(arena).length + built.minions.length + built.traps.length;
+    expect(done).toBeGreaterThanOrEqual(toolSteps);
+  });
+
+  it("only ever puts things where somebody can stand", () => {
+    // The whole point of carving: a minion in the rock would be a purchase
+    // that never fires and a trap nothing ever steps on.
+    const built = followTheTutorial();
+    const rock = rockSet(arena, built.dug);
+    for (const at of [...built.minions, ...built.traps]) {
+      expect(rock.has(at.y * arena.w + at.x)).toBe(false);
+    }
+  });
+
+  it("leaves the door still joined to the core", () => {
+    expect(connects(arena, followTheTutorial().dug)).toBe(true);
   });
 
   it("costs less than a new dungeon has", () => {
-    // A tutorial that asks for more than the player owns cannot be followed.
     expect(spend(followTheTutorial())).toBeLessThanOrEqual(START_GOLD);
   });
 
   it("repels the first raid", () => {
     /*
-     * The point of the whole file. A tutorial whose own build loses teaches
-     * that the things it just sold you do not work — and it did lose: one
-     * archer and a spike put the knight in the core with 31 of 130hp left,
-     * having killed the archer on the way.
+     * A tutorial whose own build loses teaches that the things it just sold
+     * you do not work.
      */
-    const built = followTheTutorial();
-    const sim = new RaidSim({
-      ...built,
-      party: previewParty([], 0, 0) as PartyMember[],
-      arena,
-      entrance,
-      core,
-      lures: [],
-      seed: 1,
-      terrain: decorBlocked(arena, entrance, core),
-    });
-
-    for (let i = 0; i < 6000 && sim.state.status === "running"; i++) sim.step();
-    expect(sim.state.status).toBe("repelled");
+    expect(raid(followTheTutorial()).state.status).toBe("repelled");
   });
 
   it("leaves the garrison standing, so the lesson is legible", () => {
     // Winning with everything dead reads as a near miss, not as "this works".
-    const built = followTheTutorial();
-    const sim = new RaidSim({
-      ...built,
-      party: previewParty([], 0, 0) as PartyMember[],
-      arena, entrance, core, lures: [], seed: 1,
-      terrain: decorBlocked(arena, entrance, core),
-    });
-    for (let i = 0; i < 6000 && sim.state.status === "running"; i++) sim.step();
-    expect(sim.state.minions.every((m) => m.alive)).toBe(true);
+    expect(raid(followTheTutorial()).state.minions.every((m) => m.alive)).toBe(true);
   });
 });

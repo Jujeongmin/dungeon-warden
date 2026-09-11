@@ -12,6 +12,8 @@ export interface TutorialContext {
   toolId: string;
   /** Which drawer of the toolbar is open, so a step can ask for it to be opened. */
   group: string;
+  /** How many tiles have been dug out, so the first step knows it happened. */
+  dug: number;
 }
 
 /** Where the player is being sent. `null` means nowhere in particular. */
@@ -66,18 +68,36 @@ export interface TutorialStep {
  * something say which tool to pick up, wait until it is in hand, and only then
  * ask for the tap — which is the order the player has to do it in anyway.
  */
+/**
+ * Tiles a brand new dungeon is handed, as a straight corridor. The first step
+ * is done when there is one more than that - see startingDig.
+ */
+const STARTING_DIG_TILES = 12;
+
 export const TUTORIAL: TutorialStep[] = [
   {
-    id: "obstacle",
-    tool: "barricade",
-    group: "obstacle",
-    groupHint: "tut_obstacle_group",
-    hint: "tut_obstacle_pick",
-    placeHint: "tut_obstacle_place",
-    // Straight down the line they walk in on, two tiles from the door. A wall
-    // anywhere folds the route, but a wall here folds it visibly.
-    placeAt: ({ entrance }) => (entrance ? { x: entrance.x, y: entrance.y + 2 } : null),
-    done: ({ obstacles }) => obstacles.length > 0,
+    id: "dig",
+    tool: "dig",
+    group: "dig",
+    groupHint: "tut_dig_group",
+    hint: "tut_dig_pick",
+    placeHint: "tut_dig_place",
+    /*
+     * Two nooks beside the corridor, near the core.
+     *
+     * This is the pattern the whole game is built on and it only exists
+     * because the room is carved: a corridor one tile wide has no "beside
+     * the road" to stand in, so a nook has to be cut for anything that is
+     * meant to shoot down it without blocking it. Teaching the nook first
+     * means the archer that follows has somewhere to go.
+     *
+     * Near the core because that is where two archers can hold - measured, in
+     * tests/tutorial.test.ts. Near the door they would get two shots each as
+     * the party walked past and the raid would be lost.
+     */
+    placeAt: ({ core, dug }) =>
+      core ? { x: core.x + (dug > STARTING_DIG_TILES ? -1 : 1), y: core.y - 3 } : null,
+    done: ({ dug }) => dug >= STARTING_DIG_TILES + 2,
   },
   {
     id: "minion",
@@ -102,6 +122,7 @@ export const TUTORIAL: TutorialStep[] = [
      * shoots, which is a real thing to build but not the first thing to teach:
      * the lesson here is that it fires at what walks past.
      */
+    // Into the nooks that were just cut, in the order they were cut.
     placeAt: ({ core, minions }) =>
       core ? { x: core.x + (minions.length === 0 ? 1 : -1), y: core.y - 3 } : null,
     done: ({ minions }) => minions.length >= 2,
@@ -113,9 +134,9 @@ export const TUTORIAL: TutorialStep[] = [
     groupHint: "tut_trap_group",
     hint: "tut_trap_pick",
     placeHint: "tut_trap_place",
-    // One tile in front of where the minion was suggested, so the two read as
-    // working together rather than as two separate purchases.
-    placeAt: ({ core }) => (core ? { x: core.x, y: core.y - 2 } : null),
+    // On the corridor itself, between the two nooks, so the trap and the
+    // archers read as working together rather than as two separate purchases.
+    placeAt: ({ core }) => (core ? { x: core.x, y: core.y - 3 } : null),
     done: ({ traps }) => traps.length > 0,
   },
   // There used to be a save step here. There is no save any more: placing

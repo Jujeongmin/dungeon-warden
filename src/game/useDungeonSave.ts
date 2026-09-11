@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { arenaFor, coreOf, entranceOf, inArena, type Arena, blockedKey } from "./arena";
-import { decorBlocked } from "./decor";
+import {
+  DIG_COST,
+  connects,
+  digFromWalls,
+  dugId,
+  dugSet,
+  dugTile,
+  isFixed,
+  startingDig,
+  type DugTile,
+} from "./dig";
 import { REFUND_RATE, addCost, removedValue, sameList } from "./placements";
 import { EMPTY_ROOM_EFFECTS, roomCovers, roomEffects, roomTiles } from "./rooms";
 import { RESEARCH_BY_ID, researchEffects } from "./research";
@@ -110,6 +120,7 @@ export function useDungeonSave() {
   const [minions, setMinions] = useState<PlacedMinion[]>([]);
   const [traps, setTraps] = useState<PlacedTrap[]>([]);
   const [rooms, setRooms] = useState<PlacedRoom[]>([]);
+  const [dug, setDug] = useState<DugTile[]>([]);
   const [loot, setLoot] = useState<LootItem[]>([]);
   const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
   const [adventurers, setAdventurers] = useState<AdventurerRecord[]>([]);
@@ -130,11 +141,14 @@ export function useDungeonSave() {
 
   const minionsRef = useRef<PlacedMinion[]>([]);
   const lootRef = useRef<LootItem[]>([]);
+  const dugRef = useRef<DugTile[]>([]);
+  const savedDugRef = useRef<DugTile[]>([]);
   const trapsRef = useRef<PlacedTrap[]>([]);
   const roomsRef = useRef<PlacedRoom[]>([]);
   const obstaclesRef = useRef<PlacedObstacle[]>([]);
   minionsRef.current = minions;
   lootRef.current = loot;
+  dugRef.current = dug;
   trapsRef.current = traps;
   roomsRef.current = rooms;
   obstaclesRef.current = obstacles;
@@ -170,6 +184,25 @@ export function useDungeonSave() {
 
   const applyLoad = useCallback((result: LoadResult) => {
     const loadedObstacles = result.dungeon.obstacles ?? [];
+
+    /*
+     * A dungeon that predates the carving reads as one anyway.
+     *
+     * It was a field of floor with walls standing on some of it, so the
+     * corridor its owner built is every tile that was not a wall - the shape
+     * they made survives exactly, and nobody logs in to a dungeon they do not
+     * recognise. A brand new one gets the straight corridor instead, which is
+     * the worst possible maze and therefore the best thing to hand someone
+     * who has not built one yet.
+     */
+    const loadedArena = arenaFor(result.dungeon.research ?? []);
+    const loadedDug =
+      result.dungeon.dug ??
+      (loadedObstacles.length > 0
+        ? digFromWalls(loadedArena, loadedObstacles)
+        : startingDig(loadedArena));
+    savedDugRef.current = loadedDug;
+    setDug(loadedDug);
     const loadedMinions = result.dungeon.minions ?? [];
     const loadedTraps = result.dungeon.traps ?? [];
     const loadedRooms = result.dungeon.rooms ?? [];
@@ -259,12 +292,14 @@ export function useDungeonSave() {
       addCost(minionsRef.current, savedMinionsRef.current, MINION_COST) +
       addCost(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
       addCost(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
-      addCost(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST);
+      addCost(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST) +
+      addCost(dugRef.current, savedDugRef.current, { dig: DIG_COST });
     const back =
       removedValue(minionsRef.current, savedMinionsRef.current, MINION_COST) +
       removedValue(trapsRef.current, savedTrapsRef.current, TRAP_COST) +
       removedValue(roomsRef.current, savedRoomsRef.current, ROOM_COST) +
-      removedValue(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST);
+      removedValue(obstaclesRef.current, savedObstaclesRef.current, OBSTACLE_COST) +
+      removedValue(dugRef.current, savedDugRef.current, { dig: DIG_COST });
     return added - back;
   }, []);
 
@@ -273,7 +308,8 @@ export function useDungeonSave() {
       !sameList(minionsRef.current, savedMinionsRef.current) ||
       !sameList(trapsRef.current, savedTrapsRef.current) ||
       !sameList(roomsRef.current, savedRoomsRef.current) ||
-      !sameList(obstaclesRef.current, savedObstaclesRef.current)
+      !sameList(obstaclesRef.current, savedObstaclesRef.current) ||
+      !sameList(dugRef.current, savedDugRef.current)
     );
   }, []);
 
@@ -293,6 +329,7 @@ export function useDungeonSave() {
     const nextTraps = trapsRef.current;
     const nextRooms = roomsRef.current;
     const nextObstacles = obstaclesRef.current;
+    const nextDug = dugRef.current;
 
     if (!HAS_VERSE) {
       // Offline preview. No charge here: the purse was already emptied when
@@ -301,6 +338,7 @@ export function useDungeonSave() {
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
       savedObstaclesRef.current = nextObstacles;
+      savedDugRef.current = nextDug;
       setLastSavedAt(Date.now());
       return;
     }
@@ -310,6 +348,7 @@ export function useDungeonSave() {
     try {
       const result: SaveResult = await server.remoteFunction("saveDungeon", [
         {
+          dug: nextDug,
           obstacles: nextObstacles,
           minions: nextMinions,
           traps: nextTraps,
@@ -320,6 +359,7 @@ export function useDungeonSave() {
       savedTrapsRef.current = nextTraps;
       savedRoomsRef.current = nextRooms;
       savedObstaclesRef.current = nextObstacles;
+      savedDugRef.current = nextDug;
       setGold(result.gold);
       setLastSavedAt(result.savedAt);
       setError(null);
@@ -343,13 +383,11 @@ export function useDungeonSave() {
   /** Anything already standing on this tile — one occupant per tile. */
   const occupantAt = useCallback(
     (x: number, y: number): "minion" | "trap" | "room" | "obstacle" | "terrain" | null => {
-      // The rubble the room came with. Checked first and checked here, because
-      // this one function is the gate every placement goes through — putting it
-      // anywhere else means remembering it four times.
+      // Rock. Checked first and checked here, because this one function is
+      // the gate every placement goes through - putting it anywhere else
+      // means remembering it four times.
       const arena = arenaRef.current;
-      if (decorBlocked(arena, entranceOf(arena), coreOf(arena)).has(blockedKey(x, y, arena.w))) {
-        return "terrain";
-      }
+      if (!dugSet(arena, dugRef.current).has(blockedKey(x, y, arena.w))) return "terrain";
       if (minionsRef.current.some((m) => m.x === x && m.y === y)) return "minion";
       if (trapsRef.current.some((t) => t.x === x && t.y === y)) return "trap";
       if (roomsRef.current.some((r) => roomCovers(r, x, y))) return "room";
@@ -474,6 +512,55 @@ export function useDungeonSave() {
   );
 
   /** Removes whatever occupies the tile. No refund, matching the server. */
+  /**
+   * Takes one tile of rock out.
+   *
+   * Only next to somewhere you can already stand. A dungeon is a connected
+   * thing, and letting someone open a sealed pocket in the middle of the rock
+   * would let them build a room the raid can never reach and a route that
+   * cannot exist.
+   */
+  const dig = useCallback((x: number, y: number): boolean => {
+    const arena = arenaRef.current;
+    if (!inArena(arena, x, y)) return false;
+
+    const open = dugSet(arena, dugRef.current);
+    if (open.has(blockedKey(x, y, arena.w))) return false;
+
+    const touching = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) =>
+      open.has(blockedKey(x + dx, y + dy, arena.w)),
+    );
+    if (!touching) return false;
+    if (!canAfford(DIG_COST)) return false;
+
+    setDug([...dugRef.current, dugTile(x, y)]);
+    setGold((current) => current - DIG_COST);
+    return true;
+  }, [canAfford]);
+
+  /**
+   * Puts one tile of rock back, and pays for it.
+   *
+   * Refused on anything standing on that tile, on the two fixed points, and
+   * on a tile whose removal would cut the corridor in two - filling in behind
+   * the party is not a move, it is a way to make the dungeon unplayable.
+   */
+  const fill = useCallback((x: number, y: number): boolean => {
+    const arena = arenaRef.current;
+    if (!inArena(arena, x, y) || isFixed(arena, x, y)) return false;
+
+    const key = blockedKey(x, y, arena.w);
+    if (!dugSet(arena, dugRef.current).has(key)) return false;
+    if (occupantAt(x, y)) return false;
+
+    const next = dugRef.current.filter((tile) => tile.id !== dugId(x, y));
+    if (!connects(arena, next)) return false;
+
+    setDug(next);
+    setGold((current) => current + Math.floor(DIG_COST * REFUND_RATE));
+    return true;
+  }, [occupantAt]);
+
   const removeAt = useCallback((x: number, y: number): boolean => {
     // Scenery is not the player's to clear. It read as null-or-something and
     // so reported success on a barrel: nothing was filtered out, true came
@@ -691,6 +778,9 @@ export function useDungeonSave() {
     placeTrap,
     placeRoom,
     placeObstacle,
+    dig,
+    fill,
+    dug,
     removeAt,
     equipWeapon,
     equipBest,

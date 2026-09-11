@@ -19,7 +19,7 @@ import {
 import type { Point } from "./pathfinding";
 import { buildRaidPath, findPath } from "./pathfinding";
 import { blockedKey, blockedSet, inArena, type Arena } from "../arena";
-import { decorBlocked } from "../decor";
+
 import { OBSTACLE_STATS, type SimObstacle } from "./obstacles";
 
 /** Simulation step. Everything advances in whole steps so runs are reproducible. */
@@ -192,6 +192,15 @@ export interface RaidSimOptions {
   lures: Point[];
   obstacles: PlacedObstacle[];
   seed: number;
+  /**
+   * The rock: every tile nobody dug out.
+   *
+   * Handed in rather than derived, because the shape of the room is now the
+   * player's save and not a function of its size. An empty set is a room
+   * with no rock in it, which is what every test that does not care about
+   * the corridor wants.
+   */
+  terrain?: Set<number>;
   /** Workshop rooms shorten trap cooldowns. 1 = no rooms. */
   trapCooldownScale?: number;
   /** Free jail cells. Zero means every beaten adventurer dies instead. */
@@ -215,11 +224,11 @@ export class RaidSim {
   private core: Point;
   private lures: Point[];
   /**
-   * Tiles the room came with rubble on.
+   * The rock the corridor was cut out of.
    *
-   * Terrain, not placements: nothing can be built there and nobody walks
-   * through, and unlike a wall the player put up it cannot be broken. Derived
-   * from the arena, so it needs no input and cannot disagree with the picture.
+   * Nothing can be built there and nobody walks through, and unlike a wall
+   * the player put up it cannot be broken - which is why a raid is refused
+   * unless a way through already exists.
    */
   private terrain: Set<number>;
   private entrance: Point;
@@ -299,7 +308,7 @@ export class RaidSim {
     this.arena = options.arena;
     this.core = options.core;
     this.lures = options.lures;
-    this.terrain = decorBlocked(options.arena, options.entrance, options.core);
+    this.terrain = options.terrain ?? new Set<number>();
     this.obstacles = options.obstacles.map((o) => ({
       id: o.id,
       type: o.type,

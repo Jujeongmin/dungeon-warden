@@ -3,7 +3,7 @@ import { TILE, type TileId, type ObstacleType } from "./types";
 import { ModelLibrary, MODEL_PATTERNS, fitToTile, type LoadedModel } from "./assets/ModelLibrary";
 import { bakeModelIcons } from "./assets/modelIcons";
 import { inArena, type Arena } from "./arena";
-import { decorFor, tileNoise } from "./decor";
+import { tileNoise } from "./noise";
 import type { Point } from "./sim/pathfinding";
 
 const TILE_SIZE = 1;
@@ -224,6 +224,18 @@ const CLUTTER_CLEAR_RATE = 5.5; // presence gained or lost per second
 const FLICKER_DEPTH = 0.16;
 
 /**
+ * How tall the uncut rock stands, and what colour it is.
+ *
+ * Lighter than it wants to be. The room is lit by torches standing in the
+ * corridor, so the rock is only ever edge-lit - at the colour it reads as on
+ * paper it came out as a black slab with a thread of light in it, and the
+ * player could not see the shape of their own dungeon. Kept low enough that
+ * it never hides the corridor from this camera angle.
+ */
+const ROCK_HEIGHT = 0.85;
+const ROCK_COLOR = 0x6b5c49;
+
+/**
  * How wide one tile is in the KayKit dungeon pack's own units.
  *
  * Measured, not assumed: every piece in the pack that is meant to fill a tile
@@ -321,6 +333,7 @@ export class DungeonRenderer {
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
   private floorMesh: THREE.InstancedMesh | null = null;
+  private rockMesh: THREE.InstancedMesh | null = null;
   private wallMesh: THREE.InstancedMesh | null = null;
   private highlight: THREE.Mesh;
 
@@ -401,6 +414,8 @@ export class DungeonRenderer {
   private ghostLift = 0;
   private rangeRing: THREE.Mesh | null = null;
   private rangeRadius = 0;
+  /** Flat keys of the tiles that have been dug out. Empty means solid rock. */
+  private dug = new Set<number>();
   private pathMarkers: THREE.Object3D[] = [];
   private aftermathGroup = new THREE.Group();
   private aftermathRing = new THREE.RingGeometry(0.22, 0.4, 20);
@@ -516,6 +531,17 @@ export class DungeonRenderer {
     await this.models.init();
     if (this.disposed) return {};
     return bakeModelIcons(this.models, keys);
+  }
+
+  /**
+   * Which tiles have been dug out of the rock.
+   *
+   * Separate from setArena because the room's size changes about twice in a
+   * dungeon's life and its shape changes on every tap.
+   */
+  setDug(dug: Set<number>): void {
+    this.dug = dug;
+    this.rebuildInstances();
   }
 
   setArena(arena: Arena, entrance: Point, core: Point): void {
@@ -1249,18 +1275,51 @@ export class DungeonRenderer {
 
     this.disposeInstanced();
 
+    /*
+     * Floor only where the rock has been taken out.
+     *
+     * This is the whole of the carving change as far as the picture is
+     * concerned: the room used to be a full rectangle of flagstones with
+     * objects standing on it, and it is now the shape of what was dug. The
+     * wall builder below already places a panel wherever a floor tile has a
+     * neighbour that is not floor, so it needs nothing new - it simply has
+     * more edges to find.
+     */
     const floorPositions: Array<{ x: number; y: number; tile: TileId }> = [];
-    for (let y = 0; y < arena.h; y++) {
-      for (let x = 0; x < arena.w; x++) {
-        let tile: TileId = TILE.FLOOR;
-        if (this.entrance && x === this.entrance.x && y === this.entrance.y) tile = TILE.ENTRANCE;
-        else if (this.core && x === this.core.x && y === this.core.y) tile = TILE.CORE;
-        floorPositions.push({ x, y, tile });
-      }
+    for (const key of this.dug) {
+      const x = key % arena.w;
+      const y = Math.floor(key / arena.w);
+      let tile: TileId = TILE.FLOOR;
+      if (this.entrance && x === this.entrance.x && y === this.entrance.y) tile = TILE.ENTRANCE;
+      else if (this.core && x === this.core.x && y === this.core.y) tile = TILE.CORE;
+      floorPositions.push({ x, y, tile });
     }
 
     this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, "floor");
     if (this.floorMesh) this.scene.add(this.floorMesh);
+
+    /*
+     * The rock, as a mass rather than as a hole.
+     *
+     * Without this the undug part of the room is nothing at all - the
+     * corridor floats in black, and "I have not dug there" looks the same as
+     * "there is no room there". A dark block on every uncut tile gives the
+     * room its outline back and makes the corridor read as taken out of
+     * something.
+     */
+    const rockPositions: Array<{ x: number; y: number; tile: TileId }> = [];
+    for (let y = 0; y < arena.h; y++) {
+      for (let x = 0; x < arena.w; x++) {
+        if (this.dug.has(x + y * arena.w)) continue;
+        rockPositions.push({ x, y, tile: TILE.FLOOR });
+      }
+    }
+    this.rockMesh = this.buildInstanced(rockPositions, ROCK_HEIGHT, null);
+    if (this.rockMesh) {
+      (this.rockMesh.material as THREE.MeshLambertMaterial).color.setHex(ROCK_COLOR);
+      this.rockMesh.position.y = ROCK_HEIGHT / 2;
+      this.scene.add(this.rockMesh);
+    }
 
     this.buildWalls(floorPositions);
     this.buildLandmarks();
@@ -1294,7 +1353,9 @@ export class DungeonRenderer {
       for (const [dx, dy] of steps) {
         const nx = floor.x + dx;
         const ny = floor.y + dy;
-        if (inArena(arena, nx, ny)) continue;
+        // A wall stands wherever the corridor stops: at the edge of the room,
+        // and at the edge of the rock nobody has dug through.
+        if (inArena(arena, nx, ny) && this.dug.has(nx + ny * arena.w)) continue;
         if (tileNoise(nx * 2 + dx, ny * 2 + dy, 3) > TORCH_CHANCE) continue;
 
         const torch = this.spawnModel("prop_torch", 0.5);
@@ -1334,39 +1395,6 @@ export class DungeonRenderer {
         }
         break;
       }
-
-    }
-
-    /*
-     * The floor props come from src/game/decor.ts, not from here.
-     *
-     * They are terrain: they block placement and they block the walk, so where
-     * they stand is a rule of the game and the simulation has to agree with
-     * the picture exactly. One function decides, everything reads it.
-     */
-    if (!this.entrance || !this.core) return;
-    for (const spec of decorFor(arena, this.entrance, this.core)) {
-      const prop = this.spawnModel(spec.key, 0.55);
-      if (!prop) continue;
-      // Off-centre and turned, so a room of barrels does not look stamped.
-      prop.position.set(
-        spec.x + spec.offsetX,
-        FLOOR_HEIGHT + prop.position.y,
-        spec.y + spec.offsetZ,
-      );
-      prop.rotation.y = spec.spin;
-      this.scene.add(prop);
-      this.decor.push(prop);
-      this.clutter.push({
-        object: prop,
-        x: spec.x,
-        y: spec.y,
-        restX: prop.position.x,
-        restZ: prop.position.z,
-        restScale: prop.scale.x || 1,
-        present: 1,
-        wanted: 1,
-      });
     }
   }
 
@@ -1908,7 +1936,7 @@ export class DungeonRenderer {
   }
 
   private disposeInstanced(): void {
-    for (const mesh of [this.floorMesh, this.wallMesh]) {
+    for (const mesh of [this.floorMesh, this.wallMesh, this.rockMesh]) {
       if (!mesh) continue;
       this.scene.remove(mesh);
       // Model geometry belongs to the cached glTF and is reused by the next
@@ -1919,6 +1947,7 @@ export class DungeonRenderer {
     }
     this.floorMesh = null;
     this.wallMesh = null;
+    this.rockMesh = null;
   }
 
   /** Counts of what is actually in the scene, for debugging from the console. */
