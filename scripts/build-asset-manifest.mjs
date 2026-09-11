@@ -1,5 +1,5 @@
-// Scans the KayKit packs dropped into public/assets/kaykit and writes a
-// manifest the runtime uses to find models by name.
+// Scans every model dropped under public/assets and writes a manifest the
+// runtime uses to find them by name.
 //
 // The packs are downloaded by hand from itch.io, so the exact file names are
 // not known ahead of time. Indexing whatever is actually there — instead of
@@ -14,7 +14,11 @@ import { join, relative, posix, sep, dirname } from "node:path";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PUBLIC_DIR = join(ROOT, "public");
-const MODEL_DIR = join(PUBLIC_DIR, "assets", "kaykit");
+// Every pack: the KayKit folders, and anything baked by another script
+// (scripts/bake-warden.mjs). The manifest itself stays where it has always
+// been, so the URL the runtime fetches does not move.
+const MODEL_DIR = join(PUBLIC_DIR, "assets");
+const MANIFEST = join(PUBLIC_DIR, "assets", "kaykit", "manifest.json");
 const AUDIO_DIR = join(PUBLIC_DIR, "assets", "audio");
 
 async function walk(dir, pattern) {
@@ -53,7 +57,7 @@ async function index(dir, pattern, extension) {
 
 async function main() {
   const models = await index(MODEL_DIR, /\.(gltf|glb)$/i, /\.(gltf|glb)$/i);
-  await writeFile(join(MODEL_DIR, "manifest.json"), JSON.stringify({ models }, null, 2));
+  await writeFile(MANIFEST, JSON.stringify({ models }, null, 2));
   console.log(`Indexed ${models.length} model(s) -> public/assets/kaykit/manifest.json`);
   if (models.length === 0) {
     console.log("  Nothing found. Unzip the KayKit packs into public/assets/kaykit/.");

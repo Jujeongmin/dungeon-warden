@@ -68,12 +68,18 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   /*
    * The player, seen from behind their own eyes.
    *
-   * A warden is a monster, not a person, so the body the camera rides is
-   * one of the skeletons rather than a pair of human arms from some other
-   * game - and it swings the same clips the garrison does, so nothing new
-   * has to be drawn or rigged for it.
+   * A warden is a monster, not a person, so this is a monster: the imp from
+   * the Bestiary kit, baked down by scripts/bake-warden.mjs. Its motion is a
+   * second file because the kit ships none - see warden_clips, and
+   * public/assets/warden/SOURCE.md for where both came from.
+   *
+   * The skeleton stays as a fallback: before the bake has been run there is
+   * no imp, and a warden with no body at all would take the first-person
+   * view down with it.
    */
-  warden: [/^skeleton_rogue$/, /^skeleton_warrior$/, /^skeleton_mage$/],
+  warden: [/^warden$/, /^skeleton_rogue$/, /^skeleton_warrior$/],
+  /** Motion for the warden, on the same rig. Carries no mesh of its own. */
+  warden_clips: [/^warden-clips$/],
 
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage

@@ -3,212 +3,224 @@
     {
       "url": "/assets/kaykit/adventurers/arrow_crossbow.gltf",
       "name": "arrow_crossbow",
-      "group": "adventurers",
+      "group": "kaykit/adventurers",
       "bytes": 3071
     },
     {
       "url": "/assets/kaykit/dungeon/banner_blue.gltf",
       "name": "banner_blue",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3046
     },
     {
       "url": "/assets/kaykit/dungeon/banner_shield_red.gltf",
       "name": "banner_shield_red",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3076
     },
     {
       "url": "/assets/kaykit/adventurers/Barbarian.glb",
       "name": "barbarian",
-      "group": "adventurers",
+      "group": "kaykit/adventurers",
       "bytes": 386648
     },
     {
       "url": "/assets/kaykit/dungeon/barrel_large.gltf",
       "name": "barrel_large",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3057
     },
     {
       "url": "/assets/kaykit/dungeon/bed_frame.gltf",
       "name": "bed_frame",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2990
     },
     {
       "url": "/assets/kaykit/dungeon/box_stacked.gltf",
       "name": "box_stacked",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3065
     },
     {
       "url": "/assets/kaykit/dungeon/candle.gltf",
       "name": "candle",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3015
     },
     {
       "url": "/assets/kaykit/dungeon/candle_lit.gltf",
       "name": "candle_lit",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3030
     },
     {
       "url": "/assets/kaykit/dungeon/chest_gold.gltf",
       "name": "chest_gold",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 5143
     },
     {
       "url": "/assets/kaykit/dungeon/coin_stack_large.gltf",
       "name": "coin_stack_large",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3059
     },
     {
       "url": "/assets/kaykit/dungeon/coin_stack_small.gltf",
       "name": "coin_stack_small",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3073
     },
     {
       "url": "/assets/kaykit/dungeon/floor_tile_big_spikes.gltf",
       "name": "floor_tile_big_spikes",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 4927
     },
     {
       "url": "/assets/kaykit/dungeon/floor_tile_large.gltf",
       "name": "floor_tile_large",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2999
     },
     {
       "url": "/assets/kaykit/adventurers/Knight.glb",
       "name": "knight",
-      "group": "adventurers",
+      "group": "kaykit/adventurers",
       "bytes": 341688
     },
     {
       "url": "/assets/kaykit/adventurers/Mage.glb",
       "name": "mage",
-      "group": "adventurers",
+      "group": "kaykit/adventurers",
       "bytes": 352472
     },
     {
       "url": "/assets/kaykit/dungeon/pillar_decorated.gltf",
       "name": "pillar_decorated",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3039
     },
     {
       "url": "/assets/kaykit/adventurers/Ranger.glb",
       "name": "ranger",
-      "group": "adventurers",
+      "group": "kaykit/adventurers",
       "bytes": 484712
     },
     {
       "url": "/assets/kaykit/animations/Rig_Medium_General.glb",
       "name": "rig_medium_general",
-      "group": "animations",
+      "group": "kaykit/animations",
       "bytes": 828240
     },
     {
       "url": "/assets/kaykit/animations/Rig_Medium_MovementBasic.glb",
       "name": "rig_medium_movementbasic",
-      "group": "animations",
+      "group": "kaykit/animations",
       "bytes": 689624
     },
     {
       "url": "/assets/kaykit/adventurers/Rogue.glb",
       "name": "rogue",
-      "group": "adventurers",
+      "group": "kaykit/adventurers",
       "bytes": 409188
     },
     {
       "url": "/assets/kaykit/dungeon/rubble_half.gltf",
       "name": "rubble_half",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3045
     },
     {
       "url": "/assets/kaykit/dungeon/shelf_large.gltf",
       "name": "shelf_large",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2984
     },
     {
       "url": "/assets/kaykit/skeletons/Skeleton_Mage.glb",
       "name": "skeleton_mage",
-      "group": "skeletons",
+      "group": "kaykit/skeletons",
       "bytes": 265676
     },
     {
       "url": "/assets/kaykit/skeletons/Skeleton_Rogue.glb",
       "name": "skeleton_rogue",
-      "group": "skeletons",
+      "group": "kaykit/skeletons",
       "bytes": 331180
     },
     {
       "url": "/assets/kaykit/dungeon/stairs_long.gltf",
       "name": "stairs_long",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3007
     },
     {
       "url": "/assets/kaykit/dungeon/table_long.gltf",
       "name": "table_long",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2999
     },
     {
       "url": "/assets/kaykit/dungeon/table_medium.gltf",
       "name": "table_medium",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3006
     },
     {
       "url": "/assets/kaykit/dungeon/torch.gltf",
       "name": "torch",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 3032
     },
     {
       "url": "/assets/kaykit/dungeon/wall.gltf",
       "name": "wall",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2940
     },
     {
       "url": "/assets/kaykit/dungeon/wall_corner.gltf",
       "name": "wall_corner",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2988
     },
     {
       "url": "/assets/kaykit/dungeon/wall_crossing.gltf",
       "name": "wall_crossing",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2979
     },
     {
       "url": "/assets/kaykit/dungeon/wall_endcap.gltf",
       "name": "wall_endcap",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2985
     },
     {
       "url": "/assets/kaykit/dungeon/wall_gated.gltf",
       "name": "wall_gated",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2982
     },
     {
       "url": "/assets/kaykit/dungeon/wall_Tsplit.gltf",
       "name": "wall_tsplit",
-      "group": "dungeon",
+      "group": "kaykit/dungeon",
       "bytes": 2989
+    },
+    {
+      "url": "/assets/warden/warden.glb",
+      "name": "warden",
+      "group": "warden",
+      "bytes": 526932
+    },
+    {
+      "url": "/assets/warden/warden-clips.glb",
+      "name": "warden-clips",
+      "group": "warden",
+      "bytes": 231116
     }
   ]
 }
