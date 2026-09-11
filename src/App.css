@@ -167,6 +167,7 @@ h3.section {
 }
 
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -201,6 +202,19 @@ h3.section {
   gap: 10px;
   font-size: var(--fs-sm);
   white-space: nowrap;
+}
+
+/* The icon row sits dead centre of the bar whatever is on either side of
+   it, so it does not drift as the gold grows a digit. */
+.menu {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  pointer-events: auto;
 }
 
 .gold { font-weight: var(--fw-bold); color: var(--accent); }
@@ -1667,7 +1681,7 @@ button.ad-gold {
   font-variant-numeric: tabular-nums;
 }
 
-.stats .icon-toggle {
+.menu .icon-toggle {
   /* em, so the five buttons grow and shrink with the type scale — which is
      itself clamped against the stage width. A fixed 30px button next to
      18px text on a 608px stage looks like it belongs to a different app. */

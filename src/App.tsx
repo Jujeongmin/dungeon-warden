@@ -216,7 +216,6 @@ export default function App() {
   const [toolId, setToolId] = useState("dig");
   const [group, setGroup] = useState<ToolGroup>("dig");
   /** The level to come back to when the quick mute is switched off again. */
-  const lastVolume = useRef(1);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("build");
   const [hudOpen, setHudOpen] = useState(true);
@@ -1389,21 +1388,11 @@ export default function App() {
           <span className={`status status-${status}`}>
             {STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status}
           </span>
-          {/* A quick mute that remembers the level it was set to, so silencing
-              the game on a bus does not cost the player their mix. */}
-          <button
-            className="icon-toggle"
-            onClick={() => {
-              if (settings.volume > 0) lastVolume.current = settings.volume;
-              patchSettings({ volume: settings.volume > 0 ? 0 : lastVolume.current });
-            }}
-            title={settings.volume > 0 ? t("menu_sound_off") : t("menu_sound_on")}
-            aria-label={settings.volume > 0 ? t("menu_sound_off") : t("menu_sound_on")}
-          >
-            <Icon name={settings.volume > 0 ? "sound" : "mute"} />
-          </button>
-          {/* Icons, not labels. These are somewhere to go once in a while;
-              the gold beside them is the thing being played for. */}
+        </div>
+        {/* Icons, not labels, in the middle of the bar. These are somewhere
+            to go once in a while; the gold on the left is the thing being
+            played for. */}
+        <nav className="menu">
           {/* The one button that changes where you are rather than what is
               on top of the screen. Hidden while a raid is on: the camera has
               somewhere else to be. */}
@@ -1450,7 +1439,7 @@ export default function App() {
           >
             <Icon name="home" />
           </button>
-        </div>
+        </nav>
       </header>
 
       {/* One stack so banners and the tutorial never sit on top of each other,
