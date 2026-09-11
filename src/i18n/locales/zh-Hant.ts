@@ -156,7 +156,7 @@ export const zhHant: Record<StringKey, string> = {
   tut_trap_pick: "請選擇尖刺陷阱",
   tut_trap_place: "放在手下前面",
   tut_save_hint: "儲存後才能開始入侵",
-  tut_raid_hint: "戰鬥會自動進行",
+  tut_raid_hint: "戰鬥自動進行 — 英雄會去打走得到的手下，走不到就直奔核心",
 
   res_mage: "降靈術",
   res_mage_n: "解鎖骷髏法師",
@@ -231,6 +231,7 @@ export const zhHant: Record<StringKey, string> = {
   adv_mage: "法師",
   adv_ranger: "遊俠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本機模式，不會保存。",
+  aftermath_note: "上次入侵的記錄 — 在哪挨打，在哪倒下",
   rotate_hint: "請將裝置直立",
   result_champion: "擊潰首領",
   party_summary: "Lv{level} · {count}人",

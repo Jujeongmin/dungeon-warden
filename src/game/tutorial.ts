@@ -13,6 +13,8 @@ export interface TutorialContext {
   group: string;
   /** How many tiles have been dug out, so a step can tell one from none. */
   dug: number;
+  /** Whether one tile is already cut, so a step can point at the next one. */
+  isDug: (x: number, y: number) => boolean;
   /** Whether the door can reach the core yet. */
   connected: boolean;
 }
@@ -92,9 +94,23 @@ export const TUTORIAL: TutorialStep[] = [
      * anything else there has to be a corridor - and cutting it is the verb
      * the whole game is built on. Dragging digs a run of tiles, so this is
      * one gesture rather than ten taps.
+     *
+     * Points at the first tile still standing between the door and the core,
+     * found by looking. It used to be counted - door plus however many tiles
+     * had been dug - which is only right while the player digs in the one
+     * order the sum assumes. Dig from the core end, or swipe past a tile the
+     * browser did not report, and the ring sat on a tile with nothing to do
+     * with the hole it left, which is exactly when a beginner needs it to be
+     * right.
      */
-    placeAt: ({ entrance, dug }) =>
-      entrance ? { x: entrance.x, y: entrance.y + Math.max(1, dug - 1) } : null,
+    placeAt: ({ entrance, core, isDug }) => {
+      if (!entrance || !core) return null;
+      const step = Math.sign(core.y - entrance.y) || 1;
+      for (let y = entrance.y + step; y !== core.y; y += step) {
+        if (!isDug(entrance.x, y)) return { x: entrance.x, y };
+      }
+      return null;
+    },
     done: ({ connected }) => connected,
   },
   {
@@ -117,11 +133,18 @@ export const TUTORIAL: TutorialStep[] = [
      * tests/tutorial.test.ts. Near the door they would get two shots each as
      * the party walked past and the raid would be lost.
      */
-    // Counted off the corridor rather than off the garrison: no minion
+    // Whichever side is still rock, asked rather than counted: no minion
     // exists yet at this step, so keying on minions.length aimed both nooks
-    // at the same tile and left the second archer standing in rock.
-    placeAt: ({ core, dug }) =>
-      core ? { x: core.x + (dug <= CORRIDOR_TILES ? 1 : -1), y: core.y - 3 } : null,
+    // at the same tile and left the second archer standing in rock - and a
+    // count of dug tiles gets the side wrong the moment the player cuts
+    // anything of their own.
+    placeAt: ({ core, isDug }) => {
+      if (!core) return null;
+      const y = core.y - 3;
+      if (!isDug(core.x + 1, y)) return { x: core.x + 1, y };
+      if (!isDug(core.x - 1, y)) return { x: core.x - 1, y };
+      return null;
+    },
     done: ({ dug, connected }) => connected && dug >= CORRIDOR_TILES + 2,
   },
   {

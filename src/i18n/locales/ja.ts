@@ -161,7 +161,7 @@ export const ja: Record<StringKey, string> = {
   tut_trap_pick: "スパイクトラップを選んでください",
   tut_trap_place: "手下の前に置きましょう",
   tut_save_hint: "保存すると襲撃を始められます",
-  tut_raid_hint: "戦闘は自動で進みます",
+  tut_raid_hint: "戦闘は自動 — 行ける手下は倒しに来ますが、行けなければ核へ直行します",
 
   res_mage: "降霊術",
   res_mage_n: "スケルトンメイジを解放",
@@ -236,6 +236,7 @@ export const ja: Record<StringKey, string> = {
   adv_mage: "メイジ",
   adv_ranger: "レンジャー",
   banner_offline: "VITE_AGENT8_VERSE がありません — ローカルモード、未保存。",
+  aftermath_note: "前回の侵入の記録 — どこで受け、どこで倒れたか",
   rotate_hint: "端末を縦向きにしてください",
   result_champion: "頭目を倒した",
   party_summary: "Lv{level} · {count}人",

@@ -166,7 +166,7 @@ export const ko = {
   tut_trap_pick: "가시 함정을 고르세요",
   tut_trap_place: "부하 앞에 놓으세요",
   tut_save_hint: "저장해야 침입이 시작됩니다",
-  tut_raid_hint: "전투는 자동입니다",
+  tut_raid_hint: "전투는 자동 — 영웅은 갈 수 있는 부하만 잡으러 가고, 못 가면 코어로 갑니다",
 
   // Research nodes
   res_mage: "강령술",
@@ -243,6 +243,7 @@ export const ko = {
   adv_mage: "메이지",
   adv_ranger: "레인저",
   banner_offline: "VITE_AGENT8_VERSE 없음 — 로컬 모드, 미저장.",
+  aftermath_note: "지난 침입 기록 — 어디서 맞고 어디서 쓰러졌는지",
   rotate_hint: "세로로 돌려주세요",
   result_champion: "우두머리 격파",
   party_summary: "Lv{level} · {count}명",

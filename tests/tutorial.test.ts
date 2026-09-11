@@ -34,6 +34,7 @@ function followTheTutorial() {
     minions, traps, entrance, core,
     wavesRepelled: 0, coreBreaches: 0, toolId, group,
     dug: dug.length,
+    isDug: (x, y) => dug.some((tile) => tile.x === x && tile.y === y),
     connected: connects(arena, dug),
   });
 

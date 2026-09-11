@@ -1117,6 +1117,7 @@ export default function App() {
     toolId,
     group,
     dug: dug.length,
+    isDug: (x, y) => terrain.has(blockedKey(x, y, arena.w)) === false && inArena(arena, x, y),
     connected,
   });
   // The tutorial is dismissed for good, finished, or out of the way while a
@@ -1344,6 +1345,25 @@ export default function App() {
           <div className="banner">
             <button className="banner-close" onClick={() => setShowOfflineBanner(false)} aria-label="close">×</button>
             {t("banner_offline")}
+          </div>
+        )}
+
+        {/* The map has no legend and no words on it, which is the point -
+            but a ring that appears on its own and stays needs to say once
+            what it is, and offer the way out it already had. */}
+        {showAftermath && (
+          <div className="banner">
+            <button
+              className="banner-close"
+              onClick={() => {
+                setShowAftermath(false);
+                rendererRef.current?.setAftermath(null);
+              }}
+              aria-label="close"
+            >
+              ×
+            </button>
+            {t("aftermath_note")}
           </div>
         )}
 

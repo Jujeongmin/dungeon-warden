@@ -155,7 +155,7 @@ export const en: Record<StringKey, string> = {
   tut_trap_pick: "Pick the spike trap",
   tut_trap_place: "Set it in front of your minion",
   tut_save_hint: "Save to start a raid",
-  tut_raid_hint: "Combat runs itself",
+  tut_raid_hint: "Combat runs itself — heroes hunt minions they can reach, and ignore the ones they cannot",
 
   res_mage: "Necromancy",
   res_mage_n: "Unlocks the skeleton mage",
@@ -230,6 +230,7 @@ export const en: Record<StringKey, string> = {
   adv_mage: "Mage",
   adv_ranger: "Ranger",
   banner_offline: "Missing VITE_AGENT8_VERSE — local mode, unsaved.",
+  aftermath_note: "Last raid: where they were hurt, and where they fell",
   rotate_hint: "Turn your device upright",
   result_champion: "Champion stopped",
   party_summary: "Lv{level} · {count} raiders",
