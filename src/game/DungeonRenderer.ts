@@ -224,6 +224,18 @@ const CLUTTER_CLEAR_RATE = 5.5; // presence gained or lost per second
 const FLICKER_DEPTH = 0.16;
 
 /**
+ * Where the CC0 stone the room is made of lives.
+ *
+ * Two maps per material at 512px, baked down from ambientCG's 1K packs by
+ * scripts/bake-textures.mjs - see the note there for why that is enough.
+ * Rock051 for the rock, PavingStones128 for the floor. Both CC0.
+ */
+const STONE = {
+  rock: "/assets/textures/rock051",
+  floor: "/assets/textures/pavingstones128",
+};
+
+/**
  * How tall the uncut rock stands, and what colour it is.
  *
  * Lighter than it wants to be. The room is lit by torches standing in the
@@ -233,7 +245,16 @@ const FLICKER_DEPTH = 0.16;
  * it never hides the corridor from this camera angle.
  */
 const ROCK_HEIGHT = 0.85;
-const ROCK_COLOR = 0x6b5c49;
+/*
+ * A tint over the stone, not a replacement for it.
+ *
+ * This used to be the rock's whole colour, on a material with no texture.
+ * Multiplying a photograph of stone by the same dark brown buries it - the
+ * room went black except for a pool around each torch. Cooled and barely
+ * darkened instead, so the stone reads as stone and the torches are the only
+ * warm thing in the room.
+ */
+const ROCK_TINT = 0xd8d2c6;
 
 /**
  * How wide one tile is in the KayKit dungeon pack's own units.
@@ -334,6 +355,8 @@ export class DungeonRenderer {
 
   private floorMesh: THREE.InstancedMesh | null = null;
   private rockMesh: THREE.InstancedMesh | null = null;
+  /** Loaded once and shared; disposed with the renderer. */
+  private stone = new Map<string, { color: THREE.Texture; normal: THREE.Texture }>();
   private wallMesh: THREE.InstancedMesh | null = null;
   private highlight: THREE.Mesh;
 
@@ -468,10 +491,10 @@ export class DungeonRenderer {
      * bounce, the ambient carries the warmth, and the actual light comes from
      * the torch props on the walls (see buildDecor).
      */
-    const ambient = new THREE.AmbientLight(0xffdcae, 0.42);
-    const key = new THREE.DirectionalLight(0xfff0cc, 0.85);
+    const ambient = new THREE.AmbientLight(0xbcc6d8, 0.62);
+    const key = new THREE.DirectionalLight(0xdfe3ee, 0.72);
     key.position.set(6, 14, 4);
-    const rim = new THREE.DirectionalLight(0x9fb4d8, 0.18);
+    const rim = new THREE.DirectionalLight(0x8fa6cc, 0.22);
     rim.position.set(-8, 6, -6);
     this.scene.add(ambient, key, rim);
 
@@ -1296,7 +1319,12 @@ export class DungeonRenderer {
     }
 
     this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, "floor");
-    if (this.floorMesh) this.scene.add(this.floorMesh);
+    if (this.floorMesh) {
+      // Real stone over the pack's flat flagstone. The per-instance tint that
+      // marks the door and the core rides on top of it unchanged.
+      this.dress(this.floorMesh, STONE.floor, { roughness: 0.9 });
+      this.scene.add(this.floorMesh);
+    }
 
     /*
      * The rock, as a mass rather than as a hole.
@@ -1316,7 +1344,14 @@ export class DungeonRenderer {
     }
     this.rockMesh = this.buildInstanced(rockPositions, ROCK_HEIGHT, null);
     if (this.rockMesh) {
-      (this.rockMesh.material as THREE.MeshLambertMaterial).color.setHex(ROCK_COLOR);
+      /*
+       * Standard rather than Lambert, here and on the floor only.
+       *
+       * A normal map needs a material that knows what one is, and these two
+       * surfaces are most of what the player is looking at. Everything else
+       * in the room is a small lit model where the extra cost buys nothing.
+       */
+      this.dress(this.rockMesh, STONE.rock, { roughness: 0.92, tint: ROCK_TINT });
       this.rockMesh.position.y = ROCK_HEIGHT / 2;
       this.scene.add(this.rockMesh);
     }
@@ -1579,6 +1614,57 @@ export class DungeonRenderer {
     shape.lineTo(0.2, -0.1);
     shape.closePath();
     return new THREE.ShapeGeometry(shape);
+  }
+
+  /**
+   * The colour and normal map for one of the stones, loaded on first ask.
+   *
+   * Colour is sRGB and the normal is not. Getting that backwards washes the
+   * whole room out, and it presents as "the lighting is wrong" rather than as
+   * a colour space, which is a bad afternoon.
+   */
+  private stoneMaps(base: string): { color: THREE.Texture; normal: THREE.Texture } {
+    const had = this.stone.get(base);
+    if (had) return had;
+
+    const loader = new THREE.TextureLoader();
+    const color = loader.load(`${base}_color.webp`);
+    color.colorSpace = THREE.SRGBColorSpace;
+    const normal = loader.load(`${base}_normal.webp`);
+
+    for (const map of [color, normal]) {
+      map.wrapS = THREE.RepeatWrapping;
+      map.wrapT = THREE.RepeatWrapping;
+      map.anisotropy = 4;
+    }
+
+    const maps = { color, normal };
+    this.stone.set(base, maps);
+    return maps;
+  }
+
+  /**
+   * Puts a stone material on an instanced surface.
+   *
+   * The material it replaces came from cloning the pack's, so it is this
+   * renderer's to dispose - dropping it on the floor instead leaks one
+   * material per rebuild, and the room rebuilds on every tap.
+   */
+  private dress(
+    mesh: THREE.InstancedMesh,
+    base: string,
+    options: { roughness: number; tint?: number },
+  ): void {
+    const maps = this.stoneMaps(base);
+    const old = mesh.material as THREE.Material;
+    mesh.material = new THREE.MeshStandardMaterial({
+      map: maps.color,
+      normalMap: maps.normal,
+      color: options.tint ?? 0xffffff,
+      roughness: options.roughness,
+      metalness: 0,
+    });
+    old.dispose();
   }
 
   private clearAftermath(): void {
@@ -2462,6 +2548,11 @@ export class DungeonRenderer {
     this.ringGeometry.dispose();
 
     this.setPathPreview(null);
+    for (const maps of this.stone.values()) {
+      maps.color.dispose();
+      maps.normal.dispose();
+    }
+    this.stone.clear();
     this.pathGeometry.dispose();
     this.arrowGeometry.dispose();
     this.barGeometry.dispose();

@@ -22,6 +22,23 @@ built on top of it lives in the same file (`--fs-*` / `--fw-*` / `--ls-*`) and
 is used throughout `src/App.css`. Unlike the CC0 assets above, the OFL
 requires this notice to travel with the font — that's this entry.
 
+## Textures — ambientCG, by Lennart Demes
+
+<https://ambientcg.com/> · CC0
+
+| File | Source material |
+|---|---|
+| rock051_color.webp, rock051_normal.webp | <https://ambientcg.com/view?id=Rock051> |
+| pavingstones128_color.webp, pavingstones128_normal.webp | <https://ambientcg.com/view?id=PavingStones128> |
+
+The rock the dungeon is cut out of, and the floor of the corridor cut into
+it. Taken from the 1K JPG packs and baked down to 512px WebP by
+`scripts/bake-textures.mjs`, which also drops everything but colour and
+normal: the originals are one to two megabytes a map, which is more than the
+rest of the game weighs, and what reaches the player is a tile a couple of
+centimetres across lit by torchlight. Roughness is a constant in the material
+instead — it is nearly flat across both stones.
+
 ## Models — KayKit, by Kay Lousberg
 
 <https://kaylousberg.com/> · CC0
