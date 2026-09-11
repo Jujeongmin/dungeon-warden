@@ -2010,28 +2010,32 @@ export default function App() {
 
       {walking && (
         <div className="hotbar">
-          {hotbar.map((entry, i) => {
-            const locked = heldLocked(entry);
-            return (
-              <button
-                key={entry.id}
-                data-tut={`tool:${entry.id}`}
-                className={i === held ? "slot active" : locked ? "slot locked" : "slot"}
-                onClick={() => { audio.play("click"); setHeld(i); }}
-                title={locked ? t("locked_hint") : undefined}
-              >
-                <em>{i + 1}</em>
-                {(() => {
-                  const modelKey = TOOL_MODEL[entry.id];
-                  const icon = modelKey ? toolIcons[modelKey] : undefined;
-                  return icon ? <img src={icon} alt="" /> : null;
-                })()}
-                <b>{t(entry.label)}</b>
-                <i>{entry.cost === null ? t("free") : `${entry.cost}G`}</i>
-              </button>
-            );
-          })}
-          <p className="hotbar-hint">{t("hotbar_hint")}</p>
+          {heldEntry && (
+            <p className="hotbar-held">
+              {t(heldEntry.label)}
+              <i> · {heldEntry.cost === null ? t("free") : `${heldEntry.cost}G`}</i>
+            </p>
+          )}
+          <div className="hotbar-row">
+            {hotbar.map((entry, i) => {
+              const locked = heldLocked(entry);
+              const modelKey = TOOL_MODEL[entry.id];
+              const icon = modelKey ? toolIcons[modelKey] : undefined;
+              return (
+                <button
+                  key={entry.id}
+                  data-tut={`tool:${entry.id}`}
+                  className={i === held ? "slot active" : locked ? "slot locked" : "slot"}
+                  onClick={() => { audio.play("click"); setHeld(i); }}
+                  title={locked ? t("locked_hint") : t(entry.label)}
+                  aria-label={t(entry.label)}
+                >
+                  <em>{i + 1}</em>
+                  {icon ? <img src={icon} alt="" /> : <b>{t(entry.label).slice(0, 2)}</b>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -58,6 +58,10 @@ const HOLD_REPEAT_MS = 380;
 const SWING_SECONDS = 0.42;
 /** How far in front of the eyes the camera sits, in tiles. */
 const EYE_LEAD = 0.3;
+/** How much taller the rock stands while the camera is down among it. */
+const ROCK_STRETCH = 2.1;
+/** The arm, relative to the blocks it is built from. */
+const ARM_SCALE = 0.36;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -565,6 +569,9 @@ export class DungeonRenderer {
     this.aimBox.visible = false;
     this.aimPlate.visible = false;
     this.scene.add(this.aimBox, this.aimPlate);
+    this.buildArm();
+    this.camera.add(this.arm);
+    this.scene.add(this.camera);
     this.scene.add(this.unitGroup);
     this.scene.add(this.markerGroup);
     this.scene.add(this.aftermathGroup);
@@ -1295,12 +1302,18 @@ export class DungeonRenderer {
       floorPositions.push({ x, y, tile });
     }
 
-    this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, "floor");
+    // A plain slab of stone per tile rather than the pack's hexagon flag:
+    // from eye height the flag was a paving stone the size of a table with
+    // a bevel round it, and the scan already says what the floor is made of.
+    this.floorMesh = this.buildInstanced(floorPositions, FLOOR_HEIGHT, null);
     this.floorTiles = floorPositions.map((p) => ({ x: p.x, y: p.y }));
     if (this.floorMesh) {
       // Real stone over the pack's flat flagstone. The per-instance tint that
       // marks the door and the core rides on top of it unchanged.
-      this.dress(this.floorMesh, STONE.floor, { roughness: 0.9 });
+      // The same rock as the walls, lying flat: this is a dug corridor, and
+      // what is under your feet is what you dug it out of. The paving scan
+      // read as floorboards from eye height.
+      this.dress(this.floorMesh, STONE.rock, { roughness: 0.95, tint: 0xbfb6a8, repeat: 1.6 });
       this.scene.add(this.floorMesh);
     }
 
@@ -1342,6 +1355,7 @@ export class DungeonRenderer {
        */
       this.dress(this.rockMesh, STONE.rock, { roughness: 0.92, tint: ROCK_TINT });
       this.rockMesh.position.y = ROCK_HEIGHT / 2;
+      this.applyRockHeight();
       this.scene.add(this.rockMesh);
     }
 
@@ -1632,9 +1646,19 @@ export class DungeonRenderer {
   private dress(
     mesh: THREE.InstancedMesh,
     base: string,
-    options: { roughness: number; tint?: number },
+    options: { roughness: number; tint?: number; repeat?: number },
   ): void {
     const maps = this.stoneMaps(base);
+    // One scan per tile read as a single slab from eye height; tiled twice
+    // it reads as the paving it is. The box UVs run 0..1 per face.
+    if (options.repeat) {
+      for (const map of [maps.color, maps.normal]) {
+        map.wrapS = THREE.RepeatWrapping;
+        map.wrapT = THREE.RepeatWrapping;
+        map.repeat.set(options.repeat, options.repeat);
+        map.needsUpdate = true;
+      }
+    }
     const old = mesh.material as THREE.Material;
     mesh.material = new THREE.MeshStandardMaterial({
       map: maps.color,
@@ -1895,7 +1919,9 @@ export class DungeonRenderer {
     const proto = modelKey ? this.tileProto(modelKey, height) : null;
 
     const geo =
-      proto?.geometry ?? new THREE.BoxGeometry(TILE_SIZE * 0.96, height, TILE_SIZE * 0.96);
+      // Full tiles, edge to edge: the gap that drew a grid from above was a
+      // black slit between every two blocks from inside.
+      proto?.geometry ?? new THREE.BoxGeometry(TILE_SIZE, height, TILE_SIZE);
     // No vertexColors on the fallback: the per-instance colors below drive the
     // shader through instanceColor, and enabling vertexColors without a
     // geometry color attribute renders everything black.
@@ -2059,6 +2085,19 @@ export class DungeonRenderer {
   private wardenSwing = 0;
   /** Whether the body moved this frame, for idle against walk. */
   private wardenMoving = false;
+  /**
+   * The arm in the corner of the view.
+   *
+   * A child of the camera, not of the body: the body's own arms swing at
+   * hip height and never reach the eye, and the whole point of a first
+   * person is that your hand is in the picture. Built from a few blocks in
+   * bone and claw rather than taken from a pack, so it is the warden's arm
+   * and nobody else's. Drawn over the world, because the rock is often
+   * closer than the elbow.
+   */
+  private arm = new THREE.Group();
+  /** Where the arm rests, recomputed from the field of view each frame. */
+  private armRest = new THREE.Vector3(0.34, -0.3, -0.62);
   /** The thin dark box round the block the crosshair is on. */
   private aimBox: THREE.LineSegments;
   private aimPlate: THREE.LineSegments;
@@ -2093,6 +2132,8 @@ export class DungeonRenderer {
       this.moveInput.forward = 0;
       this.moveInput.strafe = 0;
       if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+      this.arm.visible = false;
+      this.applyRockHeight();
       return;
     }
     if (!this.entrance || !this.core) return;
@@ -2105,6 +2146,71 @@ export class DungeonRenderer {
       pitch: 0,
     };
     this.spawnWarden();
+    this.arm.visible = true;
+    this.applyRockHeight();
+  }
+
+  /**
+   * The rock stands taller from inside than from above.
+   *
+   * From the board a wall the height of a person hides the corridor behind
+   * it; from the corridor a wall the height of a table shows the black
+   * above the room over every edge. So the same blocks are stretched while
+   * the camera is down among them and let back down when it climbs out.
+   */
+  private applyRockHeight(): void {
+    const k = this.walk ? ROCK_STRETCH : 1;
+    if (this.rockMesh) {
+      this.rockMesh.scale.y = k;
+      this.rockMesh.position.y = (ROCK_HEIGHT * k) / 2;
+    }
+    this.aimBox.scale.y = k;
+  }
+
+  /**
+   * Bone and claw, in a handful of boxes.
+   *
+   * Upper arm and forearm as two lengths of bone, a knuckle, three claws
+   * that taper. Flat-shaded like everything else in the room, so it reads
+   * as part of the same world rather than a photograph held up to it.
+   */
+  private buildArm(): void {
+    const bone = new THREE.MeshStandardMaterial({
+      color: 0x9a9083, roughness: 0.95, metalness: 0, depthTest: false,
+    });
+    const claw = new THREE.MeshStandardMaterial({
+      color: 0x3b3129, roughness: 0.6, metalness: 0.05, depthTest: false,
+    });
+    const part = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = 50;
+      mesh.userData.ui = true;
+      return mesh;
+    };
+
+    // Upper arm runs back and up out of the frame; the forearm comes forward.
+    const upper = part(new THREE.BoxGeometry(0.09, 0.09, 0.42), bone);
+    upper.position.set(0.02, 0.06, 0.16);
+    upper.rotation.x = -0.55;
+    const fore = part(new THREE.BoxGeometry(0.07, 0.07, 0.46), bone);
+    fore.position.set(0, 0, -0.1);
+    const knuckle = part(new THREE.BoxGeometry(0.12, 0.07, 0.1), bone);
+    knuckle.position.set(0, 0, -0.33);
+    this.arm.add(upper, fore, knuckle);
+
+    for (const [i, x] of [-0.04, 0, 0.04].entries()) {
+      const talon = part(new THREE.ConeGeometry(0.03, 0.24, 6), claw);
+      talon.rotation.x = -Math.PI / 2 - 0.35;
+      talon.position.set(x * 1.4, -0.02, -0.5 - (i === 1 ? 0.03 : 0));
+      this.arm.add(talon);
+    }
+
+    this.arm.position.copy(this.armRest);
+    this.arm.rotation.set(0.15, -0.35, 0.1);
+    // Sized to the corner of the view: at its depth the forearm alone was
+    // most of the screen at full size.
+    this.arm.scale.setScalar(ARM_SCALE);
+    this.arm.visible = false;
   }
 
   /** Stands the body up where the walk starts. Harmless before models load. */
@@ -2151,6 +2257,8 @@ export class DungeonRenderer {
    * repeated blows rather than one long loop.
    */
   private swing(): void {
+    // The arm in the corner swings whatever the body underneath can do.
+    this.wardenSwing = SWING_SECONDS;
     const entry = this.mixers.get("warden");
     const attack = entry?.actions.get("attack");
     if (!entry || !attack) return;
@@ -2159,12 +2267,48 @@ export class DungeonRenderer {
     }
     attack.reset().fadeIn(0.05).play();
     entry.current = "attack";
-    this.wardenSwing = SWING_SECONDS;
+  }
+
+  /**
+   * The arm swings on a blow and bobs on a walk.
+   *
+   * The swing is one arc: raised and back over the first third, brought
+   * down and forward over the rest, so the claws land where the crosshair
+   * is. The bob is a slow sway that stops when the feet do.
+   */
+  private updateArm(delta: number): void {
+    if (!this.walk) return;
+    const arm = this.arm;
+    const rest = this.armRest;
+    /*
+     * Placed by the frame, not by a number: a fixed offset that sat in the
+     * corner of a wide view was outside a tall one altogether. The rest
+     * position is a fraction of the half-height and half-width the camera
+     * sees at the arm's depth, so it is in the same corner on every screen.
+     */
+    const depth = 0.62;
+    const halfH = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * depth;
+    const halfW = halfH * (this.camera.aspect || 1);
+    rest.set(halfW * 0.66, -halfH * 0.62, -depth);
+
+    if (this.wardenSwing > 0) {
+      const t = 1 - Math.max(0, this.wardenSwing - delta) / SWING_SECONDS;
+      const wind = t < 0.3 ? t / 0.3 : 1 - (t - 0.3) / 0.7;
+      const strike = t < 0.3 ? 0 : Math.sin(((t - 0.3) / 0.7) * Math.PI);
+      arm.position.set(rest.x - 0.05 * strike, rest.y + 0.16 * wind - 0.08 * strike, rest.z - 0.16 * strike);
+      arm.rotation.set(0.15 - 0.9 * wind + 0.5 * strike, -0.35 - 0.2 * strike, 0.1);
+      return;
+    }
+
+    const sway = this.wardenMoving ? Math.sin(this.elapsed * 8.5) : 0;
+    arm.position.set(rest.x + sway * 0.012, rest.y + Math.abs(sway) * 0.02, rest.z);
+    arm.rotation.set(0.15, -0.35 + sway * 0.03, 0.1);
   }
 
   /** Keeps the body under the camera and in the right clip. */
   private updateWarden(delta: number): void {
     const walk = this.walk;
+    this.updateArm(delta);
     const body = this.warden;
     if (!walk || !body) return;
 
@@ -2308,7 +2452,7 @@ export class DungeonRenderer {
     this.aimBox.visible = tile?.kind === "rock";
     this.aimPlate.visible = tile?.kind === "floor";
     if (tile) {
-      this.aimBox.position.set(tile.x, ROCK_HEIGHT / 2, tile.y);
+      this.aimBox.position.set(tile.x, (ROCK_HEIGHT * this.aimBox.scale.y) / 2, tile.y);
       this.aimPlate.position.set(tile.x, FLOOR_HEIGHT + 0.012, tile.y);
     }
     this.callbacks.onAimChange?.(tile);

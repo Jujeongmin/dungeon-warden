@@ -2178,67 +2178,74 @@ button.ad-gold {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
   z-index: 2;
   transform: translateX(-50%);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  /* Room for the stick on the left and the map button on the right. */
-  max-width: calc(100% - 300px);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  pointer-events: none;
 }
 
-/* A phone on its side is short: the slots lose their price line and the
-   hint goes, so the bar is one row that the banners above never reach. */
+.hotbar-row {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 6px;
+  background: rgba(10, 8, 6, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+}
+
+/* The held slot's name, written once over the row. */
+.hotbar-held {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+  text-shadow: 0 0 4px #000, 0 0 4px #000;
+}
+
+.hotbar-held i {
+  font-style: normal;
+  font-weight: normal;
+  color: var(--accent);
+}
+
 @media (max-height: 480px) {
-  .hotbar .slot { width: 50px; height: 50px; grid-template-rows: 1fr auto; }
-  .hotbar .slot i { display: none; }
-  .hotbar .slot img { width: 20px; height: 20px; }
-  .hotbar-hint { display: none; }
   .stick { width: 92px; height: 92px; }
   .stick .knob { width: 44px; height: 44px; }
   .walkbar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
+  .hotbar .slot { width: 40px; height: 40px; }
 }
 
 .hotbar .slot {
   position: relative;
   flex: none;
-  width: 60px;
-  height: 62px;
-  padding: 4px 2px 2px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   display: grid;
-  grid-template-rows: 1fr auto auto;
-  justify-items: center;
-  align-items: center;
-  border-radius: 6px;
-  background: rgba(20, 15, 11, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  place-items: center;
+  border-radius: 4px;
+  background: rgba(40, 32, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: none;
 }
 
 .hotbar .slot.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(232, 164, 76, 0.35);
+  border-color: #f2e9dc;
+  box-shadow: 0 0 0 1px #f2e9dc, inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  background: rgba(70, 56, 40, 0.85);
 }
 
-.hotbar .slot.locked { opacity: 0.4; }
-.hotbar .slot img { width: 26px; height: 26px; object-fit: contain; }
-.hotbar .slot b { font-size: var(--fs-2xs); line-height: 1.1; white-space: nowrap; }
-.hotbar .slot i { font-size: var(--fs-2xs); font-style: normal; color: var(--muted); }
+.hotbar .slot.locked { opacity: 0.35; }
+.hotbar .slot img { width: 30px; height: 30px; object-fit: contain; }
+.hotbar .slot b { font-size: var(--fs-xs); }
 .hotbar .slot em {
   position: absolute;
-  top: 2px;
-  left: 5px;
+  top: 1px;
+  left: 4px;
   font-size: 9px;
   font-style: normal;
   color: var(--muted);
-}
-
-.hotbar-hint {
-  flex-basis: 100%;
-  margin: 2px 0 0;
-  text-align: center;
-  font-size: var(--fs-2xs);
-  color: var(--muted);
-  text-shadow: 0 0 3px #000;
 }
 
 .walk-exit {
