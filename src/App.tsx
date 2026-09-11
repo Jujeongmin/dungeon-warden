@@ -456,12 +456,19 @@ export default function App() {
     }
     if (raid.raiding) return; // no editing while a raid is running
 
-    // Taking things down stays free of the guide: a player who put the first
-    // wall somewhere they regret has to be able to undo it.
-    const guided = guidedTileRef.current;
-    if (guided && tool.kind !== "remove" && (x !== guided.x || y !== guided.y)) {
-      audio.play("error");
-      return;
+    /*
+     * Taking things down stays free of the guide: a player who put the first
+     * wall somewhere they regret has to be able to undo it, and undoing the
+     * tutorial's own wall simply un-finishes that step and brings the ring
+     * back - so the guide heals rather than dead-ends.
+     */
+    const guided = guidedTapRef.current;
+    if (guided && tool.kind !== "remove") {
+      const wrongTile = guided === "none" || x !== guided.x || y !== guided.y;
+      if (wrongTile) {
+        audio.play("error");
+        return;
+      }
     }
 
     let ok = false;
@@ -994,25 +1001,36 @@ export default function App() {
   const spotlight = useSpotlight(pointer, locateTile);
 
   /*
-   * While the opening is pointing at a tile, that tile is the only one that
-   * takes a placement.
+   * While the opening is running, the board takes the tap it is asking for
+   * and no other.
    *
-   * The ring was a suggestion and the board was still open, so the usual
-   * outcome was a first wall somewhere else entirely and a ring left pointing
-   * at a tile the player had already decided against - a tutorial arguing
-   * with the person following it. Refusing the other tiles makes the ring
-   * mean what it looks like it means.
+   * Restricting the tile was not enough. A step ends the moment its thing is
+   * built, and the next one points at a button rather than a tile - so
+   * between placing the first wall and picking up the archer the board came
+   * unlocked with the wall tool still in hand, and a player could line the
+   * room with barricades while the ring sat on a toolbar button. Taps are
+   * refused outright in that gap now: a tool step is answered by pressing the
+   * tool, not by building more of the last thing.
    *
-   * Only ever set when the step has got as far as asking for a tap: the tool
-   * steps point at a button, not a tile, and a suggestion the player has
-   * already built on is dropped upstream - so this can never lock the board
-   * to somewhere nothing can go.
+   * Three states, and the escape hatch matters as much as the lock:
+   *   - null: no tutorial, no restriction.
+   *   - a tile: the step is asking for a tap, and that is where.
+   *   - "none": the step is asking for a button press, so the board is shut.
+   *
+   * A suggested tile the player has already built on is dropped upstream,
+   * and that case falls back to null rather than to "none" - being unable to
+   * place anywhere is how a tutorial traps someone.
    *
    * Through a ref because the tap handler is written above this point.
    */
-  const guidedTileRef = useRef<{ x: number; y: number } | null>(null);
-  guidedTileRef.current =
-    pointer && pointer.kind === "tile" ? { x: pointer.x, y: pointer.y } : null;
+  const guidedTapRef = useRef<{ x: number; y: number } | "none" | null>(null);
+  guidedTapRef.current = !teaching
+    ? null
+    : pointer && pointer.kind === "tile"
+      ? { x: pointer.x, y: pointer.y }
+      : teaching.target?.kind === "tile"
+        ? null
+        : "none";
 
   const toolHint = (() => {
     if (raid.pendingSkill)
