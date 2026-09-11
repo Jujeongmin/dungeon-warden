@@ -203,7 +203,14 @@ export interface RaidStartResult {
   milestoneReached?: string | null;
   raidId: string;
   seed: number;
+  /** The first wave. Older servers send only this. */
   party: PartyMember[];
+  /**
+   * Every wave, in order. Absent from a server that predates waves, and the
+   * client falls back to treating `party` as the whole raid - so the game
+   * keeps working against a deployment that has not caught up yet.
+   */
+  waves?: PartyMember[][];
   threat: number;
   /** Minions still reviving sit the raid out; the server decides who fights. */
   availableMinionIds: string[];

@@ -247,4 +247,7 @@ export const en: Record<StringKey, string> = {
   skill_blessing_note: "Heal 40%, 3s shield",
   skill_rally_note: "Move the garrison to a tile",
   skill_detonate_note: "Fire every trap now",
+  raid_wave: "Wave {n}/{of}",
+  intermission: "Build",
+  next_wave: "Next wave",
 };

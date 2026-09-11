@@ -1208,9 +1208,29 @@ export default function App() {
           </div>
         )}
 
+        {/* The build window between waves. Its own bar rather than a state
+            inside the raid bar: the raid bar is a readout of a fight, and
+            during the window there is no fight - there is a clock and one
+            button. */}
+        {raid.intermission && raid.raidState && (
+          <div className="raid-bar building">
+            <b>{t("intermission")}</b>
+            <span>
+              {t("raid_wave", { n: raid.raidState.wave + 1, of: raid.raidState.waves })}
+            </span>
+            <span className="countdown">
+              {Math.ceil(raid.raidState.intermissionLeft)}{t("seconds")}
+            </span>
+            <button className="go-wave" onClick={() => { audio.play("raidStart"); raid.beginNextWave(); }}>
+              {t("next_wave")}
+            </button>
+          </div>
+        )}
+
         {raid.raiding && raid.raidState && (
           <div className="raid-bar">
             <b>{t("raiding")}</b>
+            <span>{t("raid_wave", { n: raid.raidState.wave, of: raid.raidState.waves })}</span>
             <span>{t("raid_adventurers")} {raid.raidState.adventurers.filter((a) => a.alive).length}/{raid.raidState.adventurers.length}</span>
             <span>{t("raid_minions")} {raid.raidState.minions.filter((m) => m.alive).length}/{raid.raidState.minions.length}</span>
             <span>{t("raid_traps")} {raid.raidState.trapDamage}</span>
@@ -1553,7 +1573,7 @@ export default function App() {
               audio.play("raidStart");
               void raid.startRaid();
             }}
-            disabled={raid.raiding || raid.starting || status === "saving"}
+            disabled={raid.raidOpen || raid.starting || status === "saving"}
           >
             {raid.starting
               ? t("preparing")

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
-import { RaidSim, SIM_DT, type RaidState, type SimEvent } from "./sim/RaidSim";
+import { RaidSim, SIM_DT, isRaidOver, type RaidState, type SimEvent } from "./sim/RaidSim";
 import { lureTiles } from "./rooms";
 import { previewParty } from "./party";
 import { SKILL_STATS } from "./sim/traps";
@@ -97,6 +97,7 @@ export function useRaid({
   const { server } = useGameServer();
 
   const [raidState, setRaidState] = useState<RaidState | null>(null);
+  const intermissionOpen = raidState?.status === "intermission";
   const [starting, setStarting] = useState(false);
   const [speed, setSpeed] = useState<RaidSpeed>(initialSpeed ?? 1);
   const [result, setResult] = useState<RaidFinishResult | null>(null);
@@ -207,7 +208,9 @@ export function useRaid({
         sim.step();
         accumulatorRef.current -= SIM_DT;
         steps++;
-        if (sim.state.status !== "running") break;
+        // A build window keeps stepping - it has a clock of its own - so only
+        // the end of the raid stops the loop here.
+        if (isRaidOver(sim.state.status)) break;
       }
 
       const drained = sim.drainEvents();
@@ -222,7 +225,7 @@ export function useRaid({
       const next = sim.state;
       setRaidState({ ...next, minions: [...next.minions], adventurers: [...next.adventurers] });
 
-      if (next.status !== "running") {
+      if (isRaidOver(next.status)) {
         cancelAnimationFrame(frameRef.current);
         void settle(next);
       }
@@ -235,6 +238,23 @@ export function useRaid({
 
     return () => cancelAnimationFrame(frameRef.current);
   }, [runId, settle]);
+
+  /*
+   * Hand the simulation whatever was built during the window.
+   *
+   * The player is editing React state the same way they do outside a raid,
+   * and the simulation is a separate object that was handed a snapshot when
+   * it started - so without this the wall goes up on screen and the next wave
+   * walks straight through where it is drawn.
+   *
+   * Guarded inside syncPlacements rather than here as well: the only thing
+   * this effect knows is that something changed, and whether that is allowed
+   * to reach the fight is the simulation's rule to keep.
+   */
+  useEffect(() => {
+    if (!intermissionOpen) return;
+    simRef.current?.syncPlacements(minions, traps, obstacles, weaponTiers);
+  }, [intermissionOpen, minions, traps, obstacles, weaponTiers]);
 
   const startRaid = useCallback(async (): Promise<void> => {
     if (!meta || starting || simRef.current) return;
@@ -256,6 +276,21 @@ export function useRaid({
           seed: 1,
           threat: meta.threat,
           party: previewParty([], meta.threat, Date.now()),
+          /*
+           * Built the same way the server builds them, so the offline game is
+           * the same shape as the real one.
+           *
+           * Ids are re-stamped per wave. previewParty hands back the same
+           * names in the same order every time it is called against an empty
+           * roster, and two adventurers sharing an id in one simulation is a
+           * hunt that follows the wrong one and a kill counted twice.
+           */
+          waves: [0, 2, 4].map((step, wave) =>
+            previewParty([], meta.threat + step, Date.now()).map((member) => ({
+              ...member,
+              id: `w${wave}-${member.id}`,
+            })),
+          ),
           availableMinionIds: minions.map((m) => m.id),
           jailFree,
         };
@@ -272,6 +307,9 @@ export function useRaid({
         traps,
         obstacles,
         party: start.party,
+        // Absent from a server that predates waves; the simulation then runs
+        // the single party as a one-wave raid, exactly as it used to.
+        waves: start.waves,
         arena,
         entrance: meta.entrance,
         core: meta.core,
@@ -386,7 +424,24 @@ export function useRaid({
 
   return {
     raidState,
+    /*
+     * Raiding means the fighting is happening, not that a raid is open.
+     *
+     * A build window is deliberately not raiding: the board unlocks, the route
+     * preview comes back and the panel works, which is the whole point of
+     * having one. `raidOpen` is the other question - whether a raid is still
+     * in progress - and it is what the raid button has to look at so it
+     * cannot be pressed again mid-raid.
+     */
     raiding: raidState !== null && raidState.status === "running",
+    raidOpen: raidState !== null && !isRaidOver(raidState.status),
+    intermission: raidState !== null && raidState.status === "intermission",
+    /** Ends the build window early. */
+    beginNextWave: () => {
+      simRef.current?.startNextWave();
+      const sim = simRef.current;
+      if (sim) setRaidState({ ...sim.state, minions: [...sim.state.minions], adventurers: [...sim.state.adventurers] });
+    },
     starting,
     speed,
     setSpeed,

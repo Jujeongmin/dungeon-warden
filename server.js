@@ -250,6 +250,20 @@ const RAID_BREACH_REWARD_PER_KILL = 8;
  * numbers; only the payout is decided here, where it cannot be invented.
  */
 const CHAMPION_THREAT = 9;
+
+/**
+ * Waves in one raid.
+ *
+ * A single party was about sixteen seconds of fighting for a minute of
+ * building. Three groups with a build window between them makes one press an
+ * engagement instead of a blip, and it is what lets a raid escalate inside
+ * itself - the last wave is the one that brings the champion.
+ *
+ * Each wave is pulled from the roster in turn, so they are different people
+ * and the later ones are the veterans. If the town runs out of anyone to
+ * send, the raid is however many waves it managed to fill.
+ */
+const WAVES_PER_RAID = 3;
 const RAID_CHAMPION_REWARD = 60;
 const RAID_PLUNDER_RATE = 0.15;
 const RAID_PLUNDER_CAP = 120;
@@ -1329,7 +1343,22 @@ class Server {
     // Announced once, on the raid that first arrives at the tier. The save is
     // written back below, so the mark sticks.
     const milestoneReached = crossMilestones(dungeon, threat);
-    const party = pickParty(dungeon, threat, now);
+    /*
+     * One party per wave, each drawn after the last.
+     *
+     * pickParty marks who it takes as raiding, so calling it again hands back
+     * the next people rather than the same ones - which is what makes wave
+     * three a different and harder group than wave one. Threat rises by two
+     * per wave for the same reason.
+     */
+    const waves = [];
+    for (let i = 0; i < WAVES_PER_RAID; i++) {
+      const wave = pickParty(dungeon, threat + i * 2, now);
+      if (wave.length === 0) break;
+      waves.push(wave);
+    }
+
+    const party = waves.length > 0 ? waves[0] : [];
 
     // Should be impossible now that abandoned raids release their party, but
     // an empty party resolves as an instant free win, so it is refused.
@@ -1351,13 +1380,25 @@ class Server {
 
     await $global.updateMyState({
       dungeon,
-      pendingRaid: { raidId, seed, party, threat, jailFree, startedAt: now },
+      // Every wave's members, flattened: this is the list finishRaid checks
+      // reported kills against, and a kill in wave one is as real as one in
+      // wave three.
+      pendingRaid: {
+        raidId,
+        seed,
+        party: waves.flat(),
+        waves,
+        threat,
+        jailFree,
+        startedAt: now,
+      },
     });
 
     return {
       raidId,
       seed,
       party,
+      waves,
       threat,
       milestoneReached,
       availableMinionIds,

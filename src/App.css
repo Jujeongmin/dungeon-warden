@@ -1960,3 +1960,36 @@ button.ad-gold {
   border-color: rgba(216, 106, 76, 0.5);
   color: var(--danger);
 }
+
+/* ---------------------------------------------------------------------------
+   The build window between waves.
+
+   Same bar as the raid readout so it lands in the same place, lit differently
+   so a glance tells you which of the two you are looking at: the raid bar is
+   a fight in progress, this one is a clock running down on your chance to do
+   something about the next one.
+   --------------------------------------------------------------------------- */
+.raid-bar.building {
+  border-color: rgba(232, 164, 76, 0.55);
+  background: linear-gradient(180deg, #3a2e1c, #241c12);
+}
+
+.raid-bar.building b { color: var(--accent); }
+
+/* The number that is actually running out. Tabular so it does not jitter as
+   it counts down. */
+.raid-bar.building .countdown {
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.raid-bar .go-wave {
+  flex: none;
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  border-color: rgba(232, 164, 76, 0.6);
+  color: var(--accent);
+}

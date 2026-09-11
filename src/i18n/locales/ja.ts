@@ -253,4 +253,7 @@ export const ja: Record<StringKey, string> = {
   skill_blessing_note: "手下全体を回復40%・3秒無敵",
   skill_rally_note: "手下全体を一タイルへ",
   skill_detonate_note: "罠を一斉発動",
+  raid_wave: "ウェーブ {n}/{of}",
+  intermission: "建設時間",
+  next_wave: "次のウェーブ",
 };

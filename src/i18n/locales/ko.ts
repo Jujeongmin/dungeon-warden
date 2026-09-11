@@ -260,4 +260,7 @@ export const ko = {
   skill_blessing_note: "부하 전체 체력 40% · 3초 무적",
   skill_rally_note: "부하 전체를 한 타일로",
   skill_detonate_note: "함정 전체 즉시 발동",
+  raid_wave: "웨이브 {n}/{of}",
+  intermission: "건설 시간",
+  next_wave: "다음 웨이브",
 };

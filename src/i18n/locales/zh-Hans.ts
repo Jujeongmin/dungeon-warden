@@ -248,4 +248,7 @@ export const zhHans: Record<StringKey, string> = {
   skill_blessing_note: "所有手下回复40%、3秒无敌",
   skill_rally_note: "所有手下移到一格",
   skill_detonate_note: "所有陷阱立即触发",
+  raid_wave: "第 {n}/{of} 波",
+  intermission: "建设时间",
+  next_wave: "下一波",
 };

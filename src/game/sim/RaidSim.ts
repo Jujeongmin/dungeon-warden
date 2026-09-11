@@ -128,7 +128,20 @@ export interface SimAdventurer {
   hunting: string | null;
 }
 
-export type RaidStatus = "running" | RaidOutcome;
+/**
+ * `intermission` is the gap between waves: the fighting has stopped, the raid
+ * has not finished, and the player is building. It is deliberately not an
+ * outcome - nothing is settled and nobody has won.
+ */
+export type RaidStatus = "running" | "intermission" | RaidOutcome;
+
+/** True once the raid is over for good, either way. */
+export function isRaidOver(status: RaidStatus): boolean {
+  return status === "repelled" || status === "breached";
+}
+
+/** Seconds the player gets to build between waves. */
+export const INTERMISSION_SECONDS = 18;
 
 export interface RaidState {
   status: RaidStatus;
@@ -144,6 +157,12 @@ export interface RaidState {
   capturedIds: string[];
   jailFree: number;
   trapDamage: number;
+  /** Which wave is on the board, 1-based. */
+  wave: number;
+  /** How many waves this raid is made of. */
+  waves: number;
+  /** Seconds left in the build window. Zero unless the status is intermission. */
+  intermissionLeft: number;
 }
 
 function distance(ax: number, ay: number, bx: number, by: number): number {
@@ -155,7 +174,17 @@ function distance(ax: number, ay: number, bx: number, by: number): number {
 export interface RaidSimOptions {
   minions: PlacedMinion[];
   traps?: PlacedTrap[];
+  /** The first wave. Kept for callers that send exactly one. */
   party: PartyMember[];
+  /**
+   * Every wave of the raid, in order. Defaults to `[party]`.
+   *
+   * The waves live in here rather than in a loop outside, because everything
+   * that has to survive between them lives in here: a minion's remaining
+   * health, a trap's cooldown, a wall's damage. Rebuilding the simulation
+   * per wave would hand the player a fresh garrison every time.
+   */
+  waves?: PartyMember[][];
   arena: Arena;
   entrance: Point;
   core: Point;
@@ -193,6 +222,7 @@ export class RaidSim {
    * from the arena, so it needs no input and cannot disagree with the picture.
    */
   private terrain: Set<number>;
+  private entrance: Point;
   /**
    * Every mutation of this array's `alive`/`hp` must be followed by a call to
    * `routeAll()` in the same operation — a route computed against a stale
@@ -208,6 +238,16 @@ export class RaidSim {
   private adventurers: SimAdventurer[];
   private status: RaidStatus = "running";
   private elapsed = 0;
+  private waves: PartyMember[][];
+  private waveIndex = 0;
+  /** When the current wave walked in, so the timeout is per wave, not per raid. */
+  private waveStartedAt = 0;
+  /** Seconds left in the build window. Only meaningful while intermission. */
+  private intermissionLeft = 0;
+  /** Kept so anything built during a build window is scaled the same way. */
+  private minionDamageScale = 1;
+  private minionHpScale = 1;
+  private weaponTiers: Record<string, number> = {};
   private trapCooldownScale: number;
   private trapDamage = 0;
   private jailFree: number;
@@ -226,18 +266,12 @@ export class RaidSim {
     this.jailFree = options.jailFree ?? 0;
 
     this.trapDamageScale = options.trapDamageScale ?? 1;
-    const damageScale = options.minionDamageScale ?? 1;
-    const hpScale = options.minionHpScale ?? 1;
+    this.minionDamageScale = options.minionDamageScale ?? 1;
+    this.minionHpScale = options.minionHpScale ?? 1;
+    this.weaponTiers = options.weaponTiers ?? {};
 
     this.minions = options.minions.map((m) => {
-      const base = minionStatsFor(m, options.weaponTiers?.[m.id] ?? 0);
-      // Research scales every minion, on top of any looted weapon.
-      const stats = {
-        ...base,
-        hp: Math.round(base.hp * hpScale),
-        damage: Math.round(base.damage * damageScale),
-      };
-      this.minionStats.set(m.id, stats);
+      const stats = this.statsFor(m);
       return {
         id: m.id,
         type: m.type,
@@ -276,10 +310,101 @@ export class RaidSim {
       alive: true,
     }));
 
-    const start = options.entrance;
-    this.adventurers = options.party.map((member, index) => {
+    this.entrance = options.entrance;
+    this.waves = options.waves?.length ? options.waves : [options.party];
+    this.adventurers = [];
+    this.sendWave(0);
+  }
+
+  /** A placed minion's numbers: its own, its weapon's, and research on top. */
+  private statsFor(minion: PlacedMinion) {
+    const base = minionStatsFor(minion, this.weaponTiers[minion.id] ?? 0);
+    const stats = {
+      ...base,
+      hp: Math.round(base.hp * this.minionHpScale),
+      damage: Math.round(base.damage * this.minionDamageScale),
+    };
+    this.minionStats.set(minion.id, stats);
+    return stats;
+  }
+
+  /**
+   * Takes on whatever the player built during the window.
+   *
+   * Only between waves. Mid-fight it would let someone drop a wall in front
+   * of a knight that is already swinging at one, and the whole point of the
+   * window is that building has its own moment.
+   *
+   * Additive and subtractive both: a wall put up changes every route, and so
+   * does one taken down, so this ends with a re-route either way. What was
+   * already standing keeps the damage it has taken - that is the reason the
+   * simulation survives between waves at all.
+   */
+  syncPlacements(
+    minions: PlacedMinion[],
+    traps: PlacedTrap[],
+    obstacles: PlacedObstacle[],
+    weaponTiers: Record<string, number> = {},
+  ): void {
+    if (this.status !== "intermission") return;
+    this.weaponTiers = weaponTiers;
+
+    const wantedMinions = new Set(minions.map((m) => m.id));
+    // Only the living are dropped: a minion that died this raid stays on the
+    // board as a casualty, and it is not the player who removed it.
+    this.minions = this.minions.filter((m) => !m.alive || wantedMinions.has(m.id));
+    for (const placed of minions) {
+      if (this.minions.some((m) => m.id === placed.id)) continue;
+      const stats = this.statsFor(placed);
+      this.minions.push({
+        id: placed.id, type: placed.type, x: placed.x, y: placed.y,
+        hp: stats.hp, maxHp: stats.hp, cooldown: 0, alive: true, shield: 0,
+        action: "idle" as SimAction, facing: 0,
+      });
+    }
+
+    const wantedTraps = new Set(traps.map((t) => t.id));
+    this.traps = this.traps.filter((t) => wantedTraps.has(t.id));
+    for (const placed of traps) {
+      if (this.traps.some((t) => t.id === placed.id)) continue;
+      this.traps.push({
+        id: placed.id, type: placed.type, x: placed.x, y: placed.y,
+        cooldown: 0, triggers: 0,
+      });
+    }
+
+    const wantedObstacles = new Set(obstacles.map((o) => o.id));
+    this.obstacles = this.obstacles.filter((o) => !o.alive || wantedObstacles.has(o.id));
+    for (const placed of obstacles) {
+      if (this.obstacles.some((o) => o.id === placed.id)) continue;
+      const hp = OBSTACLE_STATS[placed.type].hp;
+      this.obstacles.push({
+        id: placed.id, type: placed.type, x: placed.x, y: placed.y,
+        hp, maxHp: hp, alive: true,
+      });
+    }
+
+    this.routeAll();
+  }
+
+  /**
+   * Walks one wave in through the door.
+   *
+   * Appended rather than replacing what is there. The previous waves are all
+   * resolved by this point, and leaving them in the array is what makes the
+   * kill and capture counts add up across the whole raid instead of resetting
+   * with every wave - the settlement at the end is for the raid, not the last
+   * group of it.
+   */
+  private sendWave(index: number): void {
+    const start = this.entrance;
+    this.waveIndex = index;
+    this.waveStartedAt = this.elapsed;
+
+    for (let i = 0; i < this.waves[index].length; i++) {
+      const member = this.waves[index][i];
       const stats = partyMemberStats(member.cls, member.level, member.champion);
-      return {
+      this.adventurers.push({
         id: member.id,
         cls: member.cls,
         name: member.name,
@@ -291,8 +416,10 @@ export class RaidSim {
         maxHp: stats.hp,
         cooldown: 0,
         pathIndex: 0,
-        spawnAt: index * SPAWN_INTERVAL_SECONDS,
-        spawned: index === 0,
+        // Measured from now, not from the start of the raid: a later wave
+        // walks in one after another from the moment it is sent.
+        spawnAt: this.elapsed + i * SPAWN_INTERVAL_SECONDS,
+        spawned: false,
         alive: true,
         burn: null,
         downed: 0,
@@ -302,10 +429,20 @@ export class RaidSim {
         path: [],
         breaking: false,
         hunting: null,
-      };
-    });
+      });
+    }
 
+    this.status = "running";
     this.routeAll();
+  }
+
+  /**
+   * Ends the build window early. Ignored unless one is open, so a double tap
+   * on the button cannot skip a wave.
+   */
+  startNextWave(): void {
+    if (this.status !== "intermission") return;
+    this.sendWave(this.waveIndex + 1);
   }
 
   /**
@@ -563,6 +700,9 @@ export class RaidSim {
       capturedIds: this.adventurers.filter((a) => a.fate === "captured").map((a) => a.id),
       jailFree: this.jailFree,
       trapDamage: Math.round(this.trapDamage),
+      wave: this.waveIndex + 1,
+      waves: this.waves.length,
+      intermissionLeft: this.intermissionLeft,
     };
   }
 
@@ -670,6 +810,18 @@ export class RaidSim {
 
   /** Advances exactly one SIM_DT. Call repeatedly from a fixed-step accumulator. */
   step(): void {
+    /*
+     * The build window is stepped too, so the countdown on it is the same
+     * fixed-step clock everything else runs on - and so a raid left alone
+     * carries itself into the next wave rather than waiting forever for a
+     * button that may never be pressed.
+     */
+    if (this.status === "intermission") {
+      this.intermissionLeft = Math.max(0, this.intermissionLeft - SIM_DT);
+      if (this.intermissionLeft === 0) this.sendWave(this.waveIndex + 1);
+      return;
+    }
+
     if (this.status !== "running") return;
 
     this.elapsed += SIM_DT;
@@ -990,18 +1142,25 @@ export class RaidSim {
     const reachedCore = this.adventurers.some(
       (a) => a.alive && a.spawned && a.downed <= 0 && a.pathIndex >= a.path.length - 1,
     );
+    // One breach ends the raid whichever wave it happens on. There is nothing
+    // left to defend.
     if (reachedCore) {
       this.status = "breached";
       return;
     }
 
-    if (this.adventurers.every((a) => !a.alive)) {
-      this.status = "repelled";
+    // Per wave, not per raid: three waves with a build window between them
+    // take longer than one, and a raid-long clock would call the whole thing
+    // off mid-fight.
+    const stalled = this.elapsed - this.waveStartedAt >= RAID_TIMEOUT_SECONDS;
+    if (!this.adventurers.every((a) => !a.alive) && !stalled) return;
+
+    if (this.waveIndex + 1 < this.waves.length) {
+      this.status = "intermission";
+      this.intermissionLeft = INTERMISSION_SECONDS;
       return;
     }
 
-    if (this.elapsed >= RAID_TIMEOUT_SECONDS) {
-      this.status = "repelled";
-    }
+    this.status = "repelled";
   }
 }
