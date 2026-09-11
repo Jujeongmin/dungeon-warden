@@ -202,11 +202,11 @@ const MARKER_HEIGHT = 0.16;
  */
 const ROOM_PROPS: Record<string, string[]> = {
   treasury: ["treasury", "prop_coin_large", "prop_coin_small", "treasury"],
-  vault: ["vault", "prop_box", "prop_barrel", "prop_bottle"],
+  vault: ["vault", "prop_box", "prop_barrel", "prop_box"],
   barracks: ["barracks", "prop_bed", "prop_box", "prop_banner"],
   altar: ["altar", "prop_candle", "prop_pillar", "prop_candle"],
   workshop: ["workshop", "prop_table", "prop_shelf", "prop_barrel"],
-  jail: ["jail", "prop_rubble", "prop_box", "jail"],
+  jail: ["jail", "prop_box", "prop_barrel", "jail"],
 };
 
 /** Props scattered on empty room floor, and how often a tile gets one. */

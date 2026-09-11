@@ -81,10 +81,10 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
    * junction piece: stack two side by side and they simply touch, where two
    * fence sections leave a gap and look like scenery that failed to line up.
    */
-  obstacle_barricade: [/^box_stacked$/, /^barrel_large$/, /^barrier$/],
-  obstacle_barricade_end: [/^box_stacked$/, /^barrier$/],
-  obstacle_barricade_corner: [/^box_stacked$/, /^barrier$/],
-  obstacle_barricade_post: [/^box_stacked$/, /^barrier$/],
+  obstacle_barricade: [/^box_stacked$/, /^barrel_large$/],
+  obstacle_barricade_end: [/^box_stacked$/, /^barrel_large$/],
+  obstacle_barricade_corner: [/^box_stacked$/, /^barrel_large$/],
+  obstacle_barricade_post: [/^box_stacked$/, /^barrel_large$/],
 
   obstacle_wall: [/^wall$/, /^wall_arched$/],
   obstacle_wall_end: [/^wall_endcap$/, /^wall$/],
@@ -129,8 +129,6 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   prop_torch: [/^torch$/, /^torch_/, /^candle_triple$/],
   prop_barrel: [/^barrel_large$/, /^barrel_small$/, /^barrel/],
   prop_box: [/^box_stacked$/, /^box_small$/, /^box_large$/],
-  prop_bottle: [/^bottle_a_green$/, /^bottle_b_brown$/, /^bottle/],
-  prop_rubble: [/^rubble_half$/, /^rubble/, /^rocks/],
   prop_pillar: [/^pillar_decorated$/, /^pillar$/, /^column$/],
   prop_coin_large: [/^coin_stack_large$/, /^coin_stack/],
   prop_coin_small: [/^coin_stack_small$/, /^coin$/],

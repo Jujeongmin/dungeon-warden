@@ -31,10 +31,14 @@ export interface DecorProp {
 /*
  * Only things that obviously stop a person.
  *
- * A bottle and a heap of rubble used to be in here, and they block a tile the
- * same as a pillar does - so the route bent around a bottle and the player
- * saw a corner with nothing in it. Whatever blocks has to look like it
- * blocks; the rest is not worth the confusion it buys.
+ * A bottle and a heap of rubble used to be in here, blocking a tile the same
+ * as a pillar does - so the route bent around a bottle and the player saw a
+ * corner with nothing in it. Whatever blocks has to look like it blocks.
+ *
+ * They are not kept as decoration either: something lying on the floor that
+ * does not stop anybody is a second kind of thing to learn, and the bottle
+ * was deleted from the pack outright. (The rubble model stays - it is what
+ * the rockfall trap draws.)
  */
 const CLUTTER = ["prop_barrel", "prop_box", "prop_pillar"];
 const CLUTTER_CHANCE = 0.14;

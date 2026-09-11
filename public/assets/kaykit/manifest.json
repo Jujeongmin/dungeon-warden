@@ -31,40 +31,10 @@
       "bytes": 3057
     },
     {
-      "url": "/assets/kaykit/dungeon/barrier.gltf",
-      "name": "barrier",
-      "group": "dungeon",
-      "bytes": 2956
-    },
-    {
-      "url": "/assets/kaykit/dungeon/barrier_column.gltf",
-      "name": "barrier_column",
-      "group": "dungeon",
-      "bytes": 3006
-    },
-    {
-      "url": "/assets/kaykit/dungeon/barrier_corner.gltf",
-      "name": "barrier_corner",
-      "group": "dungeon",
-      "bytes": 3006
-    },
-    {
-      "url": "/assets/kaykit/dungeon/barrier_half.gltf",
-      "name": "barrier_half",
-      "group": "dungeon",
-      "bytes": 2981
-    },
-    {
       "url": "/assets/kaykit/dungeon/bed_frame.gltf",
       "name": "bed_frame",
       "group": "dungeon",
       "bytes": 2990
-    },
-    {
-      "url": "/assets/kaykit/dungeon/bottle_A_green.gltf",
-      "name": "bottle_a_green",
-      "group": "dungeon",
-      "bytes": 3062
     },
     {
       "url": "/assets/kaykit/dungeon/box_stacked.gltf",
