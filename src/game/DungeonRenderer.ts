@@ -570,8 +570,15 @@ export class DungeonRenderer {
     this.aimPlate.visible = false;
     this.scene.add(this.aimBox, this.aimPlate);
     this.buildArm();
-    this.camera.add(this.arm);
-    this.scene.add(this.camera);
+    this.armHolder.matrixAutoUpdate = false;
+    this.armHolder.add(this.arm);
+    this.armScene.add(this.armHolder);
+    // Its own light, so the arm is bone-coloured and not whatever colour the
+    // nearest torch or the doorway happens to throw.
+    this.armScene.add(new THREE.AmbientLight(0xcfc6b8, 0.55));
+    const armKey = new THREE.DirectionalLight(0xffe2bd, 0.9);
+    armKey.position.set(-1, 2, 1);
+    this.armScene.add(armKey);
     this.scene.add(this.unitGroup);
     this.scene.add(this.markerGroup);
     this.scene.add(this.aftermathGroup);
@@ -1354,7 +1361,7 @@ export class DungeonRenderer {
        * in the room is a small lit model where the extra cost buys nothing.
        */
       this.dress(this.rockMesh, STONE.rock, { roughness: 0.92, tint: ROCK_TINT });
-      this.rockMesh.position.y = ROCK_HEIGHT / 2;
+      this.rockMesh.position.y = 0;
       this.applyRockHeight();
       this.scene.add(this.rockMesh);
     }
@@ -2096,6 +2103,9 @@ export class DungeonRenderer {
    * closer than the elbow.
    */
   private arm = new THREE.Group();
+  /** Follows the camera by hand, since the arm is not its child. */
+  private armHolder = new THREE.Group();
+  private armScene = new THREE.Scene();
   /** Where the arm rests, recomputed from the field of view each frame. */
   private armRest = new THREE.Vector3(0.34, -0.3, -0.62);
   /** The thin dark box round the block the crosshair is on. */
@@ -2162,7 +2172,9 @@ export class DungeonRenderer {
     const k = this.walk ? ROCK_STRETCH : 1;
     if (this.rockMesh) {
       this.rockMesh.scale.y = k;
-      this.rockMesh.position.y = (ROCK_HEIGHT * k) / 2;
+      // Instances carry their own lift; scaling about the floor keeps their
+      // feet on it.
+      this.rockMesh.position.y = 0;
     }
     this.aimBox.scale.y = k;
   }
@@ -2176,10 +2188,10 @@ export class DungeonRenderer {
    */
   private buildArm(): void {
     const bone = new THREE.MeshStandardMaterial({
-      color: 0x9a9083, roughness: 0.95, metalness: 0, depthTest: false,
+      color: 0xd9d0bf, roughness: 0.95, metalness: 0,
     });
     const claw = new THREE.MeshStandardMaterial({
-      color: 0x3b3129, roughness: 0.6, metalness: 0.05, depthTest: false,
+      color: 0x2e2620, roughness: 0.6, metalness: 0.05,
     });
     const part = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
       const mesh = new THREE.Mesh(geometry, material);
@@ -2206,7 +2218,7 @@ export class DungeonRenderer {
     }
 
     this.arm.position.copy(this.armRest);
-    this.arm.rotation.set(0.15, -0.35, 0.1);
+    this.arm.rotation.set(-0.18, 0.3, 0.12);
     // Sized to the corner of the view: at its depth the forearm alone was
     // most of the screen at full size.
     this.arm.scale.setScalar(ARM_SCALE);
@@ -2289,20 +2301,20 @@ export class DungeonRenderer {
     const depth = 0.62;
     const halfH = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * depth;
     const halfW = halfH * (this.camera.aspect || 1);
-    rest.set(halfW * 0.66, -halfH * 0.62, -depth);
+    rest.set(halfW * 0.7, -halfH * 0.66, -depth);
 
     if (this.wardenSwing > 0) {
       const t = 1 - Math.max(0, this.wardenSwing - delta) / SWING_SECONDS;
       const wind = t < 0.3 ? t / 0.3 : 1 - (t - 0.3) / 0.7;
       const strike = t < 0.3 ? 0 : Math.sin(((t - 0.3) / 0.7) * Math.PI);
       arm.position.set(rest.x - 0.05 * strike, rest.y + 0.16 * wind - 0.08 * strike, rest.z - 0.16 * strike);
-      arm.rotation.set(0.15 - 0.9 * wind + 0.5 * strike, -0.35 - 0.2 * strike, 0.1);
+      arm.rotation.set(-0.18 - 0.9 * wind + 0.6 * strike, 0.3 + 0.15 * strike, 0.12);
       return;
     }
 
     const sway = this.wardenMoving ? Math.sin(this.elapsed * 8.5) : 0;
     arm.position.set(rest.x + sway * 0.012, rest.y + Math.abs(sway) * 0.02, rest.z);
-    arm.rotation.set(0.15, -0.35 + sway * 0.03, 0.1);
+    arm.rotation.set(-0.18, 0.3 + sway * 0.03, 0.12);
   }
 
   /** Keeps the body under the camera and in the right clip. */
@@ -3046,6 +3058,14 @@ export class DungeonRenderer {
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
+    if (this.arm.visible) {
+      this.armHolder.matrix.copy(this.camera.matrixWorld);
+      // Over the room, not instead of it: the second pass must not clear.
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      this.renderer.render(this.armScene, this.camera);
+      this.renderer.autoClear = true;
+    }
   };
 
   /**
