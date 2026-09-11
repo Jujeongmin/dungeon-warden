@@ -218,6 +218,7 @@ export const en: Record<StringKey, string> = {
   group_trap: "Traps",
   group_room: "Rooms",
   tool_remove: "Remove",
+  tool_rebuild: "Start over",
   legend_rock: "Rock",
   legend_floor: "Corridor",
   legend_entrance: "Entrance",

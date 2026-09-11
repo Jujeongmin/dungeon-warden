@@ -370,16 +370,23 @@ h3.section {
   background: rgba(232, 164, 76, 0.12);
 }
 
-/* Stacked, because they sit in a column a thumb wide. */
+/* Stacked, because they sit in a column a thumb wide - and they are
+   buttons, cut from the same stone as the one above them. They read as
+   text links for a while, which on a slab of rock looked like a caption
+   rather than something to press. */
 .title-menu {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  gap: 8px;
   margin: 10px 0 0;
 }
 
-.title-menu button { font-size: var(--fs-sm); }
+.title-menu button {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: var(--fs-sm);
+}
 
 .title-note {
   margin: 12px 0 0;
@@ -772,6 +779,15 @@ h3.section:first-child { margin-top: 2px; }
   display: flex;
   gap: 8px;
   margin: 12px 0 8px;
+}
+
+/* Quieter than the tools above it: it undoes work rather than making any,
+   and it is one tap from everything the player has built. */
+.rebuild {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
 /* A button is a slab of stone sitting proud of the panel: lit along its top
@@ -1817,20 +1833,6 @@ button.ad-gold {
   color: var(--accent);
   font-weight: var(--fw-bold);
 }
-
-/* The title's secondary row is navigation, so it reads like the tabs do. */
-.title-menu button {
-  background: none;
-  border: none;
-  box-shadow: none;
-  color: var(--muted);
-  padding: 7px 0;
-  text-align: left;
-  border-radius: 0;
-}
-
-.title-menu button:hover:not(:disabled) { background: none; color: var(--ink); }
-.title-menu button:active:not(:disabled) { transform: none; box-shadow: none; }
 
 /* Research and shop rows were bordered cards inside a bordered panel. One
    border is enough; the rule between them says the rest. */

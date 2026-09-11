@@ -562,6 +562,47 @@ export function useDungeonSave() {
     return true;
   }, [occupantAt]);
 
+  /**
+   * Takes the whole dungeon back down to bare rock, paying for all of it.
+   *
+   * Clearing one tile at a time already gives everything back, so this is
+   * not a new rule - it is the same rule applied to the room at once. A
+   * player who wants to try a different shape was otherwise tapping the
+   * remove tool forty times to get back to where they started, which is
+   * the kind of work a game should do for you.
+   *
+   * The door and the core survive, because they are not the player's to
+   * fill in - everything else goes, including minions taken from prisoners,
+   * which cost nothing and so pay back nothing.
+   */
+  const rebuild = useCallback((): boolean => {
+    const arena = arenaRef.current;
+    const base = startingDig(arena);
+    const kept = new Set(base.map((tile) => tile.id));
+
+    const back =
+      removedValue(base, dugRef.current, { dig: DIG_COST }) +
+      removedValue([], minionsRef.current, MINION_COST) +
+      removedValue([], trapsRef.current, TRAP_COST) +
+      removedValue([], roomsRef.current, ROOM_COST);
+
+    const wasBare =
+      minionsRef.current.length === 0 &&
+      trapsRef.current.length === 0 &&
+      roomsRef.current.length === 0 &&
+      dugRef.current.every((tile) => kept.has(tile.id));
+    // Nothing to undo: refuse, so the caller can say so rather than play
+    // the sound of something happening.
+    if (wasBare) return false;
+
+    setDug(base);
+    setMinions([]);
+    setTraps([]);
+    setRooms([]);
+    if (back > 0) setGold((current) => current + back);
+    return true;
+  }, []);
+
   /** Equips or clears a minion's looted weapon. Free — it is already yours. */
   const equipWeapon = useCallback((minionId: string, weaponId: string | null): void => {
     setMinions((current) =>
@@ -738,6 +779,7 @@ export function useDungeonSave() {
     fill,
     dug,
     removeAt,
+    rebuild,
     equipWeapon,
     equipBest,
     buyResearch,

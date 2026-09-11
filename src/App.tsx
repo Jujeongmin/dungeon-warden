@@ -1021,8 +1021,11 @@ export default function App() {
 
   useEffect(() => {
     installDevTools({
-      arena, minions, traps, rooms, loot, prisoners, adventurers,
+      arena, dug, minions, traps, rooms, loot, prisoners, adventurers,
       research, unlocked, effects, jailFree, meta, gold,
+      dig: save.dig,
+      fill: save.fill,
+      rebuild: save.rebuild,
       placeMinion: save.placeMinion,
       placeTrap: save.placeTrap,
       placeRoom: save.placeRoom,
@@ -1570,6 +1573,26 @@ export default function App() {
                   standing explanations are the tutorial's job, not a paragraph
                   the player reads past every session. */}
               <p className="hint">{toolHint}</p>
+
+              {/* Clearing gives everything back a tile at a time, so this is
+                  the same offer made once: try a different shape without
+                  forty taps of the remove tool first. */}
+              <div className="actions">
+                <button
+                  className="rebuild"
+                  disabled={raid.raiding}
+                  onClick={() => {
+                    const ok = save.rebuild();
+                    audio.play(ok ? "dig" : "error");
+                    if (ok) {
+                      setShowAftermath(false);
+                      rendererRef.current?.setAftermath(null);
+                    }
+                  }}
+                >
+                  {t("tool_rebuild")}
+                </button>
+              </div>
 
 
 

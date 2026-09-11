@@ -231,6 +231,7 @@ export const ko = {
   group_trap: "함정",
   group_room: "방",
   tool_remove: "회수",
+  tool_rebuild: "다시 짓기",
   legend_rock: "암반",
   legend_floor: "통로",
   legend_entrance: "입구",
