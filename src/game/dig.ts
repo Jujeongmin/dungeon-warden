@@ -166,6 +166,21 @@ export const LOOSE_TILES = 72;
 export const THIN_GARRISON = 0.7;
 
 /**
+ * How much more room a deeper dungeon is allowed before it thins out.
+ *
+ * What the shop's deeper_dungeon sells. The only thing that has ever
+ * limited digging is this - gold buys the tile, and sprawl costs the
+ * garrison - so room to dig is the one thing left for that product to be.
+ * It moves where thinning starts and where it bottoms out, so it buys a
+ * bigger dungeon at the same strength rather than a stronger one.
+ *
+ * Not a win. Threat climbs with every raid repelled, so a player who digs
+ * further settles at a higher threat against bigger parties - which is
+ * what the rest of the shop already sells.
+ */
+export const DEEP_TILES = 24;
+
+/**
  * What the garrison is worth at this size of dungeon.
  *
  * Digging used to be free of consequence: a longer corridor meant more time
@@ -182,10 +197,13 @@ export const THIN_GARRISON = 0.7;
  * Bounded at both ends: a dungeon cannot be made arbitrarily strong by being
  * small, and one that has grown large is weakened, not disarmed.
  */
-export function garrisonScale(dugTiles: number): number {
-  if (dugTiles <= TIGHT_TILES) return 1;
-  if (dugTiles >= LOOSE_TILES) return THIN_GARRISON;
+export function garrisonScale(dugTiles: number, roomier = false): number {
+  const tight = TIGHT_TILES + (roomier ? DEEP_TILES : 0);
+  const loose = LOOSE_TILES + (roomier ? DEEP_TILES : 0);
 
-  const across = (dugTiles - TIGHT_TILES) / (LOOSE_TILES - TIGHT_TILES);
+  if (dugTiles <= tight) return 1;
+  if (dugTiles >= loose) return THIN_GARRISON;
+
+  const across = (dugTiles - tight) / (loose - tight);
   return 1 - across * (1 - THIN_GARRISON);
 }

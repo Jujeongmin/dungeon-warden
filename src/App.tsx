@@ -408,6 +408,16 @@ export default function App() {
     window.setTimeout(() => setFloaters((c) => c.filter((f) => !ids.has(f.id))), 1000);
   }, [t]);
 
+  /*
+   * Room bought in the shop, under the key it was always granted with.
+   *
+   * The entitlement is still called extraObstacles because that is what it
+   * was sold as when obstacles existed, and renaming it would revoke it
+   * from anyone who already owns one. What it buys now is dig room - see
+   * garrisonScale and the note on deeper_dungeon in server.js.
+   */
+  const roomier = entitlements.extraObstacles === true;
+
   const raid = useRaid({
     onEvents: onSimEvents,
     initialSpeed: settings.raidSpeed,
@@ -422,6 +432,7 @@ export default function App() {
     jailFree,
     weaponTiers,
     research: unlocked,
+    roomier,
     onFinished: save.applyRaidResult,
     // Read on the animation frame rather than on render: the stick moves far
     // more often than React does.
@@ -1304,7 +1315,7 @@ export default function App() {
   };
 
   /** What the garrison is worth at this size of dungeon. See garrisonScale. */
-  const spread = garrisonScale(dug.length);
+  const spread = garrisonScale(dug.length, roomier);
 
   const guide = guideFor({
     entrance,

@@ -61,6 +61,14 @@ interface Options {
   weaponTiers: Record<string, number>;
   research: ResearchEffects;
   onFinished: (result: RaidFinishResult) => void;
+  /**
+   * Whether the dungeon has been bought room to sprawl in.
+   *
+   * The deeper_dungeon entitlement. Passed in rather than read here so the
+   * board and the fight cannot disagree about how thin the garrison is -
+   * the number under the dig tool is the number the raid runs on.
+   */
+  roomier?: boolean;
   /** Where the speed control starts, remembered from last session. */
   initialSpeed?: RaidSpeed;
   /**
@@ -96,6 +104,7 @@ export function useRaid({
   onEvents,
   initialSpeed,
   readControl,
+  roomier,
 }: Options) {
   const eventsRef = useRef(onEvents);
   eventsRef.current = onEvents;
@@ -345,8 +354,8 @@ export function useRaid({
          * researched and how far you have dug are two different questions
          * about the same garrison.
          */
-        minionDamageScale: research.minionDamageScale * garrisonScale(dug.length),
-        minionHpScale: research.minionHpScale * garrisonScale(dug.length),
+        minionDamageScale: research.minionDamageScale * garrisonScale(dug.length, roomier),
+        minionHpScale: research.minionHpScale * garrisonScale(dug.length, roomier),
         trapDamageScale: research.trapDamageScale,
       });
       simRef.current = sim;

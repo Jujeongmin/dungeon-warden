@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { arenaFor, blockedKey, coreOf, entranceOf } from "../src/game/arena";
 import {
   DIG_COST,
+  DEEP_TILES,
   connects,
   digFromWalls,
   dugSet,
@@ -177,5 +178,24 @@ describe("how thin the garrison is spread", () => {
     // The opening digs two nooks off the starting corridor. If that landed on
     // the slide, the balance the tutorial test pins would quietly move.
     expect(garrisonScale(straightCorridor().length + 2)).toBe(1);
+  });
+});
+
+describe("room bought in the shop", () => {
+  it("leaves a tight dungeon exactly where it was", () => {
+    // One-sided: what the entitlement moves is where thinning starts, so a
+    // dungeon that was never thinning is worth what it always was.
+    expect(garrisonScale(TIGHT_TILES, true)).toBe(1);
+    expect(garrisonScale(TIGHT_TILES)).toBe(1);
+  });
+
+  it("holds a dungeon at full strength for another DEEP_TILES of digging", () => {
+    expect(garrisonScale(TIGHT_TILES + DEEP_TILES, true)).toBe(1);
+    expect(garrisonScale(TIGHT_TILES + DEEP_TILES)).toBeLessThan(1);
+  });
+
+  it("still bottoms out, just later", () => {
+    expect(garrisonScale(LOOSE_TILES, true)).toBeGreaterThan(THIN_GARRISON);
+    expect(garrisonScale(LOOSE_TILES + DEEP_TILES, true)).toBe(THIN_GARRISON);
   });
 });
