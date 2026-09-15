@@ -3,6 +3,7 @@ import { useGameServer } from "@agent8/gameserver";
 import { RaidSim, SIM_DT, isRaidOver, type RaidState, type SimEvent } from "./sim/RaidSim";
 import { lureTiles } from "./rooms";
 import { previewParty, wavesFor } from "./party";
+import { dailyDay, dailyWaves } from "./daily";
 import { garrisonScale, type DugTile } from "./dig";
 import { SKILL_STATS } from "./sim/traps";
 import type { Arena } from "./arena";
@@ -192,7 +193,8 @@ export function useRaid({
           },
         ]);
         setResult(finish);
-        onFinished(finish);
+        // Today's raid is scored, not paid: nothing in the save moved.
+        if (!finish.daily) onFinished(finish);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -302,7 +304,11 @@ export function useRaid({
     simRef.current?.syncPlacements(minions, traps, weaponTiers);
   }, [intermissionOpen, minions, traps, weaponTiers]);
 
-  const startRaid = useCallback(async (): Promise<void> => {
+  /**
+   * Opens a raid - today's, when a nickname for the day's board is given.
+   * See src/game/daily.ts.
+   */
+  const startRaid = useCallback(async (daily?: { nickname: string }): Promise<void> => {
     if (!meta || starting || simRef.current) return;
 
     setStarting(true);
@@ -311,7 +317,23 @@ export function useRaid({
     try {
       let start: RaidStartResult;
       if (HAS_VERSE) {
-        start = await server.remoteFunction("startRaid", []);
+        start = daily
+          ? await server.remoteFunction("startDailyRaid", [{ nickname: daily.nickname }])
+          : await server.remoteFunction("startRaid", []);
+      } else if (daily) {
+        // Today's party offline, from the same mirror the board previews.
+        const day = dailyDay(Date.now());
+        const waves = dailyWaves(day);
+        start = {
+          raidId: "local",
+          seed: day,
+          threat: 0,
+          party: waves[0],
+          waves,
+          availableMinionIds: minions.map((m) => m.id),
+          jailFree: 0,
+          daily: day,
+        };
       } else {
         // Offline preview so the raid loop is playable before the first deploy.
         // Built from the same mirror the party row draws, so what walks in is

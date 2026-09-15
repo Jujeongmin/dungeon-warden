@@ -1,5 +1,5 @@
 import { useEscape } from "./useEscape";
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { useVXShop } from "@verse8/platform";
 import { useT } from "../i18n";
 import type { Entitlements } from "../game/types";

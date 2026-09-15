@@ -175,6 +175,107 @@ const THREAT_REWARD_STEP = 0.08;
 /** Global collection backing the leaderboard. */
 const LEADERBOARD = "dungeon_leaderboard";
 
+// ---------------------------------------------------------------------------
+// Today's raid
+// ---------------------------------------------------------------------------
+// Once a day every dungeon faces the same party, and how many of it each one
+// put down goes on a board that lasts the day - one collection per day, so
+// yesterday's never has to be cleared. Scored, never paid: it moves no gold,
+// no threat, no roster and no loot. Mirrored in src/game/daily.ts, which lets
+// the client show the party before asking; tests/daily.test.ts pins the two.
+const DAILY_LEADERBOARD = "dungeon_daily";
+const DAILY_WAVES = 2;
+const DAILY_PARTY_SIZE = 3;
+const DAILY_LEVEL = 2;
+const DAILY_POINTS_PER_KILL = 100;
+const DAILY_REPEL_BONUS = 500;
+
+function dailyDay(now) {
+  return Math.floor(now / (24 * 60 * 60 * 1000));
+}
+
+function dailyRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function dailyWaves(day) {
+  const rng = dailyRng((day * 2654435761) >>> 0);
+  const waves = [];
+  for (let w = 0; w < DAILY_WAVES; w++) {
+    const wave = [];
+    for (let i = 0; i < DAILY_PARTY_SIZE; i++) {
+      const cls = ADVENTURER_CLASSES[Math.floor(rng() * ADVENTURER_CLASSES.length)];
+      const name = ADVENTURER_NAMES[Math.floor(rng() * ADVENTURER_NAMES.length)];
+      wave.push({
+        id: "daily-" + day + "-" + w + "-" + i,
+        cls,
+        name,
+        level: DAILY_LEVEL + w,
+        champion: w === DAILY_WAVES - 1 && i === 0,
+      });
+    }
+    waves.push(wave);
+  }
+  return waves;
+}
+
+function dailyScore(kills, repelled) {
+  return kills * DAILY_POINTS_PER_KILL + (repelled ? DAILY_REPEL_BONUS : 0);
+}
+
+/**
+ * Closes today's raid: onto the day's board, and nothing else.
+ *
+ * Only the day's own party counts, each adventurer once, and a better score
+ * replaces a worse one - though with one attempt a day there is only ever one.
+ */
+async function finishDailyRaid(state, pending, outcome, killedIds, capturedIds) {
+  const partyIds = (pending.party || []).map((m) => m.id);
+  const kills = (Array.isArray(killedIds) ? killedIds : [])
+    .concat(Array.isArray(capturedIds) ? capturedIds : [])
+    .filter((id) => partyIds.indexOf(id) !== -1)
+    .filter((id, i, list) => list.indexOf(id) === i).length;
+  const score = dailyScore(kills, outcome === "repelled");
+  const account = $sender.account;
+  const board = DAILY_LEADERBOARD + "_" + pending.daily;
+  const entry = {
+    __id: account,
+    account,
+    nickname: pending.nickname || account.slice(0, 8),
+    day: pending.daily,
+    score,
+    kills,
+    outcome,
+    updatedAt: Date.now(),
+  };
+  const existing = await $global.getCollectionItem(board, account);
+  if (existing && existing.account) {
+    if ((existing.score || 0) < score) await $global.updateCollectionItem(board, entry);
+  } else {
+    await $global.addCollectionItem(board, entry);
+  }
+  await $global.updateMyState({ pendingRaid: null });
+
+  const dungeon = state.dungeon;
+  return {
+    outcome,
+    daily: { day: pending.daily, score, kills },
+    reward: 0,
+    plundered: 0,
+    gold: await $asset.get("gold"),
+    threat: dungeon.threat || 0,
+    wavesRepelled: dungeon.wavesRepelled || 0,
+    coreBreaches: dungeon.coreBreaches || 0,
+  };
+}
+
 function researchEffects(owned) {
   let minionDamage = 0;
   let minionHp = 0;
@@ -594,6 +695,13 @@ function abandonPendingRaid(dungeon, pending, now, effects) {
 async function settleAbandonedRaid(state, now) {
   const pending = state && state.pendingRaid;
   if (!pending || !state.dungeon) return null;
+
+  // Today's raid walked away from costs the attempt, which starting it already
+  // spent, and nothing else: it was never the dungeon's to lose.
+  if (pending.daily !== undefined && pending.daily !== null) {
+    await $global.updateMyState({ pendingRaid: null });
+    return null;
+  }
 
   const dungeon = state.dungeon;
   const effects = roomEffects(dungeon.rooms || [], state.entitlements || emptyEntitlements());
@@ -1592,6 +1700,11 @@ class Server {
     if (!pending || pending.raidId !== raidId) throw new Error("NO_PENDING_RAID");
     if (outcome !== "repelled" && outcome !== "breached") throw new Error("BAD_OUTCOME");
 
+    // Today's raid is scored, not paid - see finishDailyRaid.
+    if (pending.daily !== undefined && pending.daily !== null) {
+      return await finishDailyRaid(state, pending, outcome, killedIds, capturedIds);
+    }
+
     const dungeon = state.dungeon;
     const effects = roomEffects(dungeon.rooms || [], (state && state.entitlements) || emptyEntitlements());
     const now = Date.now();
@@ -1867,6 +1980,99 @@ class Server {
   }
 
   /** Top rows plus the caller's own, so a player always sees themselves. */
+  /**
+   * Opens today's raid: the day's party, once a day.
+   *
+   * The attempt is spent the moment it opens, so walking away from a raid
+   * going badly and trying again is not a way round it. Any ordinary raid
+   * still open is settled first, the same as starting one would.
+   */
+  async startDailyRaid({ nickname } = {}) {
+    const state = await $global.getMyState();
+    if (!state || !state.dungeon) throw new Error("NO_SAVE");
+
+    const dungeon = state.dungeon;
+    const now = Date.now();
+    const day = dailyDay(now);
+    if (state.dailyAttempt === day) throw new Error("DAILY_DONE");
+
+    const abandoned = await settleAbandonedRaid(state, now);
+
+    if (!digConnects(dugOf(dungeon, arenaFor(dungeon.research || [])), arenaFor(dungeon.research || []))) {
+      throw new Error("NOT_CONNECTED");
+    }
+
+    const waves = dailyWaves(day);
+    const availableMinionIds = (dungeon.minions || [])
+      .filter((m) => !m.revivesAt || m.revivesAt <= now)
+      .map((m) => m.id);
+    const effects = roomEffects(dungeon.rooms || [], (state && state.entitlements) || emptyEntitlements());
+    const raidId = "daily-" + day + "-" + now;
+    const name = typeof nickname === "string" ? nickname.trim().slice(0, 20) : "";
+
+    await $global.updateMyState({
+      dungeon,
+      dailyAttempt: day,
+      pendingRaid: {
+        raidId,
+        seed: day,
+        party: waves.flat(),
+        waves,
+        threat: 0,
+        // Nobody is taken alive today: the party is not the town's to lose.
+        jailFree: 0,
+        startedAt: now,
+        minionIds: availableMinionIds,
+        daily: day,
+        nickname: name,
+      },
+    });
+
+    return {
+      raidId,
+      seed: day,
+      party: waves[0],
+      waves,
+      threat: 0,
+      availableMinionIds,
+      jailFree: 0,
+      effects,
+      research: researchEffects(dungeon.research || []),
+      daily: day,
+      abandoned: abandoned && {
+        ...abandoned,
+        gold: await $asset.get("gold"),
+        minions: dungeon.minions,
+        threat: dungeon.threat || 0,
+        wavesRepelled: dungeon.wavesRepelled || 0,
+        coreBreaches: dungeon.coreBreaches || 0,
+      },
+    };
+  }
+
+  /** Today's board, my place on it, whether I have tried, and the party. */
+  async getDailyRankings({ limit } = {}) {
+    const account = $sender.account;
+    const day = dailyDay(Date.now());
+    const size = Math.max(1, Math.min(50, Math.floor(limit || 20)));
+    const board = DAILY_LEADERBOARD + "_" + day;
+
+    const top = await $global.getCollectionItems(board, {
+      orderBy: [{ field: "score", direction: "desc" }],
+      limit: size,
+    });
+    const mine = await $global.getCollectionItem(board, account);
+    const state = await $global.getMyState();
+
+    return {
+      day,
+      top: top || [],
+      mine: mine && mine.account ? mine : null,
+      attempted: Boolean(state && state.dailyAttempt === day),
+      waves: dailyWaves(day),
+    };
+  }
+
   async getRankings({ limit } = {}) {
     const account = $sender.account;
     const size = Math.max(1, Math.min(50, Math.floor(limit || 20)));

@@ -2508,7 +2508,18 @@ export default function App() {
         />
       )}
 
-      {boardOpen && <LeaderboardDialog account={account} onClose={() => setBoardOpen(false)} />}
+      {boardOpen && (
+        <LeaderboardDialog
+          account={account}
+          canStartDaily={screen === "game" && connected && !raid.raidOpen && !raid.starting}
+          onStartDaily={(nickname) => {
+            setBoardOpen(false);
+            audio.play("raidStart");
+            void raid.startRaid({ nickname });
+          }}
+          onClose={() => setBoardOpen(false)}
+        />
+      )}
 
       {settingsOpen && (
         <SettingsDialog

@@ -491,6 +491,23 @@ h3.section {
 .skin-picks button small { font-size: var(--fs-2xs); color: var(--muted); }
 .skin-picks button.active { border-color: var(--accent); color: var(--accent); }
 
+/* The leaderboard's two boards, and today's party on the second. */
+.board-tabs { margin-bottom: 8px; }
+.daily-waves {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+.daily-wave {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+}
+.daily-wave b { margin-right: 4px; color: var(--muted); font-weight: var(--fw-bold); }
+
 /* Starts fully visible: a damage number that fades in is a damage number the
    player misses. */
 @keyframes floatUp {

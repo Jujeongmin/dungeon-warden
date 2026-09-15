@@ -188,6 +188,8 @@ export interface RaidStartResult {
   availableMinionIds: string[];
   /** Free cells left in the jail, which caps how many can be taken alive. */
   jailFree: number;
+  /** Set on today's raid: the day it belongs to. See src/game/daily.ts. */
+  daily?: number;
   /**
    * Set when a raid still open had to be settled before this one: what it
    * cost, and the save as it stands afterwards.
@@ -229,6 +231,8 @@ export interface RaidFinishResult {
   wardenDowns?: number;
   /** The lifetime count after this raid, which is the warden's level. */
   wardenDownsTotal?: number;
+  /** Today's raid: scored onto the day's board rather than paid. */
+  daily?: { day: number; score: number; kills: number };
   gold: number;
   threat: number;
   wavesRepelled: number;

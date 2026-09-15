@@ -35,12 +35,13 @@ export function ResultDialog({ result, onClose }: Props) {
   const repelled = result.outcome === "repelled";
   // Only the payout counts up. A running total that ticks would be four
   // numbers competing for the same attention.
-  const reward = useCountUp(result.local ? 0 : result.reward, 620);
+  // Today's raid counts its score up instead: it pays nothing.
+  const reward = useCountUp(result.local ? 0 : result.daily ? result.daily.score : result.reward, 620);
 
   const captured = result.capturedNames ?? [];
   const loot = result.lootGained ?? [];
 
-  const totals: Array<{ label: string; value: number }> = result.local
+  const totals: Array<{ label: string; value: number }> = result.local || result.daily
     ? []
     : [
         { label: t("stat_threat"), value: result.threat },
@@ -56,7 +57,13 @@ export function ResultDialog({ result, onClose }: Props) {
       >
         <div className="verdict">
           <b>{repelled ? t("result_repelled") : t("result_breached")}</b>
-          <p>{repelled ? t("result_repelled_note") : t("result_breached_note")}</p>
+          <p>
+            {result.daily
+              ? t("daily_result_note", { kills: result.daily.kills })
+              : repelled
+                ? t("result_repelled_note")
+                : t("result_breached_note")}
+          </p>
         </div>
 
         {result.local ? (
@@ -64,9 +71,10 @@ export function ResultDialog({ result, onClose }: Props) {
         ) : (
           <div className="payout">
             <b>
-              <i>+</i>
+              {!result.daily && <i>+</i>}
               {reward.shown}
             </b>
+            {result.daily && <span className="relief">{t("daily_score_label")}</span>}
             {result.plundered > 0 && (
               <span className="taken">
                 {t("result_plundered")} −{result.plundered}
