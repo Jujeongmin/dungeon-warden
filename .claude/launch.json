@@ -10,6 +10,15 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "dungeon-warden-offline",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "process.env.VITE_AGENT8_VERSE='';import('vite').then(async({createServer})=>{const s=await createServer({server:{port:5180,strictPort:true},define:{'import.meta.env.VITE_AGENT8_VERSE':'\"\"'}});await s.listen();s.printUrls();})"
+      ],
+      "port": 5180
     }
   ]
 }

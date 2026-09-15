@@ -1432,6 +1432,9 @@ export default function App() {
       raidResult: raid.result,
       showResult: raid.showResult,
       audio,
+      // Offline only has the purse it starts with; testing a body that has to
+      // be researched and bought first needs more than that.
+      setGold: save.setGoldFromServer,
       rendererStats: () => rendererRef.current?.debugStats() ?? null,
       rendererShakeState: () => rendererRef.current?.debugShakeState() ?? null,
       renderer: () => rendererRef.current,
