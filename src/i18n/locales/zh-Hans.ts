@@ -96,6 +96,7 @@ export const zhHans: Record<StringKey, string> = {
   result_reward: "奖励",
   result_plundered: "被夺走的金币",
   result_relief: "重建补助",
+  result_warden: "亲手击倒",
   broke_note: "没有金币，也没有能战斗的手下。",
   broke_rebuild: "重建并退款 +{n}",
   result_waves: "累计击退",

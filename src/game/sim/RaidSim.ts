@@ -152,6 +152,14 @@ export interface SimAdventurer {
    * when it dies or when the way to it turns out not to exist after all.
    */
   hunting: string | null;
+  /**
+   * Put down by a blow from the body the warden was riding at the time.
+   *
+   * Set once, at the blow that drops them, and never cleared - so hopping
+   * out of that body afterwards does not take the credit away. See
+   * src/game/wardenBonus.ts for what it is worth.
+   */
+  downedByWarden: boolean;
 }
 
 /**
@@ -180,6 +188,8 @@ export interface RaidState {
   captured: number;
   killedIds: string[];
   capturedIds: string[];
+  /** Killed or captured after a blow from the ridden body put them down. */
+  wardenDownIds: string[];
   jailFree: number;
   trapDamage: number;
   /** Which wave is on the board, 1-based. */
@@ -454,6 +464,7 @@ export class RaidSim {
         facing: 0,
         path: [],
         hunting: null,
+        downedByWarden: false,
       });
     }
 
@@ -678,6 +689,9 @@ export class RaidSim {
       captured: this.adventurers.filter((a) => a.fate === "captured").length,
       killedIds: this.adventurers.filter((a) => a.fate === "killed").map((a) => a.id),
       capturedIds: this.adventurers.filter((a) => a.fate === "captured").map((a) => a.id),
+      wardenDownIds: this.adventurers
+        .filter((a) => a.downedByWarden && (a.fate === "killed" || a.fate === "captured"))
+        .map((a) => a.id),
       jailFree: this.jailFree,
       trapDamage: Math.round(this.trapDamage),
       wave: this.waveIndex + 1,
@@ -977,6 +991,7 @@ export class RaidSim {
       target.hp = 0;
       target.burn = null;
       target.downed = DOWNED_SECONDS;
+      target.downedByWarden = from !== undefined && this.possessedId !== null && from.id === this.possessedId;
       target.action = "down";
       this.events.push({ kind: "down", targetId: target.id, x: target.x, y: target.y });
     }

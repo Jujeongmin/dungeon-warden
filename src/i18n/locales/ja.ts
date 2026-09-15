@@ -101,6 +101,7 @@ export const ja: Record<StringKey, string> = {
   result_reward: "報酬",
   result_plundered: "奪われたゴールド",
   result_relief: "再建支援金",
+  result_warden: "自らの手で",
   broke_note: "ゴールドも戦える手下もいません。",
   broke_rebuild: "建て直して払い戻し +{n}",
   result_waves: "累計撃退",

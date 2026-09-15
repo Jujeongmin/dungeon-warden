@@ -72,12 +72,19 @@ export function ResultDialog({ result, onClose }: Props) {
           </div>
         )}
 
-        {(captured.length > 0 || loot.length > 0 || result.championStopped) && (
+        {(captured.length > 0 || loot.length > 0 || result.championStopped || (result.wardenDowns ?? 0) > 0) && (
           <div className="spoils">
             {/* First in the row: it is the biggest single thing that can
                 happen in a raid, and it carries its own bounty. */}
             {result.championStopped && (
               <span className="chip champion">{t("result_champion")}</span>
+            )}
+            {/* Second: the other thing in this row that was the player's own
+                doing rather than the dungeon's. */}
+            {(result.wardenDowns ?? 0) > 0 && (
+              <span className="chip warden">
+                {t("result_warden")} ×{result.wardenDowns} · +{result.wardenBonus ?? 0}
+              </span>
             )}
             {captured.map((name) => (
               <span key={`c-${name}`} className="chip captured">

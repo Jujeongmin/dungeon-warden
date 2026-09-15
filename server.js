@@ -282,6 +282,11 @@ const RAID_PLUNDER_CAP = 120;
 // only to fill the gap, so losing on purpose buys nothing. Mirrored in
 // src/game/relief.ts.
 const RELIEF_FLOOR = 60;
+// What the warden's own hands earn: per adventurer put down by a blow from
+// the body it was riding, and then killed or taken. Deliberately below what
+// the kill pays the dungeon, so fighting in person never outearns building
+// well. Mirrored in src/game/wardenBonus.ts.
+const WARDEN_BONUS_PER_DOWN = 10;
 
 // Order matters: this is the sequence classes join the roster in as threat
 // rises, so a new dungeon only ever faces knights.
@@ -1473,6 +1478,7 @@ class Server {
     killedIds,
     capturedIds,
     lostMinionIds,
+    wardenIds,
   }) {
     const state = await $global.getMyState();
     if (!state || !state.dungeon) throw new Error("NO_SAVE");
@@ -1534,6 +1540,17 @@ class Server {
       const rate = RAID_PLUNDER_RATE * effects.plunderScale;
       plundered = Math.min(Math.floor(goldBefore * rate), RAID_PLUNDER_CAP);
     }
+
+    // The warden's own share. Only its downs that also ended in a kill or a
+    // capture count, each once - a knock the adventurer got up from earned the
+    // dungeon nothing, so it earns the warden nothing. Trusted as far as the
+    // kills themselves are, which is to say the client reports both.
+    const settled = killedList.concat(captured);
+    const wardenDowns = (Array.isArray(wardenIds) ? wardenIds : [])
+      .filter((id, i, list) => list.indexOf(id) === i)
+      .filter((id) => settled.indexOf(id) !== -1).length;
+    const wardenBonus = Math.round(wardenDowns * WARDEN_BONUS_PER_DOWN * threatBonus);
+    reward += wardenBonus;
 
     // Whatever the outcome, never leave the purse under the floor.
     const goldAfter = goldBefore + reward - plundered;
@@ -1611,6 +1628,8 @@ class Server {
       outcome,
       reward,
       relief,
+      wardenBonus,
+      wardenDowns,
       championStopped,
       plundered,
       gold: await $asset.get("gold"),

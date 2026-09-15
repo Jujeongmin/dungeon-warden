@@ -96,6 +96,7 @@ export const zhHant: Record<StringKey, string> = {
   result_reward: "獎勵",
   result_plundered: "被奪走的金幣",
   result_relief: "重建補助",
+  result_warden: "親手擊倒",
   broke_note: "沒有金幣，也沒有能戰鬥的手下。",
   broke_rebuild: "重建並退款 +{n}",
   result_waves: "累計擊退",

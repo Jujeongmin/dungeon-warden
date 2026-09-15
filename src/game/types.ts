@@ -206,6 +206,10 @@ export interface RaidFinishResult {
    * src/game/relief.ts. Absent from a server that predates it.
    */
   relief?: number;
+  /** Paid for adventurers the warden put down itself. Already inside `reward`. */
+  wardenBonus?: number;
+  /** How many of those there were. */
+  wardenDowns?: number;
   gold: number;
   threat: number;
   wavesRepelled: number;

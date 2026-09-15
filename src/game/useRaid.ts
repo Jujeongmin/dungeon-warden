@@ -178,6 +178,7 @@ export function useRaid({
             killedIds: finalState.killedIds,
             capturedIds: finalState.capturedIds,
             lostMinionIds,
+            wardenIds: finalState.wardenDownIds,
           },
         ]);
         setResult(finish);

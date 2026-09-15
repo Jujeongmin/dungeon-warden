@@ -1586,6 +1586,13 @@ button.primary {
   font-weight: var(--fw-bold);
 }
 
+/* The warden's own hands: set apart from loot and prisoners, which are the
+   dungeon's, in the cold of a spell rather than the gold of a reward. */
+.chip.warden {
+  border-color: rgba(201, 182, 255, 0.5);
+  color: #d9ceff;
+}
+
 /* Running totals arrive after the payout has landed, one beat apart, so the
    block reads downwards instead of all at once. Delays are set inline from
    the row index. */

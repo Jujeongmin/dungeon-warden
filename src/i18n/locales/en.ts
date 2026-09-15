@@ -95,6 +95,7 @@ export const en: Record<StringKey, string> = {
   result_reward: "Reward",
   result_plundered: "Gold plundered",
   result_relief: "Rebuilding fund",
+  result_warden: "By your own hand",
   broke_note: "No gold, and nobody ready to fight.",
   broke_rebuild: "Start over for a refund +{n}",
   result_waves: "Total repelled",
