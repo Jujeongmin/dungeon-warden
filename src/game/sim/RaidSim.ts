@@ -73,6 +73,19 @@ export const LUNGE_COOLDOWN = 5;
  */
 export const WARDEN_MIGHT = 1.25;
 export const WARDEN_GUARD = 0.8;
+/**
+ * How near a ridden body can come before the party knows it for what it is.
+ *
+ * Further than a warrior reaches, on purpose: standing just out of the road
+ * and swinging at whoever walked past was free, because the rule that sends
+ * an adventurer after what hurts it only fires once it has been hurt - and
+ * only for the first thing that did. The warden is the thing in the dungeon
+ * worth killing, so the party goes for the body it is wearing on sight, and
+ * drops whatever else it was chasing to do it.
+ */
+export const WARDEN_NOTICE_RADIUS = 3.5;
+/** Seconds between looks: a route search per adventurer is not a per-step cost. */
+const NOTICE_EVERY = 0.25;
 
 export interface SimMinion {
   id: string;
@@ -137,7 +150,9 @@ export type SimEvent =
   | { kind: "down"; targetId: string; x: number; y: number }
   | { kind: "killed"; targetId: string; x: number; y: number }
   | { kind: "captured"; targetId: string; x: number; y: number }
-  | { kind: "minionDown"; targetId: string; x: number; y: number };
+  | { kind: "minionDown"; targetId: string; x: number; y: number }
+  /** An adventurer has seen the warden in a body and turned on it. */
+  | { kind: "noticed"; targetId: string; x: number; y: number };
 
 export interface SimAdventurer {
   id: string;
@@ -600,11 +615,44 @@ export class RaidSim {
    * party crossfired from two sides turning on the spot forever.
    */
   private considerHunting(adventurer: SimAdventurer, attacker: SimMinion): void {
-    if (adventurer.hunting || !attacker.alive) return;
+    if (!attacker.alive || adventurer.hunting === attacker.id) return;
+    // The one exception to the first attacker sticking: the body the warden
+    // is in. See noticeWarden.
+    const warden = attacker.id === this.possessedId;
+    if (adventurer.hunting && !warden) return;
     if (!this.pathToMinion(adventurer, attacker)) return;
 
     adventurer.hunting = attacker.id;
     this.route(adventurer);
+    if (warden) {
+      this.events.push({ kind: "noticed", targetId: adventurer.id, x: adventurer.x, y: adventurer.y });
+    }
+  }
+
+  /**
+   * The party looking for the warden.
+   *
+   * Every adventurer within WARDEN_NOTICE_RADIUS of the ridden body, that can
+   * get to it, turns on it - whether or not it has struck yet, and whatever
+   * it was hunting before. A body walled off where nothing can reach it is
+   * as safe as any other minion there.
+   */
+  private noticeClock = 0;
+
+  private noticeWarden(): void {
+    this.noticeClock -= SIM_DT;
+    if (this.noticeClock > 0) return;
+    this.noticeClock = NOTICE_EVERY;
+
+    const id = this.possessedId;
+    const body = id ? this.minions.find((m) => m.id === id && m.alive) : undefined;
+    if (!body) return;
+    for (const adventurer of this.adventurers) {
+      if (!adventurer.alive || !adventurer.spawned || adventurer.downed > 0) continue;
+      if (adventurer.hunting === body.id) continue;
+      if (distance(adventurer.x, adventurer.y, body.x, body.y) > WARDEN_NOTICE_RADIUS) continue;
+      this.considerHunting(adventurer, body);
+    }
   }
 
   /**
@@ -906,6 +954,7 @@ export class RaidSim {
 
     this.stepBurn();
     this.stepTraps();
+    this.noticeWarden();
     this.stepAdventurers();
     this.stepMinions();
     this.stepDowned();

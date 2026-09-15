@@ -6,7 +6,7 @@ import {
   SIM_DT,
   WARDEN_MIGHT,
 } from "../src/game/sim/RaidSim";
-import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
+import { arenaFor, blockedKey, coreOf, entranceOf } from "../src/game/arena";
 import { MINION_STATS } from "../src/game/sim/units";
 import type { MinionType, PartyMember } from "../src/game/types";
 
@@ -23,12 +23,25 @@ const entrance = entranceOf(arena);
 const core = coreOf(arena);
 const party: PartyMember[] = [{ id: "a1", cls: "knight", name: "Aldric", level: 1 }];
 
-/** A body beside the road, ridden, with the first adventurer walked level with it. */
-function riddenBesideTheRoad(type: MinionType, aside = 1) {
+/**
+ * A body beside the road, ridden, with the first adventurer walked level with it.
+ *
+ * Walled in by rock on every side: the party turns on a ridden body it can
+ * reach (see warden-notice.test.ts), and these tests are about what the skill
+ * does to someone walking past, not about a fight that comes to the body.
+ */
+function riddenBesideTheRoad(type: MinionType, aside = 2) {
+  const at = { x: entrance.x + aside, y: entrance.y + 5 };
+  const rock = new Set<number>();
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx || dy) rock.add(blockedKey(at.x + dx, at.y + dy, arena.w));
+    }
+  }
   const sim = new RaidSim({
-    minions: [{ id: "m1", type, x: entrance.x + aside, y: entrance.y + 5 }],
+    minions: [{ id: "m1", type, x: at.x, y: at.y }],
     traps: [],
-    terrain: new Set<number>(),
+    terrain: rock,
     party,
     arena,
     entrance,

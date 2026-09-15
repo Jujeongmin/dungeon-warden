@@ -130,12 +130,18 @@ describe("walking a body", () => {
 });
 
 /**
- * Beside the road rather than in it, so the body is not fought while the test
- * is about what it chooses to do. Steps until the first adventurer has walked
- * level with it, and leaves them standing there.
+ * Beside the road rather than in it, and walled in by rock, so the body is not
+ * fought while the test is about what it chooses to do - the party turns on a
+ * ridden body it can reach. Steps until the first adventurer has walked level
+ * with it, and leaves them standing there.
  */
+const BESIDE = { x: entrance.x + 2, y: entrance.y + 5 };
 function bodyBesideTheRoad() {
-  const sim = makeSim([minion("m1", entrance.x + 1, entrance.y + 5)]);
+  const ring = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) if (dx || dy) ring.push({ x: BESIDE.x + dx, y: BESIDE.y + dy });
+  }
+  const sim = makeSim([minion("m1", BESIDE.x, BESIDE.y)], ring);
   sim.possess("m1");
   for (let i = 0; i < 20 * 30; i++) {
     sim.setControl({ x: 0, y: 0, facing: 0 });
@@ -209,7 +215,7 @@ describe("where a blow came from", () => {
     // The body is beside the road; the adventurer is on it. A blow that
     // crossed that gap is one the renderer draws a line for.
     expect(hit).toMatchObject({
-      from: { x: entrance.x + 1, y: entrance.y + 5 },
+      from: { x: BESIDE.x, y: BESIDE.y },
     });
   });
 

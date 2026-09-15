@@ -384,6 +384,16 @@ export default function App() {
         // knockback is guaranteed to be seen rather than removed same-frame.
         renderer.knockbackUnit(`a:${event.targetId}`);
         renderer.shake(0.22);
+      } else if (event.kind === "noticed") {
+        // An adventurer has seen the warden in a body and is coming for it.
+        // Said over the adventurer, because that is the one the player now
+        // has to watch.
+        renderer.spawnRing(event.x, event.y, 0xff6a52);
+        const at = renderer.project(event.x, event.y);
+        if (at) {
+          floaterSeq.current += 1;
+          added.push({ id: floaterSeq.current, text: "!", x: at.x, y: at.y, kind: "noticed" });
+        }
       } else if (event.kind === "minionDown") {
         renderer.spawnRing(event.x, event.y, 0x9d8bd8);
         renderer.knockbackUnit(`m:${event.targetId}`);

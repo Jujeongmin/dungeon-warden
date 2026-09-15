@@ -468,6 +468,8 @@ h3.section {
 .floater.trap { color: #ff9a5c; font-size: var(--fs-lg); }
 .floater.killed { color: #ff8f7a; }
 .floater.captured { color: #8fe6a0; font-size: var(--fs-lg); }
+/* The party has seen the warden: bigger than a number, and the colour of trouble. */
+.floater.noticed { color: #ff6a52; font-size: var(--fs-lg); }
 
 /* Starts fully visible: a damage number that fades in is a damage number the
    player misses. */
