@@ -82,7 +82,7 @@ const START_GOLD = 200;
 
 // Mirrored in src/game/types.ts and src/game/sim/units.ts.
 const BASE_MAX_MINIONS = 8;
-const MINION_COST = { warrior: 50, mage: 70, convert: 0 };
+const MINION_COST = { warrior: 50, mage: 70, guard: 80, grunt: 25, convert: 0 };
 // ^ Converts are earned by capturing, never bought.
 
 const MAX_TRAPS = 10;
@@ -140,6 +140,8 @@ const BASE_REVIVE_MS = 90 * 1000;
 // only decides what to grey out.
 const RESEARCH = {
   mage: { cost: 120, unlockMinion: "mage" },
+  grunt: { cost: 80, unlockMinion: "grunt" },
+  guard: { cost: 150, unlockMinion: "guard" },
   trap_arrow: { cost: 90, unlockTrap: "arrow" },
   trap_rock: { cost: 160, requires: ["trap_arrow"], unlockTrap: "rockfall" },
   trap_flame: { cost: 220, requires: ["trap_rock"], unlockTrap: "flame" },

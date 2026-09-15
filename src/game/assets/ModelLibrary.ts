@@ -86,6 +86,10 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   // minion and a mage adventurer are different models.
   m_warrior: [/^skeleton_rogue$/, /^skeleton_warrior$/, /skeleton.*warrior/],
   m_mage: [/^skeleton_mage$/, /skeleton.*mage/],
+  // The big one with the shield holds the road; the small one is the cheap
+  // body there are many of. Same pack, same rig, same shared clips.
+  m_guard: [/^skeleton_warrior$/],
+  m_grunt: [/^skeleton_minion$/],
 
   // Adventurers, also used for converts. Each class has its own model.
   a_knight: [/^knight$/],

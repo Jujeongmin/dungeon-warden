@@ -10,7 +10,7 @@ export const TILE = {
 export type TileId = (typeof TILE)[keyof typeof TILE];
 
 /** `convert` is a turned adventurer: only the server may create one. */
-export type MinionType = "warrior" | "mage" | "convert";
+export type MinionType = "warrior" | "mage" | "guard" | "grunt" | "convert";
 
 export interface PlacedMinion {
   id: string;
@@ -262,6 +262,8 @@ export const MAX_MINIONS = 8;
 export const MINION_COST: Record<MinionType, number> = {
   warrior: 50,
   mage: 70,
+  guard: 80,
+  grunt: 25,
   // Converts are earned by capturing, never bought.
   convert: 0,
 };
@@ -270,6 +272,8 @@ export const MINION_COST: Record<MinionType, number> = {
 export const MINION_LABEL: Record<MinionType, StringKey> = {
   warrior: "minion_warrior",
   mage: "minion_mage",
+  guard: "minion_guard",
+  grunt: "minion_grunt",
   convert: "minion_convert",
 };
 

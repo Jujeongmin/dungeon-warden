@@ -54,6 +54,22 @@ export interface AdventurerStats {
 export const MINION_STATS: Record<Exclude<MinionType, "convert">, MinionStats> = {
   warrior: { hp: 100, damage: 10, attackInterval: 1.0, range: 2.4 },
   mage: { hp: 45, damage: 7, attackInterval: 1.4, range: 4.2 },
+  /*
+   * The two that came after, and the two questions the first pair could not
+   * answer.
+   *
+   * A guard is what goes in the road when a warrior in the road dies before
+   * the arrows beside it have done their work: nearly three warriors of hit
+   * points for a warrior and a half of gold, and a third of the damage. It
+   * buys time, not kills.
+   *
+   * A grunt is the cheap body. About a warrior's damage per coin and a
+   * fraction of its per slot, so a dungeon short of gold can fill the room
+   * and a dungeon short of slots never wants one - and every one of them is
+   * another body the warden can hop into.
+   */
+  guard: { hp: 280, damage: 5, attackInterval: 1.5, range: 2.2 },
+  grunt: { hp: 45, damage: 5, attackInterval: 0.9, range: 2.2 },
 };
 
 /**

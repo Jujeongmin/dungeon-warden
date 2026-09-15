@@ -22,6 +22,8 @@ export interface ResearchNode {
  */
 export const RESEARCH: ResearchNode[] = [
   { id: "mage", label: "res_mage", cost: 120, unlockMinion: "mage", note: "res_mage_n" },
+  { id: "grunt", label: "res_grunt", cost: 80, unlockMinion: "grunt", note: "res_grunt_n" },
+  { id: "guard", label: "res_guard", cost: 150, unlockMinion: "guard", note: "res_guard_n" },
   { id: "trap_arrow", label: "res_trap_arrow", cost: 90, unlockTrap: "arrow", note: "res_trap_arrow_n" },
   { id: "trap_rock", label: "res_trap_rock", cost: 160, requires: ["trap_arrow"], unlockTrap: "rockfall", note: "res_trap_rock_n" },
   { id: "trap_flame", label: "res_trap_flame", cost: 220, requires: ["trap_rock"], unlockTrap: "flame", note: "res_trap_flame_n" },

@@ -113,6 +113,8 @@ const TOOL_MODEL: Record<string, string | null> = {
   remove: null,
   warrior: "m_warrior",
   mage: "m_mage",
+  guard: "m_guard",
+  grunt: "m_grunt",
   spike: "spike",
   arrow: "arrow",
   rockfall: "rockfall",
@@ -158,6 +160,8 @@ const TOOLS: Array<{
   { id: "remove", tool: { kind: "remove" }, group: "dig", label: "tool_remove", cost: null },
   { id: "warrior", tool: { kind: "minion", type: "warrior" }, group: "minion", label: MINION_LABEL.warrior, cost: MINION_COST.warrior },
   { id: "mage", tool: { kind: "minion", type: "mage" }, group: "minion", label: MINION_LABEL.mage, cost: MINION_COST.mage },
+  { id: "grunt", tool: { kind: "minion", type: "grunt" }, group: "minion", label: MINION_LABEL.grunt, cost: MINION_COST.grunt },
+  { id: "guard", tool: { kind: "minion", type: "guard" }, group: "minion", label: MINION_LABEL.guard, cost: MINION_COST.guard },
   { id: "spike", tool: { kind: "trap", type: "spike" }, group: "trap", label: TRAP_LABEL.spike, cost: TRAP_COST.spike },
   { id: "arrow", tool: { kind: "trap", type: "arrow" }, group: "trap", label: TRAP_LABEL.arrow, cost: TRAP_COST.arrow },
   { id: "rockfall", tool: { kind: "trap", type: "rockfall" }, group: "trap", label: TRAP_LABEL.rockfall, cost: TRAP_COST.rockfall },
@@ -2270,7 +2274,15 @@ export default function App() {
               disabled={(raid.raidState?.possessedSkill ?? 0) > 0}
               onClick={() => skillRef.current()}
             >
-              {possessed.type === "mage" ? t("walk_skill_blast") : t("walk_skill_shove")}
+              {t(
+                possessed.type === "mage"
+                  ? "walk_skill_blast"
+                  : possessed.type === "guard"
+                    ? "walk_skill_brace"
+                    : possessed.type === "grunt"
+                      ? "walk_skill_dash"
+                      : "walk_skill_shove",
+              )}
               {(raid.raidState?.possessedSkill ?? 0) > 0 &&
                 ` ${Math.ceil(raid.raidState?.possessedSkill ?? 0)}`}
             </button>

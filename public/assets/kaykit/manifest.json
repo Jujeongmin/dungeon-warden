@@ -145,10 +145,22 @@
       "bytes": 265676
     },
     {
+      "url": "/assets/kaykit/skeletons/Skeleton_Minion.glb",
+      "name": "skeleton_minion",
+      "group": "kaykit/skeletons",
+      "bytes": 318520
+    },
+    {
       "url": "/assets/kaykit/skeletons/Skeleton_Rogue.glb",
       "name": "skeleton_rogue",
       "group": "kaykit/skeletons",
       "bytes": 331180
+    },
+    {
+      "url": "/assets/kaykit/skeletons/Skeleton_Warrior.glb",
+      "name": "skeleton_warrior",
+      "group": "kaykit/skeletons",
+      "bytes": 367484
     },
     {
       "url": "/assets/kaykit/dungeon/stairs_long.gltf",

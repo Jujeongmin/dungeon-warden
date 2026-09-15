@@ -245,6 +245,8 @@ export interface MarkerView {
 const UNIT_COLORS: Record<string, number> = {
   m_warrior: 0xd8d2c4,
   m_mage: 0x9d8bd8,
+  m_guard: 0xb9a98a,
+  m_grunt: 0xcfc6b0,
   a_knight: 0xd86a4c,
   a_barbarian: 0xc4553a,
   a_rogue: 0xa8564e,

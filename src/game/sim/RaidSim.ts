@@ -54,6 +54,14 @@ export const SHOVE_STAGGER = 0.8;
 /** How long a mage waits between blasts, and what one is worth against a normal blow. */
 export const BLAST_COOLDOWN = 8;
 export const BLAST_MULTIPLIER = 2.5;
+/** How long a guard braces - the shield the warden's blessing gives - and how long before again. */
+export const BRACE_SECONDS = 3;
+export const BRACE_COOLDOWN = 12;
+/** A grunt's lunge: how far it looks, how far it closes, what the blow is worth, and the wait. */
+export const LUNGE_REACH = 4;
+export const LUNGE_STEP = 2.5;
+export const LUNGE_MULTIPLIER = 2;
+export const LUNGE_COOLDOWN = 5;
 /**
  * What the warden's own hand is worth inside a body.
  *
@@ -1256,6 +1264,40 @@ export class RaidSim {
    * Nothing in reach means nothing happens, and the wait is not spent.
    */
   private useBodySkill(minion: SimMinion, stats: ReturnType<typeof minionStatsFor>): void {
+    /*
+     * A guard braces: the blessing's shield on this body alone. The one skill
+     * that wants nothing in reach - bracing is for the blow that is coming.
+     */
+    if (minion.type === "guard") {
+      this.bodySkillCooldowns.set(minion.id, BRACE_COOLDOWN);
+      minion.shield = Math.max(minion.shield, BRACE_SECONDS);
+      return;
+    }
+
+    /*
+     * A grunt lunges: closes on the nearest adventurer it can see and hits
+     * it twice as hard. Walked along the line a quarter tile at a time and
+     * stopped at the last standable point, so a lunge at something round a
+     * corner ends at the corner rather than inside the rock.
+     */
+    if (minion.type === "grunt") {
+      const prey = this.nearestAdventurer(minion.x, minion.y, LUNGE_REACH);
+      if (!prey) return;
+      this.bodySkillCooldowns.set(minion.id, LUNGE_COOLDOWN);
+      const gap = distance(minion.x, minion.y, prey.x, prey.y);
+      const travel = Math.min(LUNGE_STEP, Math.max(0, gap - 0.6));
+      for (let moved = 0.25; moved <= travel + 1e-6; moved += 0.25) {
+        const nx = minion.x + ((prey.x - minion.x) / gap) * 0.25;
+        const ny = minion.y + ((prey.y - minion.y) / gap) * 0.25;
+        if (!this.standable(nx, ny)) break;
+        minion.x = nx;
+        minion.y = ny;
+      }
+      minion.action = "attack";
+      this.damageAdventurer(prey, stats.damage * WARDEN_MIGHT * LUNGE_MULTIPLIER, "melee", minion);
+      return;
+    }
+
     const target = this.nearestAdventurer(minion.x, minion.y, stats.range);
     if (!target) return;
     minion.action = "attack";
