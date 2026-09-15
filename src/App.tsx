@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  DungeonRenderer,
-  type MarkerView,
-  type UnitView,
-} from "./game/DungeonRenderer";
+import type { DungeonRenderer, MarkerView, UnitView } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
@@ -201,6 +197,15 @@ type Tab = "build" | "manage" | "research";
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<DungeonRenderer | null>(null);
+  /*
+   * Whether the renderer has arrived.
+   *
+   * It is three.js and the model loader, most of the download, so it is
+   * fetched after the first paint rather than before it: the title is up
+   * while the board is still on its way. Everything that hands the renderer
+   * state has to hand it again when it lands, and depends on this for that.
+   */
+  const [rendererReady, setRendererReady] = useState(false);
   const hudRef = useRef<HTMLElement>(null);
 
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
@@ -553,7 +558,7 @@ export default function App() {
   const wardenSkin = activeSkin(settings.wardenSkin, wardenLevelOf(meta?.wardenDowns ?? 0), entitlements);
   useEffect(() => {
     rendererRef.current?.setWardenSkin(wardenSkin.model, wardenSkin.tint, wardenSkin.glow);
-  }, [wardenSkin.model, wardenSkin.tint, wardenSkin.glow, walking]);
+  }, [wardenSkin.model, wardenSkin.tint, wardenSkin.glow, walking, rendererReady]);
 
   /*
    * Walking is for between raids. During one the camera has somewhere else to
@@ -562,7 +567,7 @@ export default function App() {
    */
   useEffect(() => {
     rendererRef.current?.setWalking(walking);
-  }, [walking]);
+  }, [walking, rendererReady]);
 
   /*
    * Riding a body puts the player in the corridor, and losing it takes them
@@ -633,12 +638,12 @@ export default function App() {
   useEffect(() => {
     if (!walking) return;
     rendererRef.current?.setPossessed(possessedType);
-  }, [walking, possessedType]);
+  }, [walking, possessedType, rendererReady]);
 
   useEffect(() => {
     if (!walking || !possessed) return;
     rendererRef.current?.setPossessedAt(possessed.x, possessed.y);
-  }, [walking, possessed, possessed?.x, possessed?.y]);
+  }, [walking, possessed, possessed?.x, possessed?.y, rendererReady]);
 
   useEffect(() => {
     if (!bodyLost) return;
@@ -941,45 +946,53 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const renderer = new DungeonRenderer(canvasRef.current, {
-      onTileTap: (x, y) => tapRef.current(x, y),
-      onWalkTap: () => strikeRef.current(),
-      onStep: () => audio.play("step", 200),
-      onTileAlt: (x, y, sx, sy) => altRef.current(x, y, sx, sy),
-      onTileDrag: (x, y) => dragRef.current(x, y),
-      // Digging and filling are the only tools a drag runs along.
-      isPaintable: () => paintableRef.current,
-      onHoverChange: setHover,
-    });
-    rendererRef.current = renderer;
-
-    // Photograph the tool models once the pack has loaded. Icons are a nicety:
-    // if this fails or the device refuses a second GL context, the toolbar
-    // keeps its labels and nothing else changes.
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     let alive = true;
-    void renderer
-      .bakeToolIcons(TOOL_MODEL_KEYS)
-      .then((icons) => { if (alive) setToolIcons(icons); })
-      .catch(() => {});
+    let renderer: DungeonRenderer | null = null;
+
+    void import("./game/DungeonRenderer").then(({ DungeonRenderer }) => {
+      if (!alive) return;
+      renderer = new DungeonRenderer(canvas, {
+        onTileTap: (x, y) => tapRef.current(x, y),
+        onWalkTap: () => strikeRef.current(),
+        onStep: () => audio.play("step", 200),
+        onTileAlt: (x, y, sx, sy) => altRef.current(x, y, sx, sy),
+        onTileDrag: (x, y) => dragRef.current(x, y),
+        // Digging and filling are the only tools a drag runs along.
+        isPaintable: () => paintableRef.current,
+        onHoverChange: setHover,
+      });
+      rendererRef.current = renderer;
+      setRendererReady(true);
+
+      // Photograph the tool models once the pack has loaded. Icons are a nicety:
+      // if this fails or the device refuses a second GL context, the toolbar
+      // keeps its labels and nothing else changes.
+      void renderer
+        .bakeToolIcons(TOOL_MODEL_KEYS)
+        .then((icons) => { if (alive) setToolIcons(icons); })
+        .catch(() => {});
+    });
 
     return () => {
       alive = false;
-      renderer.dispose();
+      renderer?.dispose();
       rendererRef.current = null;
+      setRendererReady(false);
     };
   }, []);
 
   useEffect(() => {
     rendererRef.current?.setArena(arena, entrance, core);
-  }, [arena, entrance, core]);
+  }, [arena, entrance, core, rendererReady]);
 
   /** The shape of the room, which is the shape of what has been dug. */
   const open = useMemo(() => dugSet(arena, dug), [arena, dug]);
 
   useEffect(() => {
     rendererRef.current?.setDug(open);
-  }, [open]);
+  }, [open, rendererReady]);
 
   /*
    * Who is coming, ticked rather than read during render.
@@ -1192,7 +1205,7 @@ export default function App() {
     renderer.setRangeRing(
       tool.kind === "minion" ? minionStatsFor({ type: tool.type }).range : null,
     );
-  }, [toolId, tool, hover, raid.raiding, ghostLegal]);
+  }, [toolId, tool, hover, raid.raiding, ghostLegal, rendererReady]);
 
   /**
    * Tell the camera how much of itself the interface is covering.
@@ -1256,15 +1269,15 @@ export default function App() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length, raid.raiding]);
+  }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length, raid.raiding, rendererReady]);
 
   useEffect(() => {
     rendererRef.current?.setUnits(units);
-  }, [units]);
+  }, [units, rendererReady]);
 
   useEffect(() => {
     rendererRef.current?.setMarkers(markers);
-  }, [markers]);
+  }, [markers, rendererReady]);
 
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
@@ -1286,7 +1299,7 @@ export default function App() {
         new Set(terrain),
       ),
     );
-  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, showAftermath]);
+  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, showAftermath, rendererReady]);
 
   /*
    * What the route becomes if the tile under the cursor changes.
@@ -1331,7 +1344,7 @@ export default function App() {
       now.every((step, i) => step.x === after[i].x && step.y === after[i].y);
 
     renderer.setPathGhost(same ? null : after);
-  }, [hover, tool, meta, raid.raiding, arena, entrance, core, terrain, rooms, ghostLegal]);
+  }, [hover, tool, meta, raid.raiding, arena, entrance, core, terrain, rooms, ghostLegal, rendererReady]);
 
   /**
    * Paint the aftermath when the fighting stops; wipe it when it starts again.
@@ -1485,9 +1498,9 @@ export default function App() {
   useEffect(() => {
     audio.setVolume(settings.volume);
     rendererRef.current?.setPixelRatio(pixelRatioFor(settings.quality));
-    // Only on mount: later changes go through patchSettings.
+    // Only on arrival: later changes go through patchSettings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [rendererReady]);
 
   const hasProgress =
     (meta?.wavesRepelled ?? 0) + (meta?.coreBreaches ?? 0) > 0 ||
