@@ -31,15 +31,11 @@ const FLOOR_HEIGHT = 0.12;
 const PITCH = THREE.MathUtils.degToRad(68);
 
 /**
- * Eye height and body width of whatever is walking the corridor, in tiles.
+ * Half the width of whatever is walking the corridor, in tiles.
  *
- * The body is wide on purpose. At a quarter tile the camera could get its
- * nose within a fifth of a tile of the rock, and a wall that close fills the
- * screen with one texel of stone - the corridor stops reading as a corridor.
- * A third of a tile keeps a shoulder's width of dark between the eye and
- * the wall, which is what makes it feel like a passage rather than a scan.
+ * Wide on purpose: it is how far from the rock the body is kept, and a body
+ * let within a fifth of a tile of the wall is drawn with a shoulder in it.
  */
-const EYE_HEIGHT = 0.6;
 const BODY = 0.36;
 
 /** Radians of turn per pixel dragged. */
@@ -47,62 +43,38 @@ const LOOK_SPEED = 0.0045;
 /** Tiles a second on foot. A tile is about two metres. */
 const WALK_SPEED = 2.2;
 
-/** How long one swing owns the arms, in milliseconds. */
+/** How long one swing owns the body's clip, in milliseconds. */
 const SWING_MS = 450;
 
 /**
- * Where the arms sit and where they point.
+ * The camera behind the body, not inside its head.
  *
- * One object rather than a handful of constants because every one of these
- * was found by looking at the screen and moving it, and they have to be
- * movable while looking at the screen - see debugViewTuning. `back`,
- * `aside` and `drop` hang the body off the lens in tiles; `upper` and
- * `lower` are the directions the two arm bones are aimed in, in the view
- * model's own frame, where +z is out into the corridor and -y is down.
- */
-const VIEW_TUNING = {
-  back: -0.85,
-  aside: 0,
-  drop: -0.14,
-  upper: new THREE.Vector3(0.78, -1, 0.4),
-  lower: new THREE.Vector3(0.1, 0.45, 1),
-};
-
-/**
- * And where each body's arms hang, because they are different animals.
+ * A pair of arms cut out of a model and hung off the lens never stopped
+ * looking cut, and it hid the one thing worth seeing: the body itself,
+ * swinging, among the rest of the fight. So the whole body is drawn and the
+ * camera follows it from behind and above - high enough to clear the rock of
+ * a one-tile corridor, which is what ruled a shoulder camera out before.
  *
- * The imp's arms are short and thick and want to be close; the skeletons'
- * are long and thin and only read as arms from further back. There is no
- * formula in this - the numbers came from putting each one on the screen and
- * moving it until it looked like a pair of arms.
+ * `CHASE_DISTANCE` is tiles from the point it looks at; the elevation is the
+ * angle above the horizon, turned by the vertical look within the clamp so
+ * the view can neither sink into the rock behind nor flip over the top.
  */
-const VIEW_PLACE: Record<string, { back: number; drop: number }> = {
-  warden_arms: { back: -0.85, drop: -0.14 },
-};
-
-/** Everything else in the game is on KayKit's rig, and wants the same spot. */
-const VIEW_PLACE_DEFAULT = { back: -0.78, drop: 0 };
-/** How far the mannequin rig's arms are swung forward, and how far apart. */
-const VIEW_UPPER = -0.8;
-const VIEW_ELBOW = -0.5;
-const VIEW_SPREAD = 0.05;
-/** Scratch for the pose, so the frame loop allocates nothing. */
-const VIEW_TURN = new THREE.Quaternion();
-const VIEW_EULER = new THREE.Euler();
-const VIEW_ROOT = new THREE.Quaternion();
-const VIEW_WORLD = new THREE.Quaternion();
-const VIEW_PARENT = new THREE.Quaternion();
-const VIEW_DELTA = new THREE.Quaternion();
-const VIEW_WANT = new THREE.Vector3();
-const VIEW_HAVE = new THREE.Vector3();
-const VIEW_A = new THREE.Vector3();
-const VIEW_B = new THREE.Vector3();
-/** How much taller the rock stands while the camera is down among it. */
-const ROCK_STRETCH = 2.1;
+const CHASE_DISTANCE = 3.5;
+const CHASE_ELEVATION = 0.66;
+const CHASE_ELEVATION_MIN = 0.38;
+const CHASE_ELEVATION_MAX = 1.25;
+/** How far above its feet the camera aims: about the ridden body's chest. */
+const CHASE_AIM = 0.55;
+/** How far past the body it looks, in tiles along the ground. */
+const CHASE_LEAD = 0.5;
+/** The ring under the ridden body, so it can be told from its twins. */
+const MARK_COLOR = 0xc9b6ff;
+/** Health bars over units, as a share of their board size, while walking. */
+const WALK_BAR_SCALE = 0.4;
 /** How wide across the shoulders the warden is, in tiles. */
 const WARDEN_WIDTH = 0.62;
 /** And how tall it stands, which is what the eye height follows from. */
-const WARDEN_HEIGHT = 0.92;
+const WARDEN_HEIGHT = 1.15;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -290,6 +262,8 @@ const MARKER_COLORS: Record<string, number> = {
 };
 
 const UNIT_HEIGHT = 0.7;
+/** How wide a unit is drawn, in tiles. A ridden body is drawn the same. */
+const UNIT_TILES = 0.8;
 const MARKER_HEIGHT = 0.16;
 
 /**
@@ -593,18 +567,6 @@ export class DungeonRenderer {
     this.highlight.visible = false;
     this.scene.add(this.highlight);
 
-    /*
-     * The view model's own little world: a holder that copies the camera
-     * every frame, and two lights so the arms are lit the same whether the
-     * warden is standing under a torch or in the dark.
-     */
-    this.viewHolder.matrixAutoUpdate = false;
-    this.viewScene.add(this.viewHolder);
-    this.viewScene.add(new THREE.AmbientLight(0xbfae9c, 0.75));
-    const viewKey = new THREE.DirectionalLight(0xffd9a8, 1.1);
-    viewKey.position.set(-0.6, 1.4, 1);
-    this.viewScene.add(viewKey);
-
     this.scene.add(this.unitGroup);
     this.scene.add(this.markerGroup);
     this.scene.add(this.aftermathGroup);
@@ -824,7 +786,7 @@ export class DungeonRenderer {
       const usesModel = this.loaded.get(unit.kind) != null;
 
       if (!object) {
-        const model = this.spawnModel(unit.kind, 0.8);
+        const model = this.spawnModel(unit.kind, UNIT_TILES);
         object =
           model ??
           new THREE.Mesh(
@@ -1062,6 +1024,9 @@ export class DungeonRenderer {
      */
     const scale = host.scale.x || 1;
     bar.position.set(0, 1.45 / scale, 0);
+    // Remembered, because the frame loop resizes the bar while walking and
+    // has to keep undoing the host scale when it does.
+    bar.userData.baseScale = 1 / scale;
     bar.scale.setScalar(1 / scale);
 
     const fill = bar.getObjectByName("fill") as THREE.Mesh | undefined;
@@ -1076,7 +1041,16 @@ export class DungeonRenderer {
   /** Turns every bar to face the camera. Cheap: a handful of quaternion copies. */
   private updateHealthBars(): void {
     this.camera.getWorldQuaternion(FACING);
+    /*
+     * Smaller from the corridor.
+     *
+     * Sized to read from above the board, a bar a tile or two from the lens
+     * was a slab across the middle of the screen - and drawn over depth, so
+     * over the ridden body too.
+     */
+    const size = this.walk ? WALK_BAR_SCALE : 1;
     for (const bar of this.healthBars.values()) {
+      bar.scale.setScalar(((bar.userData.baseScale as number | undefined) ?? 1) * size);
       /*
        * The parent turn has to come out first, or the bar wears it.
        *
@@ -1249,7 +1223,9 @@ export class DungeonRenderer {
   /** Screen position of a world tile, for HTML overlays like damage numbers. */
   project(x: number, y: number, height = UNIT_HEIGHT): { x: number; y: number } | null {
     const vector = new THREE.Vector3(x, height, y).project(this.camera);
-    if (vector.z > 1) return null;
+    // A point level with the lens projects to infinity rather than off the
+    // screen, and an overlay placed there is a style React refuses.
+    if (vector.z > 1 || !Number.isFinite(vector.x) || !Number.isFinite(vector.y)) return null;
 
     const rect = this.canvas.getBoundingClientRect();
     return {
@@ -1427,7 +1403,6 @@ export class DungeonRenderer {
        */
       this.dress(this.rockMesh, STONE.rock, { roughness: 0.92, tint: ROCK_TINT, repeat: 1 });
       this.rockMesh.position.y = 0;
-      this.applyRockHeight();
       this.scene.add(this.rockMesh);
     }
 
@@ -1640,6 +1615,11 @@ export class DungeonRenderer {
   private updateEntranceMark(): void {
     const mark = this.entranceMark;
     if (!mark) return;
+
+    // A beacon for finding the door from above. From the corridor it is a
+    // kite the size of a person hanging in front of the camera.
+    mark.arrow.visible = this.walk === null;
+    mark.ring.visible = this.walk === null;
 
     const t = this.elapsed;
     mark.arrow.position.y = FLOOR_HEIGHT + 1.25 + Math.sin(t * 2.4) * 0.14;
@@ -2130,39 +2110,31 @@ export class DungeonRenderer {
   /**
    * Standing in the corridor rather than looking down at it.
    *
-   * Not a way to play - the board above is where a maze gets built, because
-   * planning one is a thing you do by looking at it. This is for the other
-   * half of building a dungeon, which is wanting to see what you made from
-   * inside it, at the height of the things that have to walk through it.
+   * The board above is where a maze gets built, because planning one is a
+   * thing you do by looking at it. This is the other half: down among the
+   * things that walk it - freely between raids, or inside one of the
+   * garrison during one.
    *
    * Held in world units rather than tiles so the walk is smooth; the rock it
-   * cannot pass through is still read per tile.
+   * cannot pass through is still read per tile. `pitch` is the vertical look,
+   * which raises and lowers the camera behind the body.
    */
   private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
   /**
-   * The body the camera rides while walking.
+   * The body the camera follows: the warden's own, or the minion it rides.
    *
-   * A whole skeleton standing where the player stands, turned the way they
-   * look, so their own arms swing into view when they dig and their own
-   * feet are under them when they look down. The camera sits at its eyes.
+   * Drawn whole and turned the way the player faces, playing its own walk and
+   * its own swing - the same thing the rest of the room sees it do.
    */
   private warden: THREE.Object3D | null = null;
-  /** The same body again, cut down to two arms and hung off the camera. */
-  private viewArms: THREE.Object3D | null = null;
+  /** The ring at its feet. Apart from the body so the body's scale cannot size it. */
+  private wardenMark: THREE.Mesh | null = null;
   /** Which kind of body is being ridden, or null for the warden's own. */
   private possessedType: string | null = null;
-  /** How far the view model's own eyes sit above its feet, at its drawn size. */
-  private viewEye = 0;
-  /** Whether this rig wants its arms aimed rather than turned by a fixed angle. */
-  private viewAimed = false;
+  /** Set by faceThreatOnArrival; the next position turns the view and clears it. */
+  private faceOnArrival = false;
   /** Wall-clock time the current swing ends at. */
   private swingUntil = 0;
-  /** Shoulders, arms and elbows of that copy, turned into view every frame. */
-  private viewBones: Array<[string, THREE.Object3D]> = [];
-  private viewHolder = new THREE.Group();
-  private viewScene = new THREE.Scene();
-  /** Eye height of that body, measured from its own head rather than assumed. */
-  private wardenEye = EYE_HEIGHT;
   /** Whether the body moved this frame, for idle against walk. */
   private wardenMoving = false;
   /** Seconds of walking since the last footfall. */
@@ -2180,7 +2152,7 @@ export class DungeonRenderer {
   /**
    * Drops into the dungeon, or climbs back out.
    *
-   * Entering puts the camera on the doorway looking the way the raiders walk,
+   * Entering puts the body on the doorway facing the way the raiders walk,
    * because that is the view the whole room is designed around and the one
    * the player has never actually had.
    */
@@ -2188,6 +2160,7 @@ export class DungeonRenderer {
     if (!on) {
       this.walk = null;
       this.disposeWarden();
+      this.possessedType = null;
       this.keys.clear();
       this.activePointers.clear();
       this.dragStart = null;
@@ -2195,381 +2168,130 @@ export class DungeonRenderer {
       this.moveInput.forward = 0;
       this.moveInput.strafe = 0;
       if (document.pointerLockElement === this.canvas) document.exitPointerLock();
-      this.applyRockHeight();
       return;
     }
     if (!this.entrance || !this.core) return;
 
     this.walk = {
-      at: new THREE.Vector3(this.entrance.x, FLOOR_HEIGHT + EYE_HEIGHT, this.entrance.y),
+      at: new THREE.Vector3(this.entrance.x, FLOOR_HEIGHT, this.entrance.y),
       // Facing the core: the room runs down a column, so that is straight
       // along +z, and atan2 of the difference keeps it honest if that changes.
       yaw: Math.atan2(this.core.x - this.entrance.x, this.core.y - this.entrance.y),
       pitch: 0,
     };
     this.spawnWarden();
-    this.applyRockHeight();
   }
 
   /**
-   * The rock stands taller from inside than from above.
+   * Stands the followed body up where the walk is. Harmless before models load.
    *
-   * From the board a wall the height of a person hides the corridor behind
-   * it; from the corridor a wall the height of a table shows the black
-   * above the room over every edge. So the same blocks are stretched while
-   * the camera is down among them and let back down when it climbs out.
+   * A ridden minion is drawn at the size the board draws the garrison, so
+   * climbing into one does not make it grow; the warden's own body is sized
+   * by height, because fitting a humanoid by the span of its shoulders came
+   * out half a tile tall.
    */
-  private applyRockHeight(): void {
-    const k = this.walk ? ROCK_STRETCH : 1;
-    if (this.rockMesh) {
-      this.rockMesh.scale.y = k;
-      // Instances carry their own lift; scaling about the floor keeps their
-      // feet on it.
-      this.rockMesh.position.y = 0;
-    }
-  }
-
-  /** Stands the body up where the walk starts. Harmless before models load. */
   private spawnWarden(): void {
     this.disposeWarden();
-    const body = this.spawnModel("warden", WARDEN_WIDTH);
+    const key = this.possessedType;
+    const body = key ? this.spawnModel(key, UNIT_TILES) : this.spawnModel("warden", WARDEN_WIDTH);
     if (!body) return;
 
-    /*
-     * Sized by height, not by width.
-     *
-     * fitToTile fits the widest horizontal dimension, which for a body is
-     * the span of its shoulders - so a humanoid came out half a tile tall,
-     * looking out of the corridor at the height of a dog. What matters here
-     * is how tall the thing whose eyes these are stands.
-     */
-    body.updateMatrixWorld(true);
-    const raw = new THREE.Box3().setFromObject(body);
-    const tall = raw.max.y - raw.min.y;
-    if (tall > 0.01) {
-      body.scale.multiplyScalar(WARDEN_HEIGHT / tall);
+    if (!key) {
       body.updateMatrixWorld(true);
-      const grown = new THREE.Box3().setFromObject(body);
-      body.position.y -= grown.min.y;
+      const raw = new THREE.Box3().setFromObject(body);
+      const tall = raw.max.y - raw.min.y;
+      if (tall > 0.01) {
+        body.scale.multiplyScalar(WARDEN_HEIGHT / tall);
+        body.updateMatrixWorld(true);
+        const grown = new THREE.Box3().setFromObject(body);
+        body.position.y -= grown.min.y;
+      }
     }
 
-    /*
-     * Its own head says how high the eye sits.
-     *
-     * The one number that should follow from the model rather than from a
-     * guess, whatever body ends up in this slot - a taller warden looks
-     * over the rock from higher up, and its copy stands proportionally
-     * further down the screen.
-     */
-    let eye = FLOOR_HEIGHT + EYE_HEIGHT;
-    body.updateMatrixWorld(true);
     body.traverse((child) => {
-      if (child.name === "Head") eye = child.getWorldPosition(new THREE.Vector3()).y;
+      // Skinned meshes are culled against the bind pose, so a swing that
+      // leaves it can pop out of view at the edge of the frame.
       const mesh = child as THREE.SkinnedMesh;
-      if (!mesh.isMesh) return;
-      // Skinned meshes are culled against the bind pose, so a body that
-      // swings an arm past the camera pops out of view mid-swing.
-      mesh.frustumCulled = false;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) material.side = THREE.FrontSide;
+      if (mesh.isMesh) mesh.frustumCulled = false;
     });
-    this.wardenEye = eye;
 
     /*
-     * Motion comes from a second file, not from the body.
+     * Motion from wherever this body's motion lives.
      *
-     * The kit the imp is from ships no animation at all; the library that
-     * animates it ships no monsters. They share the same skeleton, which is
-     * why these two were chosen together - the clips name bones, and these
-     * are those bones.
+     * The imp's kit ships no animation, so its clips are a second file on the
+     * same skeleton; the garrison and the adventurers borrow the shared rig
+     * clips, exactly as the board animates them.
      */
-    const own = this.loaded.get("warden")?.animations ?? [];
-    const rigged = this.loaded.get("warden_clips")?.animations ?? [];
+    const own = this.loaded.get(key ?? "warden")?.animations ?? [];
+    const rigged = key ? [] : (this.loaded.get("warden_clips")?.animations ?? []);
     const clips = own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips;
     this.setupAnimation("warden", body, clips);
     this.playClip("warden", "idle");
-    /*
-     * The body itself is not drawn while the camera is in its head.
-     *
-     * It is still there - it walks, it swings, and everything measured off
-     * it stays true - but from the inside all it can offer is the back of
-     * its own chest across the lens. What the player sees of themselves is
-     * the copy below, held where hands belong.
-     */
-    body.visible = false;
     this.warden = body;
     this.scene.add(body);
-    this.buildViewArms(clips);
-  }
 
-  /**
-   * The warden's own arms, seen down its own nose.
-   *
-   * A second copy of the body, wrapped round the lens: head and legs held
-   * at nothing, shoulders turned forward so the arms and the mace hang in
-   * the lower frame the way they do in any game played from inside a
-   * head. It runs the same clips as the body in the room, so a swing here
-   * is the swing the room sees.
-   *
-   * A copy rather than the body itself, and drawn in a pass of its own
-   * over a cleared depth buffer: an arm a hand's width from the lens is
-   * inside whatever wall the warden is standing at, and the room would
-   * eat it.
-   */
-  /**
-   * How tall a creature stands and how high its eyes sit, in its own units.
-   *
-   * Read off the whole body even when what gets drawn is a pair of arms: the
-   * arms were cut out of that body and carry no head to measure, and the two
-   * numbers the view needs - how much to shrink it, and how far to drop it so
-   * the eyes land on the lens - are both about the whole animal.
-   */
-  private measureBody(key: string): { tall: number; eye: number } | null {
-    const model = this.loaded.get(key);
-    if (!model) return null;
-
-    const scene = model.scene;
-    scene.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(scene);
-    const tall = box.max.y - box.min.y;
-    if (tall < 0.01) return null;
-
-    // Top of the head as a fallback, for a rig that names its skull something
-    // this does not know.
-    let eye = box.max.y;
-    const at = new THREE.Vector3();
-    scene.traverse((child) => {
-      if (/^head$/i.test(child.name)) eye = child.getWorldPosition(at).y;
-    });
-    return { tall, eye: eye - box.min.y };
-  }
-
-  private buildViewArms(
-    clips: THREE.AnimationClip[],
-    key = "warden_arms",
-    sourceKey = "warden",
-  ): void {
-    /*
-     * Arms if the bake made them, the whole body if it did not.
-     *
-     * scripts/bake-warden.mjs cuts the arms out of the body by bone weight,
-     * because no free pack ships a monster's. Falling back to the body keeps
-     * the view working on a checkout where that file was never built.
-     */
-    const model = this.loaded.get(key) ?? this.loaded.get("warden_arms") ?? this.loaded.get("warden");
-    if (!model) return;
-
-    const arms = this.models.instantiate(model);
-    arms.traverse((child) => {
-      const mesh = child as THREE.SkinnedMesh;
-      if (!mesh.isMesh) return;
-      // Skinned meshes are culled against their bind pose, and this one is
-      // never where the pose says it is.
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 60;
-    });
-
-    /*
-     * Sized and hung off its own eyes.
-     *
-     * The copy comes out of the library at whatever scale the file was
-     * authored in - which for this one is a giant - so it borrows the scale
-     * the room body was fitted to, and hangs by the distance from that
-     * body's feet to its eyes: put the copy's head where the lens is, and
-     * its shoulders land where shoulders belong.
-     */
-    /*
-     * Sized against the body it is a copy of, and hung by the eyes.
-     *
-     * The library hands out the model at the scale its author used - a
-     * giant, here - so the copy borrows the scale the room body was fitted
-     * to. Dropping it by the height of that body's eyes puts the copy's own
-     * eyes at the lens, whatever body ends up in the slot; turning it to
-     * face away from the viewer is what makes this the inside of a head
-     * rather than a mirror.
-     */
-    /*
-     * Measured from the body these arms came out of, not from the warden.
-     *
-     * Borrowing the warden's scale worked while the only arms in the game
-     * were the warden's. A ridden skeleton is a different model at a
-     * different authored size, and wearing the imp's shrink factor made it
-     * either a pair of girders across the screen or nothing at all.
-     */
-    const fit = this.measureBody(sourceKey);
-    const factor = fit ? WARDEN_HEIGHT / fit.tall : 1;
-    const eyeAboveFeet = fit ? fit.eye * factor : this.wardenEye - FLOOR_HEIGHT;
-    arms.scale.multiplyScalar(factor);
-    const place = VIEW_PLACE[key] ?? VIEW_PLACE_DEFAULT;
-    VIEW_TUNING.back = place.back;
-    VIEW_TUNING.drop = place.drop;
-    arms.position.set(VIEW_TUNING.aside, -eyeAboveFeet + place.drop, place.back);
-    this.viewEye = eyeAboveFeet;
-    arms.rotation.set(0, Math.PI, 0);
-
-    this.viewBones = [];
-    arms.traverse((child) => {
-      // Three naming conventions, because the packs disagree and three.js
-      // strips the dot out of the ones that use one: upperarm_l on the
-      // mannequin, upperarm.l in KayKit files, upperarml once loaded.
-      if (/^(upperarm|lowerarm)[_.]?[lr]$/i.test(child.name)) {
-        this.viewBones.push([child.name, child]);
-      }
-    });
-    // Only the Unreal mannequin keeps a separator by the time three is done
-    // with it, and only the mannequin has a pose that was found by hand. See
-    // poseViewArms for the two ways.
-    this.viewAimed = !this.viewBones.some(([name]) => /_[lr]$/i.test(name));
-
-    this.viewArms = arms;
-    this.viewHolder.add(arms);
-    this.setupAnimation("view-arms", arms, clips);
-    this.playClip("view-arms", "idle");
+    // Only on a ridden body: among two identical skeletons the player has to
+    // know which one is theirs, and the warden walking alone has no twin.
+    if (key) {
+      const mark = new THREE.Mesh(
+        new THREE.RingGeometry(0.3, 0.4, 32),
+        new THREE.MeshBasicMaterial({
+          color: MARK_COLOR,
+          transparent: true,
+          opacity: 0.75,
+          depthWrite: false,
+        }),
+      );
+      mark.rotation.x = -Math.PI / 2;
+      this.wardenMark = mark;
+      this.scene.add(mark);
+    }
   }
 
   private disposeWarden(): void {
-    if (this.viewArms) {
-      this.mixers.delete("view-arms");
-      this.disposeObject(this.viewHolder, this.viewArms);
-      this.viewArms = null;
-      this.viewBones = [];
+    if (this.wardenMark) {
+      // disposeObject leaves geometry alone because models share theirs; this
+      // ring's is its own.
+      this.wardenMark.geometry.dispose();
+      this.disposeObject(this.scene, this.wardenMark);
+      this.wardenMark = null;
     }
-    this.possessedType = null;
     if (!this.warden) return;
     this.mixers.delete("warden");
     this.disposeObject(this.scene, this.warden);
     this.warden = null;
   }
 
-  /**
-   * Turns the copy's shoulders forward and folds away what is not an arm.
-   *
-   * Applied after the mixer and before the frame, on top of whatever the
-   * clip did: the clip decides how the arm swings, this decides where it
-   * swings from. Both have to be redone every frame - the clips carry
-   * rotation and scale tracks, so a pose set once is gone by the next one,
-   * which is how the head grew back mid-swing the first time.
-   */
-  private poseViewArms(): void {
-    const arms = this.viewArms;
-    if (!arms) return;
-
-    /*
-     * Each arm is aimed rather than rotated by a fixed angle.
-     *
-     * A fixed Euler only works for one skeleton. The imp is rigged to the
-     * Unreal mannequin and the minions to KayKit's, and the same numbers that
-     * put an imp's claws in the frame left a skeleton's arms splayed out
-     * sideways, because the two rigs do not agree on which way an arm bone
-     * lies in its parent. So this asks the only question that transfers:
-     * where does this bone currently point, and where should it point? The
-     * turn that carries one onto the other is the pose, whatever the rig.
-     *
-     * Re-done every frame on top of whatever the clip did - the clips carry
-     * rotation tracks for these bones, so a pose set once is gone by the next
-     * frame - and the clip still owns the swing. This only decides where the
-     * arm swings from.
-     */
-    if (!this.viewAimed) {
-      /*
-       * The mannequin rig, turned by a fixed angle at the shoulder.
-       *
-       * An arm bone points down its own length, so turning it about its own
-       * axes only twists the limb. Applied from the parent side instead, the
-       * same angle swings the whole arm forward, which is what puts it in the
-       * picture. These numbers were found on the imp and they fit it.
-       */
-      for (const [name, bone] of this.viewBones) {
-        const side = name.endsWith("_l") ? 1 : -1;
-        const pitch = name.startsWith("upperarm") ? VIEW_UPPER : VIEW_ELBOW;
-        VIEW_EULER.set(pitch, VIEW_SPREAD * side, 0);
-        VIEW_TURN.setFromEuler(VIEW_EULER);
-        bone.quaternion.premultiply(VIEW_TURN);
-      }
-      return;
-    }
-
-    arms.updateMatrixWorld(true);
-    arms.getWorldQuaternion(VIEW_ROOT);
-
-    for (const [name, bone] of this.viewBones) {
-      const child = bone.children.find((c) => (c as THREE.Bone).isBone) ?? bone.children[0];
-      if (!child) continue;
-
-      // The models are mirrored down the middle, so the left arm wants the
-      // same aim with its sideways component flipped.
-      const side = /[_.]?l$/i.test(name) ? 1 : -1;
-      const aim = name.toLowerCase().startsWith("upperarm") ? VIEW_TUNING.upper : VIEW_TUNING.lower;
-      VIEW_WANT.set(aim.x * side, aim.y, aim.z).normalize().applyQuaternion(VIEW_ROOT);
-
-      bone.updateMatrixWorld(true);
-      child.updateMatrixWorld(true);
-      VIEW_HAVE.copy(child.getWorldPosition(VIEW_A)).sub(bone.getWorldPosition(VIEW_B));
-      if (VIEW_HAVE.lengthSq() < 1e-8) continue;
-      VIEW_HAVE.normalize();
-
-      // Turn in world terms, then written back into the parent's frame, which
-      // is the only frame a bone's own rotation is allowed to speak in.
-      VIEW_DELTA.setFromUnitVectors(VIEW_HAVE, VIEW_WANT);
-      bone.getWorldQuaternion(VIEW_WORLD);
-      bone.parent?.getWorldQuaternion(VIEW_PARENT);
-      bone.quaternion.copy(VIEW_PARENT.invert().multiply(VIEW_DELTA).multiply(VIEW_WORLD));
-      bone.updateMatrixWorld(true);
-    }
-  }
-
-  /** Keeps the body under the camera and in the right clip. */
+  /** Keeps the body where the walk is and in the right clip. */
   private updateWarden(): void {
     const walk = this.walk;
     const body = this.warden;
     if (!walk || !body) return;
 
-
     body.position.x = walk.at.x;
     body.position.z = walk.at.z;
     body.rotation.y = walk.yaw;
-    this.poseViewArms();
+    this.wardenMark?.position.set(walk.at.x, FLOOR_HEIGHT + 0.03, walk.at.z);
 
-    // A swing owns the arms until it is done, or walking would cut it off
+    // A swing owns the body until it is done, or walking would cut it off
     // at the first frame the player moved.
     if (performance.now() < this.swingUntil) return;
     this.playClip("warden", this.wardenMoving ? "walk" : "idle");
-    this.playClip("view-arms", this.wardenMoving ? "walk" : "idle");
   }
 
   /**
-   * Puts the view inside one of the garrison instead of the warden's own body.
+   * Puts the camera behind one of the garrison instead of the warden's own body.
    *
    * Only the picture changes here. Where that body stands, what it hits and
    * whether it lives are the simulation's, and arrive through
-   * `setPossessedAt`; this swaps the arms for the ones belonging to the type
-   * of thing being ridden, so a warden in a skeleton looks down at bone.
+   * `setPossessedAt`; this swaps which model is drawn under the camera.
    *
-   * Passing null hands the view back to the warden's own arms.
+   * Passing null hands the view back to the warden's own body.
    */
   setPossessed(key: string | null): void {
     if (this.possessedType === key) return;
     this.possessedType = key;
-
-    if (!this.warden) return;
-
-    if (this.viewArms) {
-      this.mixers.delete("view-arms");
-      this.disposeObject(this.viewHolder, this.viewArms);
-      this.viewArms = null;
-      this.viewBones = [];
-    }
-
-    if (key) {
-      // The skeletons carry no clips of their own; the pack ships one rig's
-      // worth for everything built on it, which is what sharedClips holds.
-      this.buildViewArms(this.sharedClips, `${key}_arms`, key);
-      return;
-    }
-
-    const own = this.loaded.get("warden")?.animations ?? [];
-    const rigged = this.loaded.get("warden_clips")?.animations ?? [];
-    this.buildViewArms(own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips);
+    if (this.walk) this.spawnWarden();
   }
 
   /**
@@ -2583,6 +2305,37 @@ export class DungeonRenderer {
     if (!this.walk) return;
     this.walk.at.x = x;
     this.walk.at.z = y;
+    if (!this.faceOnArrival) return;
+    this.faceOnArrival = false;
+
+    /*
+     * Turned towards the fight.
+     *
+     * Every ride used to start facing the core, the way a walk from the door
+     * does - which in a raid is facing away from the people coming in, and the
+     * first thing a player climbing into a body felt was a blow in the back.
+     * The nearest adventurer if one is in the room, the door if not.
+     */
+    let target: { x: number; y: number } | null = this.entrance;
+    let best = Infinity;
+    for (const unit of this.lastUnits) {
+      if (!unit.id.startsWith("a:")) continue;
+      const d = Math.hypot(unit.x - x, unit.y - y);
+      if (d < best) {
+        best = d;
+        target = unit;
+      }
+    }
+    if (!target || (target.x === x && target.y === y)) return;
+    this.walk.yaw = Math.atan2(target.x - x, target.y - y);
+  }
+
+  /**
+   * Turns the view towards the nearest adventurer once the ridden body's
+   * position next arrives. Called on every new ride, hops included.
+   */
+  faceThreatOnArrival(): void {
+    this.faceOnArrival = true;
   }
 
   /**
@@ -2604,48 +2357,30 @@ export class DungeonRenderer {
   }
 
   /**
-   * Throws the arms through one swing.
+   * Throws the body through one swing.
    *
    * Timed off the wall clock rather than counted down in the frame loop,
    * because the swing is a picture: it has no say in what the simulation
-   * decides the blow did, and a dropped frame should not leave an arm stuck
-   * out in front of the camera.
+   * decides the blow did, and a dropped frame should not leave it stuck
+   * mid-swing.
    */
   swing(): void {
-    if (!this.viewArms && !this.warden) return;
+    if (!this.warden) return;
     this.swingUntil = performance.now() + SWING_MS;
     this.playClip("warden", "attack");
-    this.playClip("view-arms", "attack");
   }
 
-  /**
-   * The view model's placement, live.
-   *
-   * Every number in it was arrived at by moving it and looking, so it is
-   * handed out rather than hidden: change a field and the next frame shows
-   * it. Used from the console during development; nothing in the game writes
-   * to it.
-   */
-  debugViewTuning(): typeof VIEW_TUNING & { apply: () => void } {
-    return Object.assign(VIEW_TUNING, {
-      apply: () => {
-        if (!this.viewArms) return;
-        this.viewArms.position.set(
-          VIEW_TUNING.aside,
-          -this.viewEye + VIEW_TUNING.drop,
-          VIEW_TUNING.back,
-        );
-      },
-    });
-  }
-
-  /** Turns the head. Radians, from a drag. */
+  /** Turns the view. Radians, from a drag. */
   look(dYaw: number, dPitch: number): void {
     if (!this.walk) return;
     this.walk.yaw -= dYaw;
-    // Stopped short of straight up and straight down, where the horizon rolls
-    // over and the controls appear to invert.
-    this.walk.pitch = THREE.MathUtils.clamp(this.walk.pitch - dPitch, -1.2, 1.2);
+    // Held to the range the camera can actually use, so a long drag past the
+    // stop does not have to be dragged all the way back before it responds.
+    this.walk.pitch = THREE.MathUtils.clamp(
+      this.walk.pitch - dPitch,
+      CHASE_ELEVATION - CHASE_ELEVATION_MAX,
+      CHASE_ELEVATION - CHASE_ELEVATION_MIN,
+    );
   }
 
   /**
@@ -2730,8 +2465,8 @@ export class DungeonRenderer {
   /**
    * Whether a point is far enough from the rock to stand on.
    *
-   * Kept a body-width clear of the edge, or the camera pushes its nose
-   * through the wall and the corridor turns inside out.
+   * Kept a body-width clear of the edge, so the body is never drawn with a
+   * shoulder inside the wall.
    */
   private standable(x: number, z: number): boolean {
     const arena = this.arena;
@@ -2747,36 +2482,38 @@ export class DungeonRenderer {
   }
 
   private updateCamera(): void {
-    /*
-     * Down in the corridor: the camera is the player, so it is a position and
-     * a heading rather than something orbiting a point on the floor.
-     */
     if (this.walk) {
       /*
-       * At the warden's own eyes.
+       * Behind the body and above it, looking a little past it.
        *
-       * Standing the camera behind the shoulders was tried and cannot work
-       * here: the corridor is one tile wide, so anywhere far enough back to
-       * see the body is inside the rock behind it, and at the door - where
-       * every game starts - that is the outside of the room. So the view is
-       * the warden's, and what it sees of itself is the pair of arms held
-       * in front of it by `viewArms`.
+       * High enough that the line to the body clears the rock of a one-tile
+       * corridor from anywhere in the elevation clamp, so there is never a
+       * wall between the player and the thing they are steering. Aimed ahead
+       * of the body rather than at it, because what is coming down the
+       * corridor matters more than the back of one's own head.
        */
-      const eye = this.warden ? this.wardenEye : this.walk.at.y;
-      const ex = this.walk.at.x;
-      const ez = this.walk.at.z;
-      this.camera.position.set(ex, eye, ez);
-      const cosPitch = Math.cos(this.walk.pitch);
-      this.camera.lookAt(
-        ex + Math.sin(this.walk.yaw) * cosPitch,
-        eye + Math.sin(this.walk.pitch),
-        ez + Math.cos(this.walk.yaw) * cosPitch,
+      const walk = this.walk;
+      const elevation = THREE.MathUtils.clamp(
+        CHASE_ELEVATION - walk.pitch,
+        CHASE_ELEVATION_MIN,
+        CHASE_ELEVATION_MAX,
       );
+      const aimY = FLOOR_HEIGHT + CHASE_AIM;
+      const ahead = Math.cos(elevation) * CHASE_LEAD;
+      const ax = walk.at.x + Math.sin(walk.yaw) * ahead;
+      const az = walk.at.z + Math.cos(walk.yaw) * ahead;
+      const back = Math.cos(elevation) * CHASE_DISTANCE;
+      this.camera.position.set(
+        walk.at.x - Math.sin(walk.yaw) * back + this.shakeOffset.x,
+        aimY + Math.sin(elevation) * CHASE_DISTANCE + this.shakeOffset.y,
+        walk.at.z - Math.cos(walk.yaw) * back + this.shakeOffset.z,
+      );
+      this.camera.lookAt(ax, aimY, az);
       const closeFog = this.scene.fog as THREE.Fog | null;
-      // Much tighter than the overview: down here the dark is the point.
+      // Tighter than the overview: down here the dark is the point.
       if (closeFog) {
-        closeFog.near = 1.5;
-        closeFog.far = 11;
+        closeFog.near = CHASE_DISTANCE + 1;
+        closeFog.far = CHASE_DISTANCE + 11;
       }
       return;
     }
@@ -3281,24 +3018,6 @@ export class DungeonRenderer {
 
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
-    if (this.viewArms) {
-      /*
-       * The arms go where the head goes, pitch and all: they are part of
-       * the view, not part of the room.
-       *
-       * The flag has to be raised by hand because this holder keeps a
-       * matrix rather than a position and a rotation; without it three
-       * leaves the matrix where it was built and the arms hang at the
-       * origin, in the corner of the room, which looks like no arms at all.
-       */
-      this.viewHolder.matrix.copy(this.camera.matrixWorld);
-      this.viewHolder.matrixWorldNeedsUpdate = true;
-      // Over the room, never instead of it: this pass clears depth only.
-      this.renderer.autoClear = false;
-      this.renderer.clearDepth();
-      this.renderer.render(this.viewScene, this.camera);
-      this.renderer.autoClear = true;
-    }
   };
 
   /**

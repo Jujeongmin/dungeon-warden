@@ -248,11 +248,17 @@ export function useRaid({
         }
       }
 
-      const next = sim.state;
+      let next = sim.state;
       // The build window is played from the board: there is nothing to fight
       // during it, and a warden left standing in an empty corridor cannot
-      // spend the gold it just won.
-      if (next.possessedId !== null && next.status !== "running") sim.release();
+      // spend the gold it just won. The state is read again after letting go:
+      // it is a snapshot, and publishing the one from before the release left
+      // the last frame of a won raid still riding - the corridor stayed open,
+      // the pointer stayed locked, and the result could not be clicked.
+      if (next.possessedId !== null && next.status !== "running") {
+        sim.release();
+        next = sim.state;
+      }
       setRaidState({ ...next, minions: [...next.minions], adventurers: [...next.adventurers] });
 
       if (isRaidOver(next.status)) {

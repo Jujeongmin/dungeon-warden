@@ -450,8 +450,8 @@ export default function App() {
    * Which model the ridden body wears, not which kind of unit it is.
    *
    * The same answer the board uses to draw it - see `units` - because the
-   * arms in front of the camera have to be the arms on the thing everyone
-   * else can see. A convert wears whatever class it was caught as.
+   * body the camera follows has to be the one everyone else can see. A
+   * convert wears whatever class it was caught as.
    */
   const possessedType = possessed
     ? possessed.type === "convert"
@@ -541,6 +541,7 @@ export default function App() {
     if (possessedId) {
       wasRiding.current = possessedId;
       setWalking(true);
+      rendererRef.current?.faceThreatOnArrival();
       return;
     }
 
@@ -585,10 +586,10 @@ export default function App() {
   }, [possessed, possessed?.hp, settings.haptics]);
 
   /*
-   * Whose arms the player sees, and where those arms are standing.
+   * Whose body the camera follows, and where that body is standing.
    *
    * Declared after the effect that opens the walking view, so by the time it
-   * runs there is a body to hang the arms off. The position arrives from the
+   * runs there is a walk to put the body in. The position arrives from the
    * simulation every frame - it owns where a ridden body ends up, because it
    * is the thing that knows about rock, reach and everybody else.
    */
@@ -961,8 +962,8 @@ export default function App() {
       const live: UnitView[] = [];
       for (const m of raid.raidState.minions) {
         if (!m.alive) continue;
-        // Standing inside it: drawing it here would put its ribs across the
-        // lens. The arms in front of the camera are this body's own.
+        // Ridden: the renderer draws it itself, under the camera that
+        // follows it, so it is not drawn twice.
         if (m.id === possessedId) continue;
         const placed = minions.find((p) => p.id === m.id);
         // A convert keeps the adventurer model it had before turning.
@@ -1301,6 +1302,17 @@ export default function App() {
     audio.play(raid.result.outcome === "repelled" ? "victory" : "defeat", 0);
   }, [raid.result]);
 
+  /*
+   * The result is read from the board, with a cursor.
+   *
+   * A raid started from the corridor could end with the player still down in
+   * it and the mouse still captured for looking, so the dialog came up with
+   * no pointer to press its button with. Climbing out frees both.
+   */
+  useEffect(() => {
+    if (raid.result) setWalking(false);
+  }, [raid.result]);
+
   useEffect(() => {
     installDevTools({
       arena, dug, minions, traps, rooms, loot, prisoners, adventurers,
@@ -1351,6 +1363,21 @@ export default function App() {
    */
   const stuck = !raid.raidOpen && screen !== "title" && isBroke(gold, minions, partyClock);
   const stuckRefund = stuck ? planRebuild({ arena, dug, minions, traps, rooms }).refund : 0;
+
+  /*
+   * Milliseconds until the first minion is standing again, or 0.
+   *
+   * A defence begun while the whole garrison is still on its revive timer
+   * is a breach before the door opens - played through, it looked like the
+   * dungeon had simply stopped working. The button still starts it, because
+   * traps alone may be the plan, but it says who is not coming.
+   */
+  const reviveLeft = useMemo(() => {
+    if (minions.length === 0) return 0;
+    return Math.min(
+      ...minions.map((m) => (m.revivesAt && m.revivesAt > partyClock ? m.revivesAt - partyClock : 0)),
+    );
+  }, [minions, partyClock]);
 
   const onGoldAd = useCallback(async () => {
     const outcome = await adGold.claim();
@@ -1770,7 +1797,8 @@ export default function App() {
 
       {/* The way in, said once where the board is. Only while there is
           still a body to take, and never while the player is already in one. */}
-      {raid.raiding && !walking && !possessedId && !settings.possessSeen && (
+      {raid.raiding && !walking && !possessedId && !settings.possessSeen &&
+        raid.raidState?.minions.some((m) => m.alive) && (
         <div className="possess-hint">{t("possess_pick")}</div>
       )}
 
@@ -2158,7 +2186,14 @@ export default function App() {
               * Numbers survive being small. The crown is a flat glyph rather
               * than a render, for the same reason.
               */}
-            {connected && !raid.starting && nextParty.length > 0 && (
+            {connected && !raid.starting && reviveLeft > 0 && (
+              <span className="go-sub go-warn">
+                {t("raid_reviving", {
+                  t: `${Math.floor(Math.ceil(reviveLeft / 1000) / 60)}:${String(Math.ceil(reviveLeft / 1000) % 60).padStart(2, "0")}`,
+                })}
+              </span>
+            )}
+            {connected && !raid.starting && reviveLeft === 0 && nextParty.length > 0 && (
               <span className="go-sub">
                 {nextParty.some((m) => m.champion) && <Icon name="crown" size={13} />}
                 {t("party_summary", {

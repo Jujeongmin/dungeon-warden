@@ -12,10 +12,9 @@
  *   Universal Animation Library 2 (Quaternius, CC0) — the motion, on that same
  *   skeleton, which is the whole reason these two were chosen together.
  *
- * What comes out is three files: a body with its textures cut to something a
- * phone can hold, the locomotion clips it actually plays with the library's
- * own mannequin thrown away, and the same body cut down to a pair of arms
- * for the view from inside its head. Run with:
+ * What comes out is two files: a body with its textures cut to something a
+ * phone can hold, and the locomotion clips it actually plays with the
+ * library's own mannequin thrown away. Run with:
  *
  *   node scripts/bake-warden.mjs
  */
@@ -26,7 +25,6 @@ import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { dedup, prune, quantize, resample, textureCompress, weld } from "@gltf-transform/functions";
 import sharp from "sharp";
-import { cutArmsAndPrune } from "./lib/cut-arms.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -72,8 +70,8 @@ async function main() {
    * The occlusion/roughness/metalness map goes.
    *
    * It is the single heaviest texture in the pack and it is describing a
-   * surface nobody will ever inspect: this model is seen as two arms at the
-   * bottom of the screen, in a corridor lit by one torch. Flat roughness says
+   * surface nobody will ever inspect: this model is seen a few tiles off, in
+   * a corridor lit by one torch. Flat roughness says
    * the same thing there for nothing.
    */
   for (const material of body.getRoot().listMaterials()) {
@@ -107,8 +105,8 @@ async function main() {
        * The animation library's mannequin has a few finger and foot-tip
        * joints that the imp does not. Three.js can ignore those tracks, but
        * it reports every missing target for every copy of the rig, which
-       * floods the console as soon as first-person mode creates its body and
-       * view-arms mixers. Keep only channels the shipped body can actually
+       * floods the console as soon as the corridor view creates its body
+       * mixer. Keep only channels the shipped body can actually
        * bind, then drop samplers that no surviving channel uses.
        */
       for (const channel of animation.listChannels()) {
@@ -150,13 +148,9 @@ async function main() {
   await clips.transform(resample(), dedup(), prune({ keepLeaves: true }));
   await io.write(join(out, "warden-clips.glb"), clips);
 
-  // --- the arms ------------------------------------------------------------
-  await bakeArms(io);
-
   const size = (file) => `${(readFileSync(file).byteLength / 1024).toFixed(0)}KB`;
   console.log(`warden.glb        ${size(join(out, "warden.glb"))}`);
   console.log(`warden-clips.glb  ${size(join(out, "warden-clips.glb"))}`);
-  console.log(`warden-arms.glb   ${size(join(out, "warden-arms.glb"))}`);
 
   const kept = Object.values(WANTED).join(", ");
   writeFileSync(
@@ -178,23 +172,6 @@ async function main() {
       "",
     ].join("\n"),
   );
-}
-
-/**
- * The same body again, cut down to the pair of arms the player looks past.
- *
- * The cut itself lives in scripts/lib/cut-arms.mjs, because the minions get
- * the same treatment - see scripts/bake-minion-arms.mjs - and one rule for
- * what counts as an arm is worth more than two that drift apart.
- */
-async function bakeArms(io) {
-  const document = await io.read(join(out, "warden.glb"));
-  if (!(await cutArmsAndPrune(document))) {
-    console.error("no arm bones found in warden.glb, nothing written");
-    process.exitCode = 1;
-    return;
-  }
-  await io.write(join(out, "warden-arms.glb"), document);
 }
 
 await main();

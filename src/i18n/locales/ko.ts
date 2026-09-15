@@ -53,6 +53,7 @@ export const ko = {
   stat_unsaved: "미저장",
   save_now: "지금 저장",
   start_raid: "방어 시작",
+  raid_reviving: "부하 부활까지 {t}",
   preparing: "준비 중…",
   unsaved_changes: "저장하지 않은 변경이 있습니다.",
   hover_hint: "타일 위에 커서를 올려보세요",

@@ -13,6 +13,11 @@
 export function buzz(enabled: boolean, pattern: number | number[]): void {
   if (!enabled) return;
   if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+  // Chrome refuses a buzz before the page has been touched and logs an error
+  // for every one it refuses - a raid watched from the keyboard filled the
+  // console with them. Nothing is lost by not asking.
+  const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+  if (activation && !activation.hasBeenActive) return;
   try {
     navigator.vibrate(pattern);
   } catch {

@@ -50,6 +50,7 @@ export const en: Record<StringKey, string> = {
   stat_unsaved: "Unsaved",
   save_now: "Save now",
   start_raid: "Begin defense",
+  raid_reviving: "Minions back in {t}",
   preparing: "Preparing…",
   unsaved_changes: "You have unsaved changes.",
   hover_hint: "Hover a tile to inspect it",

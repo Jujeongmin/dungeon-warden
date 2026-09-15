@@ -51,6 +51,7 @@ export const zhHant: Record<StringKey, string> = {
   stat_unsaved: "未儲存",
   save_now: "立即儲存",
   start_raid: "開始防守",
+  raid_reviving: "部下復活還需 {t}",
   preparing: "準備中…",
   unsaved_changes: "有尚未儲存的變更。",
   hover_hint: "把游標移到格子上看看",

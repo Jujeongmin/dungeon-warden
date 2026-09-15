@@ -74,43 +74,18 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
    * public/assets/warden/SOURCE.md for where both came from.
    *
    * The skeleton stays as a fallback: before the bake has been run there is
-   * no imp, and a warden with no body at all would take the first-person
-   * view down with it.
+   * no imp, and a warden with no body at all would leave the camera that
+   * follows it with nothing to follow.
    */
   warden: [/^warden$/, /^skeleton_rogue$/, /^skeleton_warrior$/],
   /** Motion for the warden, on the same rig. Carries no mesh of its own. */
   warden_clips: [/^warden-clips$/],
-  /** The same body with everything that is not an arm cut away, for the view. */
-  warden_arms: [/^warden-arms$/],
 
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
   // minion and a mage adventurer are different models.
   m_warrior: [/^skeleton_rogue$/, /^skeleton_warrior$/, /skeleton.*warrior/],
   m_mage: [/^skeleton_mage$/, /skeleton.*mage/],
-
-  /*
-   * The same two, cut down to the arms the warden sees when it rides one.
-   *
-   * Possessing a skeleton and looking down at an imp's claws is worse than
-   * having no arms at all, so each body gets its own pair, cut out of the
-   * shipped model by scripts/bake-minion-arms.mjs the same way the warden's
-   * were. A checkout where that script has not been run falls back to the
-   * warden's arms rather than showing none.
-   */
-  m_warrior_arms: [/^warrior-arms$/],
-  m_mage_arms: [/^mage-arms$/],
-
-  /*
-   * And the adventurers', because a convert keeps the body it was caught
-   * in - a turned knight is a knight, and looking down at a skeleton's
-   * hands while wearing plate is the wrong answer.
-   */
-  a_knight_arms: [/^knight-arms$/],
-  a_barbarian_arms: [/^barbarian-arms$/],
-  a_rogue_arms: [/^rogue-arms$/],
-  a_ranger_arms: [/^ranger-arms$/],
-  a_mage_arms: [/^advmage-arms$/],
 
   // Adventurers, also used for converts. Each class has its own model.
   a_knight: [/^knight$/],

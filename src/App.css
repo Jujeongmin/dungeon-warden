@@ -1278,11 +1278,14 @@ button.primary {
 
 .raid-bar {
   align-self: stretch;
-  /* What doesn't fit scrolls; it is already overflow-x. */
-  gap: 8px;
+  /* What doesn't fit goes onto a second line. It used to scroll, and the
+     board column beside the panel is narrow enough that it always did: a
+     scrollbar under the counters, and the clock cut off the end. */
+  flex-wrap: wrap;
+  gap: 4px 10px;
   font-size: var(--fs-2xs);
-  justify-content: space-between;
-  overflow-x: auto;
+  justify-content: flex-start;
+  border-radius: 16px;
 }
 
 /* The speed toggles are controls; the counters beside them are read-only.
@@ -1780,6 +1783,10 @@ button.ad-gold {
   color: var(--accent);
 }
 
+/* Nobody is standing to defend yet: the one line on the button that has to
+   be read before pressing it. */
+.hud-foot .go .go-warn { color: #ffb4a8; }
+
 .hud-foot .go {
   display: flex;
   flex-direction: column;
@@ -2246,9 +2253,13 @@ button.ad-gold {
    has taken it up once never needs to read it again. */
 .possess-hint {
   position: absolute;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
+  /* Clear above the skill cards, centred on the board column rather than the
+     stage: lower down it sat on the cards' titles, and centred on the whole
+     stage it straddled the panel. */
+  left: calc((100% - min(42%, 360px) - 20px) / 2);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 124px);
   transform: translateX(-50%);
+  white-space: nowrap;
   z-index: 3;
   padding: 6px 14px;
   border-radius: 99px;
@@ -2295,6 +2306,9 @@ button.ad-gold {
 /* Said down in the corridor instead, where the skills are not drawn and the
    bar along the foot is the stick and the swing. */
 .strike-hint {
+  /* The panel is gone down there, so this one centres on the whole stage. */
+  left: 50%;
+  top: auto;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 158px);
 }
 
@@ -2360,9 +2374,9 @@ button.ad-gold {
 .walk-life {
   position: absolute;
   left: 50%;
-  /* Down in the gap between the stick and the swing, rather than across
-     the middle of the arms. */
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+  /* Above the row of buttons between the stick and the swing: level with
+     them it ran under the skill and hop buttons. */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 132px);
   transform: translateX(-50%);
   z-index: 3;
   width: min(34%, 240px);

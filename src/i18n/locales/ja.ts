@@ -56,6 +56,7 @@ export const ja: Record<StringKey, string> = {
   stat_unsaved: "未保存",
   save_now: "保存する",
   start_raid: "防衛開始",
+  raid_reviving: "配下の復活まで {t}",
   preparing: "準備中…",
   unsaved_changes: "保存していない変更があります。",
   hover_hint: "タイルにカーソルを合わせてください",
