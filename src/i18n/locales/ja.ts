@@ -178,6 +178,7 @@ export const ja: Record<StringKey, string> = {
   shop_no_host: "Verse8 上で遊んでいるときだけショップを開けます。",
   shop_empty: "登録された商品はありません。",
   shop_loading: "商品を読み込み中…",
+  speed_locked: "3倍速はショップで購入できます",
 
   status_connecting: "サーバーに接続中",
   status_loading: "セーブを読み込み中",

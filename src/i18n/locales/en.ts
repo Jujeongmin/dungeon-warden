@@ -172,6 +172,7 @@ export const en: Record<StringKey, string> = {
   shop_no_host: "The shop is only available when the game runs on Verse8.",
   shop_empty: "No products registered.",
   shop_loading: "Loading products…",
+  speed_locked: "3× speed is available in the shop",
 
   status_connecting: "Connecting",
   status_loading: "Loading save",

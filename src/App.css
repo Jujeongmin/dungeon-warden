@@ -2595,3 +2595,7 @@ button.ad-gold {
   font-size: var(--fs-2xs);
   border-radius: 99px;
 }
+
+/* The bought speed, before it is bought. */
+.speeds button.locked { opacity: 0.7; }
+.speeds button .lock { font-size: 0.8em; margin-right: 2px; }

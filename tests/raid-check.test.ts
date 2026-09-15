@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   RAID_BLEED_SECONDS,
   RAID_CLOCK_SLACK_MS,
-  RAID_MAX_SPEED,
+  RAID_FREE_SPEED,
+  RAID_PAID_SPEED,
   RAID_SPAWN_INTERVAL,
   earliestFates,
   raidSeconds,
@@ -110,17 +111,17 @@ describe("a report the clock does not allow", () => {
   const everyone = waves.flat().map((m) => m.id);
 
   it("drops kills reported the moment the raid opened", () => {
-    const seconds = raidSeconds(1_000, 1_000);
+    const seconds = raidSeconds(1_000, 1_000, RAID_PAID_SPEED);
     const timely = timelyFates(waves, seconds, everyone, []);
     expect(timely.killed).toEqual([]);
     expect(timely.canRepel).toBe(false);
   });
 
   it("keeps only the adventurers who could have walked in yet", () => {
-    // Half a second at top speed, with the slack, is three simulated seconds:
-    // the first wave is in and the second has not finished arriving.
-    const seconds = raidSeconds(0, 500);
-    expect(seconds).toBeCloseTo(3, 9);
+    // Half a second at the bought speed, with the slack, is 2.25 simulated
+    // seconds: the first wave is in and the second has not finished arriving.
+    const seconds = raidSeconds(0, 500, RAID_PAID_SPEED);
+    expect(seconds).toBeCloseTo(2.25, 9);
     const timely = timelyFates(waves, seconds, [], everyone);
     expect(timely.captured).toEqual(["a1", "a2", "a3", "b1", "b2", "b3"].filter((id) => earliestFates(waves).downAt[id] <= seconds));
     expect(timely.captured).toContain("a1");
@@ -128,13 +129,13 @@ describe("a report the clock does not allow", () => {
   });
 
   it("allows everything once enough time has passed", () => {
-    const timely = timelyFates(waves, raidSeconds(0, 60_000), everyone, []);
+    const timely = timelyFates(waves, raidSeconds(0, 60_000, RAID_FREE_SPEED), everyone, []);
     expect(timely.killed).toEqual(everyone);
     expect(timely.canRepel).toBe(true);
   });
 
   it("does not judge a raid opened before the clock was recorded", () => {
-    expect(raidSeconds(undefined, 0)).toBe(Infinity);
+    expect(raidSeconds(undefined, 0, RAID_FREE_SPEED)).toBe(Infinity);
   });
 
   it("puts each wave after the one before it", () => {
@@ -152,15 +153,21 @@ describe("the server's side of it", () => {
     expect(RAID_BLEED_SECONDS).toBeLessThan(DOWNED_SECONDS);
     expect(RAID_BLEED_SECONDS).toBeGreaterThanOrEqual(DOWNED_SECONDS - 3 * SIM_DT);
     const speeds = useRaid.match(/export const RAID_SPEEDS = \[([^\]]+)\]/)?.[1].split(",").map(Number) ?? [];
-    expect(RAID_MAX_SPEED).toBe(Math.max(...speeds));
+    expect(RAID_PAID_SPEED).toBe(Math.max(...speeds));
+    expect(speeds).toContain(RAID_FREE_SPEED);
+    expect(RAID_FREE_SPEED).toBeLessThan(RAID_PAID_SPEED);
+    expect(useRaid).toContain(`export const FREE_RAID_SPEED = ${RAID_FREE_SPEED};`);
+    expect(useRaid).toContain(`export const PAID_RAID_SPEED = ${RAID_PAID_SPEED};`);
   });
 
   it("uses the same numbers and the same rule", () => {
-    expect(server).toContain(`const RAID_MAX_SPEED = ${RAID_MAX_SPEED};`);
+    expect(server).toContain(`const RAID_FREE_SPEED = ${RAID_FREE_SPEED};`);
+    expect(server).toContain(`const RAID_PAID_SPEED = ${RAID_PAID_SPEED};`);
+    expect(body("raidSpeedFor")).toContain("state.entitlements.fastForward ? RAID_PAID_SPEED : RAID_FREE_SPEED");
     expect(server).toContain(`const RAID_SPAWN_INTERVAL = ${RAID_SPAWN_INTERVAL};`);
     expect(server).toContain(`const RAID_BLEED_SECONDS = ${RAID_BLEED_SECONDS};`);
     expect(server).toContain(`const RAID_CLOCK_SLACK_MS = ${RAID_CLOCK_SLACK_MS};`);
-    expect(body("raidSeconds")).toContain("((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * RAID_MAX_SPEED");
+    expect(body("raidSeconds")).toContain("((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * speed");
     expect(body("earliestFates")).toContain("waveStart += Math.max(0, wave.length - 1) * RAID_SPAWN_INTERVAL;");
     const timely = body("timelyFates");
     expect(timely).toContain("killed: killed.filter((id) => reached(id, RAID_BLEED_SECONDS)),");
@@ -168,8 +175,8 @@ describe("the server's side of it", () => {
   });
 
   it("applies it to every raid that pays or scores", () => {
-    expect(server).toContain("const timely = timelyFates(pending, now, reportedKilled, reportedCaptured);");
-    expect(body("finishDailyRaid")).toContain("timelyFates(pending, Date.now(), reportedKilled, reportedCaptured)");
+    expect(server).toContain("const timely = timelyFates(pending, now, reportedKilled, reportedCaptured, raidSpeedFor(state));");
+    expect(body("finishDailyRaid")).toContain("timelyFates(pending, Date.now(), reportedKilled, reportedCaptured, raidSpeedFor(state))");
     expect(server.split('if (outcome === "repelled" && !timely.canRepel) throw new Error("RAID_TOO_FAST");').length - 1).toBe(2);
   });
 });

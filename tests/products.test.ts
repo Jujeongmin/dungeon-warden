@@ -7,7 +7,7 @@ const server = readFileSync(new URL("../server.js", import.meta.url), "utf8").re
 describe("the shop's products", () => {
   it("grant what the server grants", () => {
     const block = server.slice(server.indexOf("const PRODUCTS = {"), server.indexOf("\n};\n", server.indexOf("const PRODUCTS = {")));
-    const rows = [...block.matchAll(/^\s+([a-z_]+): \{ grants: "([A-Za-z]+)"/gm)];
+    const rows = [...block.matchAll(/^\s+([a-z0-9_]+): \{ grants: "([A-Za-z]+)"/gm)];
     expect(Object.fromEntries(rows.map((m) => [m[1], m[2]]))).toEqual(PRODUCT_GRANTS);
   });
 

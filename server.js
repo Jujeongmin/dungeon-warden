@@ -179,18 +179,24 @@ const THREAT_REWARD_STEP = 0.08;
 // The client reports who fell; the server cannot replay the fight, but it can
 // read the clock. Nobody goes down before walking in, walking in is staggered,
 // a wave follows only once the last is over, a beaten adventurer bleeds out
-// before counting as killed, and the fight runs at most RAID_MAX_SPEED. What
+// before counting as killed, and the fight runs at most 2x - 3x on an account
+// that bought raid_speed_3x. What
 // the time since startRaid does not allow is dropped. A floor rather than a
 // proof - an honest raid is always slower. Mirrored in src/game/raidCheck.ts;
 // tests/raid-check.test.ts pins the two and plays real raids against it.
-const RAID_MAX_SPEED = 4;
+const RAID_FREE_SPEED = 2;
+const RAID_PAID_SPEED = 3;
 const RAID_SPAWN_INTERVAL = 0.9;
 const RAID_BLEED_SECONDS = 2.9;
 const RAID_CLOCK_SLACK_MS = 250;
 
-function raidSeconds(startedAt, now) {
+function raidSpeedFor(state) {
+  return state && state.entitlements && state.entitlements.fastForward ? RAID_PAID_SPEED : RAID_FREE_SPEED;
+}
+
+function raidSeconds(startedAt, now, speed) {
   if (typeof startedAt !== "number") return Infinity;
-  return ((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * RAID_MAX_SPEED;
+  return ((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * speed;
 }
 
 function earliestFates(waves) {
@@ -203,8 +209,8 @@ function earliestFates(waves) {
   return { downAt, repelledAt: waveStart };
 }
 
-function timelyFates(pending, now, killed, captured) {
-  const seconds = raidSeconds(pending.startedAt, now);
+function timelyFates(pending, now, killed, captured, speed) {
+  const seconds = raidSeconds(pending.startedAt, now, speed);
   const waves = Array.isArray(pending.waves) && pending.waves.length > 0 ? pending.waves : [pending.party || []];
   const { downAt, repelledAt } = earliestFates(waves);
   const reached = (id, after) => downAt[id] !== undefined && downAt[id] + after <= seconds;
@@ -290,7 +296,7 @@ async function finishDailyRaid(state, pending, outcome, killedIds, capturedIds) 
     .filter((id, i, list) => list.indexOf(id) === i)
     .filter((id) => reportedCaptured.indexOf(id) === -1);
   // A board is only worth anything if the fastest score on it was possible.
-  const timely = timelyFates(pending, Date.now(), reportedKilled, reportedCaptured);
+  const timely = timelyFates(pending, Date.now(), reportedKilled, reportedCaptured, raidSpeedFor(state));
   if (outcome === "repelled" && !timely.canRepel) throw new Error("RAID_TOO_FAST");
   const kills = timely.killed.length + timely.captured.length;
   const score = dailyScore(kills, outcome === "repelled");
@@ -490,6 +496,9 @@ const PRODUCTS = {
   // Cosmetic: a recoloured warden and nothing the simulation reads. Sold
   // alongside a skin earned for free at warden level 3 - see src/game/skins.ts.
   warden_skin_ember: { grants: "skinEmber", repeatable: false },
+  // Convenience: raids at 3x. Changes how long a raid takes to watch, not how
+  // it goes - the simulation steps the same either way. See RAID_SPEEDS.
+  raid_speed_3x: { grants: "fastForward", repeatable: false },
 };
 
 /** How much each entitlement is worth, applied on top of the research caps. */
@@ -1779,7 +1788,7 @@ class Server {
     // And only as many as the time since the raid opened allows - see
     // timelyFates. A win reported before the last adventurer could even have
     // walked in is refused outright rather than paid at a discount.
-    const timely = timelyFates(pending, now, reportedKilled, reportedCaptured);
+    const timely = timelyFates(pending, now, reportedKilled, reportedCaptured, raidSpeedFor(state));
     if (outcome === "repelled" && !timely.canRepel) throw new Error("RAID_TOO_FAST");
     const captured = timely.captured;
     const killedList = timely.killed;

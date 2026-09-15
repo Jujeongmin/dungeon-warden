@@ -14,7 +14,7 @@ export type Quality = "low" | "high";
  * Mirrors RAID_SPEEDS in useRaid.ts. Declared here rather than imported so a
  * preferences file does not depend on the raid loop.
  */
-export type RaidSpeed = 1 | 2 | 4;
+export type RaidSpeed = 1 | 2 | 3;
 
 export interface Settings {
   /**
@@ -32,7 +32,7 @@ export interface Settings {
    * How fast raids run.
    *
    * Remembered because it is a preference, not a per-raid decision: a player
-   * twenty raids in watches at 4x, and resetting to 1x every time makes them
+   * twenty raids in watches at 2x, and resetting to 1x every time makes them
    * say so again every time.
    */
   raidSpeed: RaidSpeed;
@@ -80,7 +80,11 @@ export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return base;
-    return { ...base, ...(JSON.parse(raw) as Partial<Settings>) };
+    const merged = { ...base, ...(JSON.parse(raw) as Partial<Settings>) };
+    // 4x was taken out when 3x went on sale. A speed that no longer exists
+    // falls back to the fastest free one rather than to a bought one.
+    if (![1, 2, 3].includes(merged.raidSpeed)) merged.raidSpeed = 2;
+    return merged;
   } catch {
     // Private browsing, blocked storage, or corrupt JSON.
     return base;

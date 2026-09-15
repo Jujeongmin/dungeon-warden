@@ -12,6 +12,7 @@ export const PRODUCT_GRANTS: Record<string, string> = {
   deeper_dungeon: "extraObstacles",
   larger_garrison: "extraMinions",
   warden_skin_ember: "skinEmber",
+  raid_speed_3x: "fastForward",
 };
 
 /** Whether the account already holds what a product sells. */

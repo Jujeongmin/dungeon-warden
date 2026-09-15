@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DungeonRenderer, MarkerView, UnitView } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
-import { useRaid, RAID_SPEEDS } from "./game/useRaid";
+import { useRaid, RAID_SPEEDS, FREE_RAID_SPEED, PAID_RAID_SPEED } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
@@ -450,7 +450,11 @@ export default function App() {
 
   const raid = useRaid({
     onEvents: onSimEvents,
-    initialSpeed: settings.raidSpeed,
+    // 3x is bought. A remembered 3x on an account without it starts at 2x.
+    initialSpeed:
+      settings.raidSpeed === PAID_RAID_SPEED && entitlements.fastForward !== true
+        ? FREE_RAID_SPEED
+        : settings.raidSpeed,
     arena,
     meta,
     minions,
@@ -1928,15 +1932,30 @@ export default function App() {
             <span>{t("raid_traps")} {raid.raidState.trapDamage}</span>
             <span>{raid.raidState.elapsed.toFixed(0)}{t("seconds")}</span>
             <div className="speeds" hidden={possessedId !== null}>
-              {RAID_SPEEDS.map((s) => (
-                <button
-                  key={s}
-                  className={raid.speed === s ? "active" : ""}
-                  onClick={() => { raid.setSpeed(s); patchSettings({ raidSpeed: s }); }}
-                >
-                  {s}×
-                </button>
-              ))}
+              {RAID_SPEEDS.map((s) => {
+                // The bought speed shows where the others are, locked, and
+                // leads to the shop rather than hiding until someone asks.
+                const locked = s === PAID_RAID_SPEED && entitlements.fastForward !== true;
+                return (
+                  <button
+                    key={s}
+                    className={raid.speed === s ? "active" : locked ? "locked" : ""}
+                    title={locked ? t("speed_locked") : undefined}
+                    onClick={() => {
+                      if (locked) {
+                        audio.play("click");
+                        setShopOpen(true);
+                        return;
+                      }
+                      raid.setSpeed(s);
+                      patchSettings({ raidSpeed: s });
+                    }}
+                  >
+                    {locked && <span className="lock" aria-hidden>🔒</span>}
+                    {s}×
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

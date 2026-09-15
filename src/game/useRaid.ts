@@ -35,14 +35,17 @@ const MAX_STEPS_PER_FRAME = 8;
  */
 const HIT_STOP_SECONDS = 0.1;
 /** A player who chose fast-forward asked for less drama, not more. */
-const HIT_STOP_SPEED_SCALE: Record<RaidSpeed, number> = { 1: 1, 2: 0.4, 4: 0 };
+const HIT_STOP_SPEED_SCALE: Record<RaidSpeed, number> = { 1: 1, 2: 0.4, 3: 0 };
 const DECISIVE_EVENTS = new Set<SimEvent["kind"]>([
   "killed",
   "captured",
   "minionDown",
 ]);
 
-export const RAID_SPEEDS = [1, 2, 4] as const;
+export const RAID_SPEEDS = [1, 2, 3] as const;
+/** The fastest speed anyone has, and the one sold as raid_speed_3x. Mirrored in server.js. */
+export const FREE_RAID_SPEED = 2;
+export const PAID_RAID_SPEED = 3;
 export type RaidSpeed = (typeof RAID_SPEEDS)[number];
 
 interface Options {

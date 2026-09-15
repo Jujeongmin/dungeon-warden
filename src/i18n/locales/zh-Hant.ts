@@ -173,6 +173,7 @@ export const zhHant: Record<StringKey, string> = {
   shop_no_host: "只有在 Verse8 上遊玩時才能開啟商店。",
   shop_empty: "沒有已登錄的商品。",
   shop_loading: "正在載入商品…",
+  speed_locked: "3倍速可在商店購買",
 
   status_connecting: "連線中",
   status_loading: "載入存檔中",

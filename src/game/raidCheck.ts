@@ -8,7 +8,7 @@ import type { PartyMember } from "./types";
  * before they have walked in, walking in is staggered, a wave only follows the
  * one before it once that one is over, a beaten adventurer bleeds out for
  * seconds before they count as killed, and the fastest the fight can be played
- * is RAID_SPEEDS' top speed. A report that says more happened than the time
+ * is 2x, or 3x on an account that bought it. A report that says more happened than the time
  * since the raid opened allows is trimmed to what it allows.
  *
  * A floor, not a proof: an honest raid is always slower than this, and a
@@ -19,8 +19,9 @@ import type { PartyMember } from "./types";
  * pins the two together and plays real raids against it.
  */
 
-/** RAID_SPEEDS' top speed. */
-export const RAID_MAX_SPEED = 4;
+/** The fastest a raid runs for free, and for an account that bought 3x. See RAID_SPEEDS. */
+export const RAID_FREE_SPEED = 2;
+export const RAID_PAID_SPEED = 3;
 /** RaidSim's SPAWN_INTERVAL_SECONDS. */
 export const RAID_SPAWN_INTERVAL = 0.9;
 /** RaidSim's DOWNED_SECONDS, less a step or two of rounding. */
@@ -29,9 +30,9 @@ export const RAID_BLEED_SECONDS = 2.9;
 export const RAID_CLOCK_SLACK_MS = 250;
 
 /** Simulated seconds a raid can have run, given the wall clock since it opened. */
-export function raidSeconds(startedAt: number | undefined, now: number): number {
+export function raidSeconds(startedAt: number | undefined, now: number, speed: number): number {
   if (typeof startedAt !== "number") return Infinity;
-  return ((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * RAID_MAX_SPEED;
+  return ((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * speed;
 }
 
 /**
