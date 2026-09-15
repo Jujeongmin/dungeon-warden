@@ -331,6 +331,8 @@ h3.section {
   font-size: var(--fs-xs);
   letter-spacing: var(--ls-widest);
   color: var(--accent);
+  /* Japanese wrapped this line with one character left on the second row. */
+  text-wrap: balance;
 }
 
 .title-name {
@@ -1882,10 +1884,26 @@ button.ad-gold {
 /* Removing gets a name like everything beside it. A lone glyph on a phone is a
    guess, and this one is the tool that takes things away. */
 .group.remove {
-  flex: 0 0 46px;
+  flex: 0 0 auto;
+  padding: 7px 5px;
   justify-content: center;
   font-size: inherit;
 }
+
+/*
+ * The labels scale with the row, not the window.
+ *
+ * English names are longer than the Korean ones this row was sized for:
+ * "Minions" and "Remove" pushed it 11px past a phone-landscape panel and cut
+ * the last chip in half. Sized in container units they shrink only when the
+ * row itself is narrow, and stay at the type scale everywhere else.
+ */
+.groups {
+  container-type: inline-size;
+  gap: 2px;
+}
+.group b { font-size: min(var(--fs-xs), 4.4cqi); }
+.group i { font-size: min(var(--fs-2xs), 3.9cqi); }
 
 /* Two rows of tools have to fit without the second one being sliced by the
    panel edge, so the cards lose the height they were not using. */
@@ -2555,7 +2573,9 @@ button.ad-gold {
     font-size: var(--fs-2xs);
     line-height: 1.45;
   }
-  .group.remove { flex-basis: 34px; }
+  /* Not pinned narrow any more: the labels now shrink with the row (see
+     .groups), and a fixed 34px cut "Remove" in half in English. */
+  .group.remove { flex-basis: auto; }
   /* The start button on one line: stacked, it took 88px of a 375px screen
      from the tools above it. */
   .hud-foot .go {

@@ -22,6 +22,23 @@ built on top of it lives in the same file (`--fs-*` / `--fw-*` / `--ls-*`) and
 is used throughout `src/App.css`. Unlike the CC0 assets above, the OFL
 requires this notice to travel with the font — that's this entry.
 
+## Display fonts — Google Fonts, all SIL Open Font License 1.1
+
+Titles, dialog heads, buttons and the purse. Each is cut down to the characters
+its locale table uses by `scripts/build-fonts.mjs`; the full licence texts are
+in `src/assets/fonts/licenses/`.
+
+| File | Font | Designer | Source |
+|---|---|---|---|
+| Warden-Latin.woff2 | Cinzel (wght 700) | Natanael Gama | <https://github.com/google/fonts/tree/main/ofl/cinzel> |
+| Warden-KR.woff2 | Song Myung | JIKJISOFT | <https://github.com/google/fonts/tree/main/ofl/songmyung> |
+| Warden-JP.woff2 | Zen Antique | Yoshimichi Ohira | <https://github.com/google/fonts/tree/main/ofl/zenantique> |
+| Warden-SC.woff2 | Noto Serif SC (wght 700) | Google | <https://github.com/google/fonts/tree/main/ofl/notoserifsc> |
+| Warden-TC.woff2 | Noto Serif TC (wght 700) | Google | <https://github.com/google/fonts/tree/main/ofl/notoseriftc> |
+
+The subsets are Modified Versions under the OFL and keep the original names
+out of their file names; they are not sold on their own.
+
 ## Textures — ambientCG, by Lennart Demes
 
 <https://ambientcg.com/> · CC0
@@ -110,6 +127,9 @@ game's amber. Geometry unchanged.
 | dungeon_ambience.ogg | <https://opengameart.org/sites/default/files/dungeon_ambient_1_0.ogg> |
 
 The one music track: a 94-second seamless loop of low wind and water drips,
-renamed on the way in. It is not synthesised when missing, unlike the cues —
+renamed on the way in. Re-encoded from the original 160 kbps Vorbis to Vorbis
+quality 0 (about 58 kbps, 44.1 kHz stereo) with the `ffmpeg-static` binary -
+1.6 MB to 668 kB for a track that plays under everything at a third of full
+volume. It is not synthesised when missing, unlike the cues —
 a generated click is still a click, but two minutes of generated room tone is
 a fault rather than music, so the game simply runs silent without it.

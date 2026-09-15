@@ -25,6 +25,71 @@
   font-display: swap;
 }
 
+/* The display faces: titles, dialog heads, buttons and the purse. An
+   inscription face for Latin and an old-press serif per CJK script, each cut
+   to the characters its locale table uses by scripts/build-fonts.mjs (all
+   SIL OFL 1.1, see CREDITS.md). unicode-range keeps a face from being
+   fetched for text it has nothing to draw, so a Korean player downloads the
+   Latin and Korean cuts and nothing else. Body text stays Pretendard. */
+@font-face {
+  font-family: "Warden Latin";
+  src: url("./assets/fonts/Warden-Latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2010-2027, U+2190-2193, U+2212, U+2605-2606, U+2665;
+}
+
+@font-face {
+  font-family: "Warden KR";
+  src: url("./assets/fonts/Warden-KR.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+AC00-D7A3, U+3130-318F, U+3000-303F, U+FF01-FF5E;
+}
+
+@font-face {
+  font-family: "Warden JP";
+  src: url("./assets/fonts/Warden-JP.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+3040-30FF, U+4E00-9FFF, U+3000-303F, U+FF01-FF5E;
+}
+
+@font-face {
+  font-family: "Warden SC";
+  src: url("./assets/fonts/Warden-SC.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+4E00-9FFF, U+3000-303F, U+FF01-FF5E;
+}
+
+@font-face {
+  font-family: "Warden TC";
+  src: url("./assets/fonts/Warden-TC.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+4E00-9FFF, U+3000-303F, U+FF01-FF5E;
+}
+
+.title-name,
+.modal-head h2,
+.title-start,
+button.primary,
+.hud-foot .go,
+.go-wave,
+.gold {
+  font-family: var(--font-display);
+}
+
+/* The line under the raid button is a sentence, not a label. */
+.hud-foot .go-sub {
+  font-family: var(--font-sans);
+}
+
+html[lang="ja"] { --font-display: "Warden Latin", "Warden JP", var(--font-sans); }
+html[lang="zh-Hans"] { --font-display: "Warden Latin", "Warden SC", var(--font-sans); }
+html[lang="zh-Hant"] { --font-display: "Warden Latin", "Warden TC", var(--font-sans); }
+
 :root {
   /* Pretendard is subset to Hangul and Latin, so Japanese kana and Chinese
      hanzi fall through to whatever the device ships. Naming those faces here
@@ -35,6 +100,10 @@
     "PingFang TC", "Microsoft JhengHei", "Noto Sans TC",
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
     sans-serif;
+  /* Han characters are shared between Japanese and both Chinese scripts but
+     drawn differently in each, so the CJK face is picked by the page language
+     (set from the player's locale), not by character range. */
+  --font-display: "Warden Latin", "Warden KR", var(--font-sans);
 
   /*
    * How wide the game is, whatever it is running on.

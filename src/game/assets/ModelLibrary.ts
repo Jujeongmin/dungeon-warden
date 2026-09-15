@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+// Every shipped model is packed with EXT_meshopt_compression - see
+// scripts/optimize-models.mjs. The decoder is a small WASM blob inlined in
+// the module, so it adds no request of its own.
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { publicUrl } from "./publicUrl";
 
@@ -143,7 +147,7 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
  */
 export class ModelLibrary {
   private entries: ManifestEntry[] = [];
-  private loader = new GLTFLoader();
+  private loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   private cache = new Map<string, LoadedModel | null>();
   private pending = new Map<string, Promise<LoadedModel | null>>();
   private sharedClips: THREE.AnimationClip[] | null = null;

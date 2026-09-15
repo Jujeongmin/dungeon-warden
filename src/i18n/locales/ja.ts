@@ -313,5 +313,5 @@ export const ja: Record<StringKey, string> = {
   walk_skill_dash: "突進",
   body_lost: "体を失った",
   connect_first: "入口とコアを繋げて",
-  tut_nook_place: "通路の横を掘って場所を",
+  tut_nook_place: "通路の横を掘って場所を作りましょう",
 };

@@ -1,5 +1,5 @@
 /**
- * Shrinks the KayKit characters and animation rigs the game ships.
+ * Shrinks the models the game ships.
  *
  * The packs come as exported: full-float vertex data, and animation files
  * that carry a whole mannequin mesh plus every clip in the library. The game
@@ -15,9 +15,13 @@
  *   the bones stay), and only the clips DungeonRenderer's CLIP_PATTERNS pick
  *   are kept. Keyframes are resampled, which only removes redundant ones.
  *
- * The dungeon tiles are left alone on purpose: DungeonRenderer.tileProto builds
- * the floor InstancedMesh from a model's raw geometry, which a quantized file
- * would hand over without its dequantize transform.
+ *   Everything, dungeon tiles and the baked warden included - packed with
+ *   EXT_meshopt_compression in its lossless mode. It changes how the bytes are
+ *   stored, not what they decode to; ModelLibrary hands GLTFLoader the decoder.
+ *
+ * The dungeon tiles are never quantized: DungeonRenderer.tileProto builds the
+ * floor InstancedMesh from a model's raw geometry, which a quantized file would
+ * hand over without its dequantize transform.
  *
  * Safe to run again on its own output. Run with:
  *
@@ -27,11 +31,13 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NodeIO } from "@gltf-transform/core";
-import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
+import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
 import { dedup, prune, quantize, resample, weld } from "@gltf-transform/functions";
+import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const kaykit = join(root, "public/assets/kaykit");
+const assets = join(root, "public/assets");
+const kaykit = join(assets, "kaykit");
 
 /** Characters, drawn whole. */
 const CHARACTER_DIRS = ["adventurers", "skeletons"];
@@ -46,8 +52,20 @@ const RIG_CLIPS = {
   "Rig_Medium_MovementBasic.glb": ["Walking_A"],
 };
 
-const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+await MeshoptDecoder.ready;
+await MeshoptEncoder.ready;
+const io = new NodeIO()
+  .registerExtensions(ALL_EXTENSIONS)
+  .registerDependencies({ "meshopt.decoder": MeshoptDecoder, "meshopt.encoder": MeshoptEncoder });
 const kb = (file) => Math.round(readFileSync(file).byteLength / 1024);
+
+/** Lossless: stores the same values in fewer bytes. */
+function pack(doc) {
+  doc
+    .createExtension(EXTMeshoptCompression)
+    .setRequired(true)
+    .setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
+}
 
 async function character(file) {
   const before = kb(file);
@@ -58,6 +76,7 @@ async function character(file) {
     prune({ keepAttributes: false }),
     quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12, quantizeWeight: 8 }),
   );
+  pack(doc);
   await io.write(file, doc);
   return [file, before, kb(file)];
 }
@@ -85,8 +104,20 @@ async function rig(file, keep) {
   for (const skin of root_.listSkins()) skin.dispose();
 
   await doc.transform(resample(), dedup(), prune({ keepLeaves: true }));
+  pack(doc);
   await io.write(file, doc);
   return [file, before, kb(file)];
+}
+
+/** Stored as it is, only packed. For files whose geometry must not move. */
+async function packOnly(file) {
+  const bin = file.replace(/\.gltf$/, ".bin");
+  const size = () => kb(file) + (file.endsWith(".gltf") ? kb(bin) : 0);
+  const before = size();
+  const doc = await io.read(file);
+  pack(doc);
+  await io.write(file, doc);
+  return [file, before, size()];
 }
 
 const rows = [];
@@ -97,6 +128,12 @@ for (const dir of CHARACTER_DIRS) {
 }
 for (const [name, keep] of Object.entries(RIG_CLIPS)) {
   rows.push(await rig(join(kaykit, "animations", name), keep));
+}
+for (const name of readdirSync(join(kaykit, "dungeon")).filter((n) => n.endsWith(".gltf"))) {
+  rows.push(await packOnly(join(kaykit, "dungeon", name)));
+}
+for (const name of readdirSync(join(assets, "warden")).filter((n) => n.endsWith(".glb"))) {
+  rows.push(await packOnly(join(assets, "warden", name)));
 }
 
 let before = 0;
