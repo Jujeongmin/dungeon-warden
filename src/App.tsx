@@ -693,19 +693,26 @@ export default function App() {
     const onKey = (event: KeyboardEvent) => {
       // Q or Tab to the next body, Shift to go back the way you came. Tab
       // would otherwise walk focus round the page's buttons instead.
-      if (event.key.toLowerCase() === "q" || event.code === "Tab") {
+      // By the key's place on the board, not the letter it types: with the
+      // Korean input method on, Q arrives as "ㅂ" and nothing answered it.
+      if (event.code === "KeyQ" || event.key.toLowerCase() === "q" || event.code === "Tab") {
         event.preventDefault();
         if (!event.repeat) hopRef.current(event.shiftKey ? -1 : 1);
         return;
       }
       // E for the body's own skill.
-      if (event.key.toLowerCase() === "e") {
+      if (event.code === "KeyE" || event.key.toLowerCase() === "e") {
         event.preventDefault();
         if (!event.repeat) skillRef.current();
         return;
       }
       // Space is the swing; F because half of everyone reaches for it.
-      if (event.code !== "Space" && event.key !== " " && event.key.toLowerCase() !== "f") return;
+      if (
+        event.code !== "Space" &&
+        event.key !== " " &&
+        event.code !== "KeyF" &&
+        event.key.toLowerCase() !== "f"
+      ) return;
       if (event.repeat) return;
       // Space scrolls a page and presses whatever button was last focused.
       event.preventDefault();
@@ -714,6 +721,32 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [possessedId]);
+
+  /*
+   * Out of the corridor: M, or the map button, which do the same thing.
+   *
+   * A ridden body is given back first, and it goes straight back to standing
+   * its ground. The button was the only way out, so a player steering with
+   * both hands on the keyboard had to let go of one to find it.
+   */
+  const leaveRef = useRef<() => void>(() => {});
+  leaveRef.current = () => {
+    audio.play("click");
+    if (possessedId) raid.release();
+    else setWalking(false);
+  };
+  useEffect(() => {
+    if (!walking) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (event.repeat || (event.code !== "KeyM" && event.key.toLowerCase() !== "m")) return;
+      event.preventDefault();
+      leaveRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walking]);
 
 
   /*
@@ -2357,17 +2390,9 @@ export default function App() {
               {HAS_MOUSE && <kbd>Space</kbd>}
             </button>
           )}
-          <button
-            className="walk-exit"
-            onClick={() => {
-              audio.play("click");
-              // Leaving the corridor gives the body back first: a released
-              // minion goes straight back to standing its ground.
-              if (possessedId) raid.release();
-              else setWalking(false);
-            }}
-          >
+          <button className="walk-exit" onClick={() => leaveRef.current()}>
             {t("walk_map")}
+            {HAS_MOUSE && <kbd>M</kbd>}
           </button>
         </div>
       )}

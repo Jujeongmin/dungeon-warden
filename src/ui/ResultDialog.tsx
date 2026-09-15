@@ -1,3 +1,4 @@
+import { useEscape } from "./useEscape";
 import { useT } from "../i18n";
 import { useCountUp } from "./useCountUp";
 import type { RaidFinishResult } from "../game/types";
@@ -21,6 +22,7 @@ interface Props {
  * it, and the running totals come in underneath a beat later.
  */
 export function ResultDialog({ result, onClose }: Props) {
+  useEscape(onClose);
   const t = useT();
   const repelled = result.outcome === "repelled";
   // Only the payout counts up. A running total that ticks would be four

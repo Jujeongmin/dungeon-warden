@@ -1,3 +1,4 @@
+import { useEscape } from "./useEscape";
 import { useT } from "../i18n";
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
  * the reversal: two short lines, not an explanation of how to play.
  */
 export function IntroDialog({ onClose }: Props) {
+  useEscape(onClose);
   const t = useT();
 
   return (

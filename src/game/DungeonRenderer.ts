@@ -2986,9 +2986,23 @@ export class DungeonRenderer {
     this.zoom(e.deltaY * 0.012);
   };
 
+  /**
+   * A held key by where it sits, not what it types.
+   *
+   * With the Korean input method on, W arrives as "ㅈ" and the corridor could
+   * not be walked at all. The physical code is the same whatever the layout
+   * or input method; the typed letter is only the fallback for a browser that
+   * reports no code.
+   */
+  private static keyName(e: KeyboardEvent): string {
+    if (e.code.startsWith("Key")) return e.code.slice(3).toLowerCase();
+    if (e.code.startsWith("Arrow")) return e.code.toLowerCase();
+    return e.key.toLowerCase();
+  }
+
   private onKeyDown = (e: KeyboardEvent): void => {
     if (this.walk) {
-      this.keys.add(e.key.toLowerCase());
+      this.keys.add(DungeonRenderer.keyName(e));
       return;
     }
     if (e.key === "q" || e.key === "Q") this.rotate(-1);
@@ -2996,7 +3010,7 @@ export class DungeonRenderer {
   };
 
   private onKeyUp = (e: KeyboardEvent): void => {
-    this.keys.delete(e.key.toLowerCase());
+    this.keys.delete(DungeonRenderer.keyName(e));
   };
 
   private loop = (): void => {

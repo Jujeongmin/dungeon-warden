@@ -1,3 +1,4 @@
+import { useEscape } from "./useEscape";
 ﻿import { useCallback, useEffect, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { useT } from "../i18n";
@@ -27,6 +28,7 @@ const NICKNAME_KEY = "dw.nickname";
  * entering is optional.
  */
 export function LeaderboardDialog({ account, onClose }: Props) {
+  useEscape(onClose);
   const t = useT();
   const { server } = useGameServer();
 

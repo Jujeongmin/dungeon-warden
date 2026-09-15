@@ -1,3 +1,4 @@
+import { useEscape } from "./useEscape";
 ﻿import { useEffect } from "react";
 import { useVXShop } from "@verse8/platform";
 import { useT } from "../i18n";
@@ -18,6 +19,7 @@ interface Props {
  * anything itself; it only re-reads state once the dialog closes.
  */
 export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
+  useEscape(onClose);
   const t = useT();
   const { items, isLoading, error, buyItem, refresh, onClose: onShopClose } =
     useVXShop({ verseId: VERSE_ID });

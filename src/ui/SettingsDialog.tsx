@@ -1,3 +1,4 @@
+import { useEscape } from "./useEscape";
 import { useT } from "../i18n";
 import { LOCALE_LABEL, type Locale } from "../i18n/strings";
 import type { Settings } from "../game/settings";
@@ -39,6 +40,7 @@ export function SettingsDialog({
   resetDisabled,
   onClose,
 }: Props) {
+  useEscape(onClose);
   const t = useT();
 
   return (
