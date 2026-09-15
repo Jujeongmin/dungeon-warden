@@ -28,7 +28,7 @@ export const SIM_DT = 1 / 20;
 const RAID_TIMEOUT_SECONDS = 180;
 
 /** Gap between adventurers entering, so a party files in instead of stacking. */
-const SPAWN_INTERVAL_SECONDS = 0.9;
+export const SPAWN_INTERVAL_SECONDS = 0.9;
 
 /**
  * A beaten adventurer lies helpless for this long before bleeding out. Capture

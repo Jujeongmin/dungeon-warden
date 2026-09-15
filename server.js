@@ -173,6 +173,48 @@ const THREAT_DECAY_MS = 20 * 60 * 1000;
 const THREAT_REWARD_STEP = 0.08;
 
 /** Global collection backing the leaderboard. */
+// ---------------------------------------------------------------------------
+// How fast a raid can go
+// ---------------------------------------------------------------------------
+// The client reports who fell; the server cannot replay the fight, but it can
+// read the clock. Nobody goes down before walking in, walking in is staggered,
+// a wave follows only once the last is over, a beaten adventurer bleeds out
+// before counting as killed, and the fight runs at most RAID_MAX_SPEED. What
+// the time since startRaid does not allow is dropped. A floor rather than a
+// proof - an honest raid is always slower. Mirrored in src/game/raidCheck.ts;
+// tests/raid-check.test.ts pins the two and plays real raids against it.
+const RAID_MAX_SPEED = 4;
+const RAID_SPAWN_INTERVAL = 0.9;
+const RAID_BLEED_SECONDS = 2.9;
+const RAID_CLOCK_SLACK_MS = 250;
+
+function raidSeconds(startedAt, now) {
+  if (typeof startedAt !== "number") return Infinity;
+  return ((Math.max(0, now - startedAt) + RAID_CLOCK_SLACK_MS) / 1000) * RAID_MAX_SPEED;
+}
+
+function earliestFates(waves) {
+  const downAt = {};
+  let waveStart = 0;
+  for (const wave of waves) {
+    for (let i = 0; i < wave.length; i++) downAt[wave[i].id] = waveStart + i * RAID_SPAWN_INTERVAL;
+    waveStart += Math.max(0, wave.length - 1) * RAID_SPAWN_INTERVAL;
+  }
+  return { downAt, repelledAt: waveStart };
+}
+
+function timelyFates(pending, now, killed, captured) {
+  const seconds = raidSeconds(pending.startedAt, now);
+  const waves = Array.isArray(pending.waves) && pending.waves.length > 0 ? pending.waves : [pending.party || []];
+  const { downAt, repelledAt } = earliestFates(waves);
+  const reached = (id, after) => downAt[id] !== undefined && downAt[id] + after <= seconds;
+  return {
+    killed: killed.filter((id) => reached(id, RAID_BLEED_SECONDS)),
+    captured: captured.filter((id) => reached(id, 0)),
+    canRepel: seconds >= repelledAt,
+  };
+}
+
 const LEADERBOARD = "dungeon_leaderboard";
 
 // ---------------------------------------------------------------------------
@@ -238,10 +280,19 @@ function dailyScore(kills, repelled) {
  */
 async function finishDailyRaid(state, pending, outcome, killedIds, capturedIds) {
   const partyIds = (pending.party || []).map((m) => m.id);
-  const kills = (Array.isArray(killedIds) ? killedIds : [])
-    .concat(Array.isArray(capturedIds) ? capturedIds : [])
-    .filter((id) => partyIds.indexOf(id) !== -1)
-    .filter((id, i, list) => list.indexOf(id) === i).length;
+  const inParty = (id) => partyIds.indexOf(id) !== -1;
+  const reportedCaptured = (Array.isArray(capturedIds) ? capturedIds : [])
+    .filter(inParty)
+    .filter((id, i, list) => list.indexOf(id) === i)
+    .slice(0, Math.max(0, pending.jailFree || 0));
+  const reportedKilled = (Array.isArray(killedIds) ? killedIds : [])
+    .filter(inParty)
+    .filter((id, i, list) => list.indexOf(id) === i)
+    .filter((id) => reportedCaptured.indexOf(id) === -1);
+  // A board is only worth anything if the fastest score on it was possible.
+  const timely = timelyFates(pending, Date.now(), reportedKilled, reportedCaptured);
+  if (outcome === "repelled" && !timely.canRepel) throw new Error("RAID_TOO_FAST");
+  const kills = timely.killed.length + timely.captured.length;
   const score = dailyScore(kills, outcome === "repelled");
   const account = $sender.account;
   const board = DAILY_LEADERBOARD + "_" + pending.daily;
@@ -1715,15 +1766,23 @@ class Server {
     const partyIds = pending.party.map((m) => m.id);
     const inParty = (id) => partyIds.indexOf(id) !== -1;
 
-    const captured = (Array.isArray(capturedIds) ? capturedIds : [])
+    const reportedCaptured = (Array.isArray(capturedIds) ? capturedIds : [])
       .filter(inParty)
       .filter((id, i, list) => list.indexOf(id) === i)
       .slice(0, Math.max(0, pending.jailFree || 0));
 
-    const killedList = (Array.isArray(killedIds) ? killedIds : [])
+    const reportedKilled = (Array.isArray(killedIds) ? killedIds : [])
       .filter(inParty)
       .filter((id, i, list) => list.indexOf(id) === i)
-      .filter((id) => captured.indexOf(id) === -1);
+      .filter((id) => reportedCaptured.indexOf(id) === -1);
+
+    // And only as many as the time since the raid opened allows - see
+    // timelyFates. A win reported before the last adventurer could even have
+    // walked in is refused outright rather than paid at a discount.
+    const timely = timelyFates(pending, now, reportedKilled, reportedCaptured);
+    if (outcome === "repelled" && !timely.canRepel) throw new Error("RAID_TOO_FAST");
+    const captured = timely.captured;
+    const killedList = timely.killed;
 
     const kills = killedList.length + captured.length;
 
