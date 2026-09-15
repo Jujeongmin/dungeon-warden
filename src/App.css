@@ -1752,8 +1752,6 @@ button.ad-gold {
   font-size: var(--fs-base);
 }
 
-/* The panel no longer needs half the screen to hold what is in it. */
-.hud { max-height: 34%; }
 .toolbar { grid-template-columns: repeat(3, 1fr); }
 
 /* The panel's foot: the one action, always on screen, never scrolled. */
@@ -1824,7 +1822,21 @@ button.ad-gold {
 .tool { padding: 5px 3px; gap: 2px; }
 .tool-icon { width: 2em; height: 2em; }
 
-.hud { max-height: 38%; }
+/*
+   As tall as what is in it, up to the whole right-hand column, and no taller.
+
+   Two caps written for a panel along the foot of a portrait screen - 34% and
+   then 38% - outlived the move to a sideways stage, where the panel owns the
+   full height of the right. At 38% the build tab had 64px for 298px of
+   tools and scrolled in a box the size of a matchbox. Sized to its content
+   instead, build and manage show everything at once, and only research,
+   which is a genuinely long list, scrolls - inside its own body, under a
+   foot that stays put.
+*/
+.hud {
+  bottom: auto;
+  max-height: calc(100% - var(--topdock-h, 92px) - 12px);
+}
 
 /* ── Hierarchy inside the panel ───────────────────────────────────────────
  *
