@@ -2410,6 +2410,39 @@ button.ad-gold {
   .strike-hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 128px); }
 }
 
+/*
+   A phone on its side.
+
+   390px tall, and the banners were stacked at desktop size: a note about the
+   last raid and a guide step between them took the top half of the board and
+   left the dungeon a strip in the corner. The guide step is the one that asks
+   for something, so while it is up the notes step aside - warnings and the
+   stuck banner do not, because those are the ones with a way out on them.
+
+   In the panel, five kinds across 291px: the counts ran off the edge of their
+   buttons, so the remove button gives back some width and a count that still
+   does not fit ends in an ellipsis instead of being sliced.
+*/
+@media (max-height: 520px) {
+  .topdock:has(.tutorial) .banner:not(.banner-broke):not(.banner-error) { display: none; }
+  .banner,
+  .tutorial {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: var(--fs-2xs);
+    line-height: 1.45;
+  }
+  .group.remove { flex-basis: 34px; }
+  .group i {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* A tool's name breaks between words, never inside one: "스켈레톤 궁 / 수". */
+.tool b { word-break: keep-all; }
+
 .walk-exit {
   flex: none;
   margin-left: auto;
