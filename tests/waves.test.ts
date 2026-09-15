@@ -189,7 +189,8 @@ describe("how many waves a raid is", () => {
   it("grows with threat the way the party does", () => {
     expect(wavesFor(0)).toBe(1);
     expect(wavesFor(2)).toBe(1);
-    expect(wavesFor(3)).toBe(2);
+    expect(wavesFor(3)).toBe(1);
+    expect(wavesFor(4)).toBe(2);
     expect(wavesFor(8)).toBe(2);
     expect(wavesFor(9)).toBe(3);
     expect(wavesFor(40)).toBe(3);
@@ -197,7 +198,7 @@ describe("how many waves a raid is", () => {
 
   it("agrees with the server about where the steps are", () => {
     const server = readFileSync(new URL("../server.js", import.meta.url), "utf8");
-    expect(server).toContain("if (threat < 3) return 1;");
+    expect(server).toContain("if (threat < 4) return 1;");
     expect(server).toContain("if (threat < CHAMPION_THREAT) return 2;");
   });
 

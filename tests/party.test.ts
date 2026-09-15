@@ -83,22 +83,24 @@ describe("the client mirror of the server's party rules", () => {
   });
 
   it("caps a veteran at the same level", () => {
-    expect(server).toContain("const levelCap = 2 + Math.floor(threat / 3);");
+    expect(server).toContain("const levelCap = recruitLevel(threat) + 1;");
     expect(server).toContain("level: Math.min(member.level, levelCap),");
     // Aldric died five times at threat 0: he still arrives at level 2.
     expect(previewParty([record({ level: 6 })], 0, 0)[0].level).toBe(2);
-    expect(previewParty([record({ level: 6 })], 9, 0)[0].level).toBe(5);
+    expect(previewParty([record({ level: 6 })], 9, 0)[0].level).toBe(4);
   });
 
   it("recruits at the level the server would hire at", () => {
-    expect(server).toContain("level: 1 + Math.floor(threat / 3),");
-    expect(previewParty([], 9, 0)[0].level).toBe(4);
+    expect(server).toContain("level: recruitLevel(threat),");
+    expect(server).toContain("return 1 + Math.floor(Math.max(0, threat - 2) / 3);");
+    // Level 1 until threat 5, then a step every three.
+    expect([0, 4, 5, 7, 8, 9].map((t) => previewParty([], t, 0)[0].level)).toEqual([1, 1, 2, 2, 3, 3]);
   });
 });
 
 describe("previewParty", () => {
-  // A fresh recruit at threat 9 hires in at level 4, which outranks a veteran
-  // who has only lost twice - so "strongest available" really does mean
+  // A fresh recruit at threat 9 hires in at level 3, which outranks a veteran
+  // who has only lost once - so "strongest available" really does mean
   // strongest, not "whoever has been here longest".
   it("sends the strongest available first, so the leader is the best of them", () => {
     const roster = [

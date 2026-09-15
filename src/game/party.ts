@@ -50,7 +50,8 @@ export const MAX_ROSTER = 12;
  * what the opening teaches and then fights the real raid with it.
  */
 export function wavesFor(threat: number): number {
-  if (threat < 3) return 1;
+  // From 4, not 3: at 3 the party doubles, and the two used to land together.
+  if (threat < 4) return 1;
   if (threat < CHAMPION_THREAT) return 2;
   return 3;
 }
@@ -82,7 +83,17 @@ export function hasChampion(threat: number): boolean {
  * and losing, which is the only thing that lowers threat, could not help.
  */
 export function veteranCap(threat: number): number {
-  return 2 + Math.floor(threat / 3);
+  return recruitLevel(threat) + 1;
+}
+
+/**
+ * The level a fresh recruit arrives at. Mirrored from `recruitLevel` in server.js.
+ *
+ * Steps up first at threat 5 rather than 3, so the party growing, a second
+ * wave arriving and the levels rising each come on a raid of their own.
+ */
+export function recruitLevel(threat: number): number {
+  return 1 + Math.floor(Math.max(0, threat - 2) / 3);
 }
 
 export interface PartyPreviewMember extends PartyMember {
@@ -126,7 +137,7 @@ export function previewParty(
       id: `preview-${index}`,
       cls: pool[index % pool.length],
       name: ADVENTURER_NAMES[index % ADVENTURER_NAMES.length],
-      level: 1 + Math.floor(threat / 3),
+      level: recruitLevel(threat),
       known: false,
       raids: 0,
     });

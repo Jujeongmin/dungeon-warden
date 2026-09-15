@@ -278,7 +278,10 @@ const WAVES_PER_RAID = 3;
  * first raid to a rule nobody has taught them.
  */
 function wavesFor(threat) {
-  if (threat < 3) return 1;
+  // A second wave from threat 4, not 3. At 3 the party also doubled in size
+  // and levelled up in the same raid - three steps at once, and the build a
+  // player could afford by then lost all three of them together.
+  if (threat < 4) return 1;
   if (threat < CHAMPION_THREAT) return 2;
   return WAVES_PER_RAID;
 }
@@ -608,6 +611,16 @@ async function settleAbandonedRaid(state, now) {
   return { plundered, lostMinionIds };
 }
 
+/**
+ * The level a fresh recruit arrives at. Mirrored in src/game/party.ts.
+ *
+ * It stepped up at threat 3, the same threat the party doubled and a second
+ * wave arrived. Held back to 5, so each of the three comes on its own.
+ */
+function recruitLevel(threat) {
+  return 1 + Math.floor(Math.max(0, threat - 2) / 3);
+}
+
 function pickParty(dungeon, threat, now) {
   const roster = Array.isArray(dungeon.adventurers) ? dungeon.adventurers.slice() : [];
   // Party size is the dial threat turns; individual levels come from the
@@ -626,7 +639,7 @@ function pickParty(dungeon, threat, now) {
       id: "adv-" + now + "-" + index,
       cls: pool[index % pool.length],
       name: ADVENTURER_NAMES[index % ADVENTURER_NAMES.length],
-      level: 1 + Math.floor(threat / 3),
+      level: recruitLevel(threat),
       state: "town",
       returnsAt: 0,
       raids: 0,
@@ -646,7 +659,7 @@ function pickParty(dungeon, threat, now) {
   // for good - losing, which lowers threat, could never get it back. The
   // record keeps its real level and fields it again as threat rises.
   // Mirrored in src/game/party.ts.
-  const levelCap = 2 + Math.floor(threat / 3);
+  const levelCap = recruitLevel(threat) + 1;
 
   // The party is sorted by level, so its leader is the strongest thing the
   // town can field - which is exactly who should be wearing the crown.
