@@ -407,6 +407,11 @@ export function useRaid({
     simRef.current?.requestAttack();
   }, []);
 
+  /** Asks the ridden body for its own skill. Spent by the next simulation step. */
+  const skill = useCallback(() => {
+    simRef.current?.requestSkill();
+  }, []);
+
   /**
    * Fires a warden skill. Rally needs a tile, so selecting it arms a pending
    * state and the next tap on the dungeon supplies the target.
@@ -514,6 +519,7 @@ export function useRaid({
     possess,
     release,
     attack,
+    skill,
     /** The body being ridden right now, if it is still standing. */
     possessed: raidState?.possessedId
       ? (raidState.minions.find((m) => m.id === raidState.possessedId && m.alive) ?? null)

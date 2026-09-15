@@ -2313,6 +2313,24 @@ button.ad-gold {
 
 .walk-hop + .walk-strike { margin-left: 10px; }
 
+/* The skill leads the group on the right; the hop tucks in after it. The
+   wait is written on the button itself, so it greys out while it counts. */
+.walk-skill {
+  flex: none;
+  margin-left: auto;
+  align-self: flex-end;
+  padding: 8px 14px;
+  font-size: var(--fs-2xs);
+  border-radius: 99px;
+  color: var(--ink);
+  border: 1px solid rgba(201, 182, 255, 0.45);
+  background: rgba(20, 15, 11, 0.62);
+}
+
+.walk-skill:disabled { opacity: 0.55; }
+
+.walk-skill + .walk-hop { margin-left: 10px; }
+
 .walk-strike + .walk-exit { margin-left: 12px; }
 
 /* What is left of the body being ridden.

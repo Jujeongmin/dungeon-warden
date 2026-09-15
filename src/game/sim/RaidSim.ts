@@ -48,6 +48,13 @@ const CAPTURE_RADIUS = 1.6;
  */
 const POSSESSED_SPEED = 2.6;
 
+/** How long a warrior waits between shoves, and how long a shoved adventurer reels. */
+export const SHOVE_COOLDOWN = 6;
+export const SHOVE_STAGGER = 0.8;
+/** How long a mage waits between blasts, and what one is worth against a normal blow. */
+export const BLAST_COOLDOWN = 8;
+export const BLAST_MULTIPLIER = 2.5;
+
 export interface SimMinion {
   id: string;
   type: MinionType;
@@ -183,6 +190,8 @@ export interface RaidState {
   intermissionLeft: number;
   /** Which minion the warden is riding, if any. */
   possessedId: string | null;
+  /** Seconds until the ridden body's skill is ready again. Zero when riding nothing. */
+  possessedSkill: number;
 }
 
 function distance(ax: number, ay: number, bx: number, by: number): number {
@@ -290,7 +299,14 @@ export class RaidSim {
    * the raid ends the way it always did.
    */
   private possessedId: string | null = null;
-  private control = { x: 0, y: 0, facing: 0, attack: false };
+  private control = { x: 0, y: 0, facing: 0, attack: false, skill: false };
+  /**
+   * Seconds until each body can use its skill again, by minion id.
+   *
+   * Kept per body and ticked for all of them, ridden or not, so hopping out
+   * of a body and back in is not a way to reset it.
+   */
+  private bodySkillCooldowns = new Map<string, number>();
   /** Which tile the ridden body was on last step, so hunts re-route on a step. */
   private possessedTile = { x: -1, y: -1 };
 
@@ -668,6 +684,7 @@ export class RaidSim {
       waves: this.waves.length,
       intermissionLeft: this.intermissionLeft,
       possessedId: this.possessedId,
+      possessedSkill: this.possessedId ? (this.bodySkillCooldowns.get(this.possessedId) ?? 0) : 0,
     };
   }
 
@@ -784,7 +801,7 @@ export class RaidSim {
     if (!minion) return false;
 
     this.possessedId = id;
-    this.control = { x: 0, y: 0, facing: minion.facing, attack: false };
+    this.control = { x: 0, y: 0, facing: minion.facing, attack: false, skill: false };
     this.possessedTile = { x: Math.round(minion.x), y: Math.round(minion.y) };
     return true;
   }
@@ -793,7 +810,7 @@ export class RaidSim {
   release(): void {
     if (!this.possessedId) return;
     this.possessedId = null;
-    this.control = { x: 0, y: 0, facing: 0, attack: false };
+    this.control = { x: 0, y: 0, facing: 0, attack: false, skill: false };
   }
 
   /** The body being ridden, or null. */
@@ -819,6 +836,11 @@ export class RaidSim {
   /** Asks for one swing. Spent by the next step, whether or not it connects. */
   requestAttack(): void {
     this.control.attack = true;
+  }
+
+  /** Asks for the ridden body's own skill. Spent by the next step. */
+  requestSkill(): void {
+    this.control.skill = true;
   }
 
   /** Advances exactly one SIM_DT. Call repeatedly from a fixed-step accumulator. */
@@ -1095,6 +1117,10 @@ export class RaidSim {
   }
 
   private stepMinions(): void {
+    for (const [id, left] of this.bodySkillCooldowns) {
+      this.bodySkillCooldowns.set(id, Math.max(0, left - SIM_DT));
+    }
+
     for (const minion of this.minions) {
       if (!minion.alive) continue;
       if (minion.id === this.possessedId) {
@@ -1168,6 +1194,11 @@ export class RaidSim {
       this.routeAll();
     }
 
+    if (this.control.skill) {
+      this.control.skill = false;
+      if ((this.bodySkillCooldowns.get(minion.id) ?? 0) <= 0) this.useBodySkill(minion, stats);
+    }
+
     if (!this.control.attack) return;
     this.control.attack = false;
     if (minion.cooldown > 0) return;
@@ -1178,6 +1209,40 @@ export class RaidSim {
     minion.action = "attack";
     const target = this.nearestAdventurer(minion.x, minion.y, stats.range);
     if (target) this.damageAdventurer(target, stats.damage, "melee", minion);
+  }
+
+  /**
+   * The one thing each body does that no other body does.
+   *
+   * Every ridden body swinging the same swing made the choice of which one
+   * to climb into a choice of hit points and nothing else. A warrior shoves:
+   * whatever it hits is put back a tile along its own road, onto ground it
+   * has already walked and so can always stand on, and loses a moment
+   * finding its feet - the tool for holding a corridor mouth. A mage
+   * blasts: one blow worth several, on a longer wait, and through the
+   * ordinary damage path so the line to the target is drawn like any other.
+   *
+   * Nothing in reach means nothing happens, and the wait is not spent.
+   */
+  private useBodySkill(minion: SimMinion, stats: ReturnType<typeof minionStatsFor>): void {
+    const target = this.nearestAdventurer(minion.x, minion.y, stats.range);
+    if (!target) return;
+    minion.action = "attack";
+
+    if (minion.type === "mage") {
+      this.bodySkillCooldowns.set(minion.id, BLAST_COOLDOWN);
+      this.damageAdventurer(target, stats.damage * BLAST_MULTIPLIER, "melee", minion);
+      return;
+    }
+
+    this.bodySkillCooldowns.set(minion.id, SHOVE_COOLDOWN);
+    if (target.pathIndex > 0) {
+      target.pathIndex -= 1;
+      const back = target.path[target.pathIndex];
+      target.x = back.x;
+      target.y = back.y;
+    }
+    target.cooldown = Math.max(target.cooldown, SHOVE_STAGGER);
   }
 
   /** Whether a body may stand here: inside the arena, and on dug floor. */

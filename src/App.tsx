@@ -639,6 +639,25 @@ export default function App() {
    * a ref for the same reason the swing is: the listener below is attached
    * once, and the garrison it walks changes every frame.
    */
+  /**
+   * The ridden body's own skill - a warrior's shove, a mage's blast.
+   *
+   * Refused out loud while it is still recovering, rather than swallowed: the
+   * button shows the wait, but a key press has nowhere to show it but a sound.
+   */
+  const skillRef = useRef<() => void>(() => {});
+  skillRef.current = () => {
+    if (!possessedId) return;
+    if ((raid.raidState?.possessedSkill ?? 0) > 0) {
+      audio.play("error");
+      return;
+    }
+    audio.play("skill");
+    buzz(settings.haptics, BUZZ.hurt);
+    raid.skill();
+    rendererRef.current?.swing();
+  };
+
   const hopRef = useRef<(step: 1 | -1) => void>(() => {});
   hopRef.current = (step) => {
     if (!possessedId || !raid.raidState || !entrance) return;
@@ -658,6 +677,12 @@ export default function App() {
       if (event.key.toLowerCase() === "q" || event.code === "Tab") {
         event.preventDefault();
         if (!event.repeat) hopRef.current(event.shiftKey ? -1 : 1);
+        return;
+      }
+      // E for the body's own skill.
+      if (event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        if (!event.repeat) skillRef.current();
         return;
       }
       // Space is the swing; F because half of everyone reaches for it.
@@ -2192,6 +2217,17 @@ export default function App() {
           >
             <div ref={knobRef} className="knob" />
           </div>
+          {possessed && (
+            <button
+              className="walk-skill"
+              disabled={(raid.raidState?.possessedSkill ?? 0) > 0}
+              onClick={() => skillRef.current()}
+            >
+              {possessed.type === "mage" ? t("walk_skill_blast") : t("walk_skill_shove")}
+              {(raid.raidState?.possessedSkill ?? 0) > 0 &&
+                ` ${Math.ceil(raid.raidState?.possessedSkill ?? 0)}`}
+            </button>
+          )}
           {possessed && (
             <button className="walk-hop" onClick={() => hopRef.current(1)}>
               {t("walk_hop")}
