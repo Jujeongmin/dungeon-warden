@@ -307,7 +307,6 @@ export const ko = {
   tut_dig_group: "굴착 탭을 여세요",
   tut_dig_pick: "파기를 고르세요",
   tut_dig_place: "입구에서 코어까지 끌어서 파세요",
-  hint_spread: "넓게 파면 부하가 약해집니다 ×{scale}",
   menu_walk: "던전 걸어보기",
   walk_exit: "나가기",
   walk_map: "지도",

@@ -3,15 +3,10 @@ import { describe, expect, it } from "vitest";
 import { arenaFor, blockedKey, coreOf, entranceOf } from "../src/game/arena";
 import {
   DIG_COST,
-  DEEP_TILES,
   connects,
   digFromWalls,
   dugSet,
   dugTile,
-  LOOSE_TILES,
-  THIN_GARRISON,
-  TIGHT_TILES,
-  garrisonScale,
   isFixed,
   rockSet,
   startingDig,
@@ -140,62 +135,5 @@ describe("reading an older dungeon", () => {
     // digFromWalls on an empty wall list would open the entire room, which is
     // not a maze — the caller uses startingDig for that case instead.
     expect(straightCorridor().length).toBeLessThan(digFromWalls(arena, []).length);
-  });
-});
-
-describe("how thin the garrison is spread", () => {
-  it("costs nothing while the dungeon is tight", () => {
-    // Every number measured against the old open-floor model was measured at
-    // this end of the curve, so this end has to stay worth exactly 1.
-    expect(garrisonScale(0)).toBe(1);
-    expect(garrisonScale(straightCorridor().length)).toBe(1);
-    expect(garrisonScale(TIGHT_TILES)).toBe(1);
-  });
-
-  it("slides down as the corridor sprawls, and stops", () => {
-    expect(garrisonScale(TIGHT_TILES + 1)).toBeLessThan(1);
-    expect(garrisonScale(LOOSE_TILES)).toBeCloseTo(THIN_GARRISON, 5);
-    // Weakened, never disarmed: a big dungeon is still a dungeon.
-    expect(garrisonScale(arena.w * arena.h)).toBeCloseTo(THIN_GARRISON, 5);
-    expect(garrisonScale(10_000)).toBeCloseTo(THIN_GARRISON, 5);
-  });
-
-  it("never rewards digging more", () => {
-    let last = garrisonScale(0);
-    for (let tiles = 1; tiles <= arena.w * arena.h; tiles++) {
-      const now = garrisonScale(tiles);
-      expect(now).toBeLessThanOrEqual(last);
-      last = now;
-    }
-  });
-
-  it("halves the distance at the halfway point, so the slide is readable", () => {
-    const middle = (TIGHT_TILES + LOOSE_TILES) / 2;
-    expect(garrisonScale(middle)).toBeCloseTo(1 - (1 - THIN_GARRISON) / 2, 5);
-  });
-
-  it("gives the tutorial's dungeon the strength it was measured with", () => {
-    // The opening digs two nooks off the starting corridor. If that landed on
-    // the slide, the balance the tutorial test pins would quietly move.
-    expect(garrisonScale(straightCorridor().length + 2)).toBe(1);
-  });
-});
-
-describe("room bought in the shop", () => {
-  it("leaves a tight dungeon exactly where it was", () => {
-    // One-sided: what the entitlement moves is where thinning starts, so a
-    // dungeon that was never thinning is worth what it always was.
-    expect(garrisonScale(TIGHT_TILES, true)).toBe(1);
-    expect(garrisonScale(TIGHT_TILES)).toBe(1);
-  });
-
-  it("holds a dungeon at full strength for another DEEP_TILES of digging", () => {
-    expect(garrisonScale(TIGHT_TILES + DEEP_TILES, true)).toBe(1);
-    expect(garrisonScale(TIGHT_TILES + DEEP_TILES)).toBeLessThan(1);
-  });
-
-  it("still bottoms out, just later", () => {
-    expect(garrisonScale(LOOSE_TILES, true)).toBeGreaterThan(THIN_GARRISON);
-    expect(garrisonScale(LOOSE_TILES + DEEP_TILES, true)).toBe(THIN_GARRISON);
   });
 });

@@ -300,7 +300,6 @@ export const ja: Record<StringKey, string> = {
   tut_dig_group: "掘削タブを開いて",
   tut_dig_pick: "掘るを選んで",
   tut_dig_place: "入口からコアまでドラッグして掘る",
-  hint_spread: "広く掘るほど手下が弱くなります ×{scale}",
   menu_walk: "ダンジョンを歩く",
   walk_exit: "戻る",
   walk_map: "地図",

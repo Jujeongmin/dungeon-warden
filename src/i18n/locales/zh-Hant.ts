@@ -295,7 +295,6 @@ export const zhHant: Record<StringKey, string> = {
   tut_dig_group: "打開挖掘分頁",
   tut_dig_pick: "選擇挖",
   tut_dig_place: "從入口拖曳到核心",
-  hint_spread: "挖得越廣，手下越弱 ×{scale}",
   menu_walk: "走進地牆",
   walk_exit: "離開",
   walk_map: "地圖",

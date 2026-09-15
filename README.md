@@ -139,7 +139,7 @@ M2부터는 부하 배치 · A* 경로탐색 · 자동 전투가 들어갑니다
 
 | Product ID | 종류 | 효과 | 대시보드 설정 |
 |---|---|---|---|
-| `deeper_dungeon` | 영구 | 장애물 예산 +8 | Lifetime 구매 제한 **1회** |
+| `deeper_dungeon` | — | **판매 안 함** — 효과 없음, 등록하지 말 것 | — |
 | `larger_garrison` | 영구 | 부하 상한 +4 | Lifetime 구매 제한 **1회** |
 | `warden_skin_ember` | 영구 | 워든 스킨 (외형만) | Lifetime 구매 제한 **1회** |
 | `raid_speed_3x` | 영구 | 습격 3배속 (무료는 2배속까지) | Lifetime 구매 제한 **1회** |

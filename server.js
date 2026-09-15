@@ -485,12 +485,9 @@ const ADVENTURER_NAMES = [
 //  is the entitlement key. Adding a row here is the whole server-side
 // change;  below reads this table and nothing else.
 const PRODUCTS = {
-  // extraObstacles buys dig room now. It was sold as a cap on placed walls,
-  // and walls are not placed any more - the player digs the room out of the
-  // rock. What limits that is not gold but sprawl: a garrison spread over
-  // more ground is weaker for it, so this moves where that thinning starts.
-  // See garrisonScale in src/game/dig.ts. The key keeps its old name so an
-  // entitlement already granted is never revoked.
+  // Not for sale. It bought dig room while a sprawling dungeon weakened its
+  // garrison, and that rule is gone, so nothing reads what it grants. Kept
+  // only so a stray purchase callback is acknowledged rather than refused.
   deeper_dungeon: { grants: "extraObstacles", repeatable: false },
   larger_garrison: { grants: "extraMinions", repeatable: false },
   // Cosmetic: a recoloured warden and nothing the simulation reads. Sold
