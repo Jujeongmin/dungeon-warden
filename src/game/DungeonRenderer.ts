@@ -37,6 +37,8 @@ const PITCH = THREE.MathUtils.degToRad(68);
  * let within a fifth of a tile of the wall is drawn with a shoulder in it.
  */
 const BODY = 0.36;
+/** How close the warden walking alone may come to one of its own minions, in tiles. */
+const MINION_CLEARANCE = 0.6;
 
 /** Radians of turn per pixel dragged. */
 const LOOK_SPEED = 0.0045;
@@ -2405,8 +2407,29 @@ export class DungeonRenderer {
     const dx = Math.sin(walk.yaw) * amount - Math.cos(walk.yaw) * sideways;
     const dz = Math.cos(walk.yaw) * amount + Math.sin(walk.yaw) * sideways;
 
-    if (this.standable(walk.at.x + dx, walk.at.z)) walk.at.x += dx;
-    if (this.standable(walk.at.x, walk.at.z + dz)) walk.at.z += dz;
+    const { x, z } = walk.at;
+    if (this.standable(x + dx, z) && !this.bumps(x, z, x + dx, z)) walk.at.x += dx;
+    if (this.standable(walk.at.x, z + dz) && !this.bumps(walk.at.x, z, walk.at.x, z + dz)) walk.at.z += dz;
+  }
+
+  /**
+   * Whether a step would walk the warden into one of its own minions.
+   *
+   * Walking alone, it went straight through them, which made the garrison look
+   * like pictures of a garrison. A step is refused only when it ends within
+   * MINION_CLEARANCE of a minion and nearer than it began, so a warden that
+   * starts on top of one - at the door, or after a rebuild - can always walk
+   * off it instead of being stuck inside. A ridden body is moved by the
+   * simulation and never comes through here.
+   */
+  private bumps(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+    for (const unit of this.lastUnits) {
+      if (!unit.id.startsWith("m:")) continue;
+      const after = Math.hypot(unit.x - toX, unit.y - toZ);
+      if (after >= MINION_CLEARANCE) continue;
+      if (after < Math.hypot(unit.x - fromX, unit.y - fromZ)) return true;
+    }
+    return false;
   }
 
   /**
