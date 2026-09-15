@@ -537,14 +537,20 @@ function lootTierFor(level) {
  * so the same names keep showing up, stronger each time.
  */
 /**
- * Settles a raid the player walked away from.
+ * Settles a raid the player walked away from, on the dungeon in memory.
  *
  * Without this, closing the tab mid-fight is strictly better than losing: the
  * party stays flagged "raiding" forever, the roster fills with ghosts, and
  * pickParty starts handing back empty parties that resolve as an instant
- * "repelled" for free gold. Abandoning now costs what losing costs.
+ * "repelled" for free gold.
+ *
+ * It used to stop at the breach count and the threat, which left walking
+ * away still better than losing - no minion went down and no gold was taken,
+ * so a raid going badly was one reload from costing nothing. Every minion
+ * that was fielded now goes on the same revive timer a loss puts it on.
+ * Returns their ids; the gold is settleAbandonedRaid's, because it is async.
  */
-function abandonPendingRaid(dungeon, pending, now) {
+function abandonPendingRaid(dungeon, pending, now, effects) {
   const ids = (pending.party || []).map((m) => m.id);
   for (const record of dungeon.adventurers || []) {
     if (ids.indexOf(record.id) === -1) continue;
@@ -553,8 +559,53 @@ function abandonPendingRaid(dungeon, pending, now) {
     record.returnsAt = now + ADVENTURER_REGROUP_MS;
   }
 
+  // A raid opened by a server that did not record who fought costs no bodies:
+  // guessing would take down minions that were still on revive timers then.
+  const fielded = Array.isArray(pending.minionIds) ? pending.minionIds : [];
+  const downTime = Math.round(BASE_REVIVE_MS * ((effects && effects.reviveScale) || 1));
+  const lost = [];
+  dungeon.minions = (dungeon.minions || []).map((minion) => {
+    if (fielded.indexOf(minion.id) === -1) return minion;
+    if (minion.revivesAt && minion.revivesAt > now) return minion;
+    lost.push(minion.id);
+    return { ...minion, revivesAt: now + downTime };
+  });
+
   dungeon.coreBreaches = (dungeon.coreBreaches || 0) + 1;
   dungeon.threat = Math.max(0, (dungeon.threat || 0) - 1);
+  return lost;
+}
+
+/**
+ * The whole loss for a raid left open: bodies, breach, and the plunder.
+ *
+ * Plundered at the breach rate and cap, but never below RELIEF_FLOOR and with
+ * no relief paid - a dungeon under the floor that walked away would otherwise
+ * be topped up for it. The save is written before the gold moves: if the burn
+ * fails the player keeps the gold, and if the write failed after a burn the
+ * next load would burn it again.
+ */
+async function settleAbandonedRaid(state, now) {
+  const pending = state && state.pendingRaid;
+  if (!pending || !state.dungeon) return null;
+
+  const dungeon = state.dungeon;
+  const effects = roomEffects(dungeon.rooms || [], state.entitlements || emptyEntitlements());
+  const lostMinionIds = abandonPendingRaid(dungeon, pending, now, effects);
+
+  const goldBefore = await $asset.get("gold");
+  const plundered = Math.max(
+    0,
+    Math.min(
+      Math.floor(goldBefore * RAID_PLUNDER_RATE * effects.plunderScale),
+      RAID_PLUNDER_CAP,
+      goldBefore - RELIEF_FLOOR,
+    ),
+  );
+
+  await $global.updateMyState({ dungeon, pendingRaid: null });
+  if (plundered > 0) await $asset.burn("gold", plundered);
+  return { plundered, lostMinionIds };
 }
 
 function pickParty(dungeon, threat, now) {
@@ -1138,7 +1189,7 @@ class Server {
    * Loads the caller's dungeon, creating a fresh one on first play.
    * Gold lives in $asset, never in the save, so editing the save cannot mint money.
    */
-  async loadGame() {
+  async loadGame({ settle } = {}) {
     const state = await $global.getMyState();
 
     // A purchase can land before the player has ever built anything, so
@@ -1169,6 +1220,13 @@ class Server {
       // Sentences are served between sessions, so conversions are settled on
       // load rather than by a timer the sandbox does not allow.
       const now = Date.now();
+      /*
+       * Opening the game is walking away from any raid still open - but only
+       * the load that opens it. The client also reloads to recover from a
+       * failed save, possibly in the middle of a raid it is still playing,
+       * and settling that one would take the fight out from under it.
+       */
+      const abandoned = settle ? await settleAbandonedRaid({ ...state, dungeon }, now) : null;
       const converted = resolveConversions(dungeon, arena, now).converted;
 
       decayThreat(dungeon, now);
@@ -1182,6 +1240,7 @@ class Server {
         converted: converted.map((c) => c.name),
         research: researchEffects(dungeon.research),
         account: $sender.account,
+        abandoned,
       };
     }
 
@@ -1405,8 +1464,9 @@ class Server {
     const dungeon = state.dungeon;
     const now = Date.now();
 
-    // A raid left unresolved is settled as a loss before a new one opens.
-    if (state.pendingRaid) abandonPendingRaid(dungeon, state.pendingRaid, now);
+    // A raid left unresolved is settled as a loss before a new one opens - the
+    // same whole loss the next load would have settled it as.
+    const abandoned = await settleAbandonedRaid(state, now);
 
     // Nothing can walk in until the way in exists. Checked before anything
     // is spent or marked, so a refused raid costs the player nothing.
@@ -1467,6 +1527,8 @@ class Server {
         threat,
         jailFree,
         startedAt: now,
+        // Who fought, so a raid walked away from can cost them.
+        minionIds: availableMinionIds,
       },
     });
 
@@ -1481,6 +1543,14 @@ class Server {
       jailFree,
       effects,
       research: researchEffects(dungeon.research || []),
+      abandoned: abandoned && {
+        ...abandoned,
+        gold: await $asset.get("gold"),
+        minions: dungeon.minions,
+        threat: dungeon.threat || 0,
+        wavesRepelled: dungeon.wavesRepelled || 0,
+        coreBreaches: dungeon.coreBreaches || 0,
+      },
     };
   }
 

@@ -452,6 +452,10 @@ export default function App() {
     research: unlocked,
     roomier,
     onFinished: save.applyRaidResult,
+    onAbandoned: (settled) => {
+      save.applyRaidResult(settled);
+      save.noteAbandoned(settled);
+    },
     // Read on the animation frame rather than on render: the stick moves far
     // more often than React does.
     readControl: () => rendererRef.current?.moveRequest() ?? null,
@@ -1754,6 +1758,15 @@ export default function App() {
         )}
 
         {error && <div className="banner banner-error">{t("save_error")}: {error}</div>}
+        {/* A raid left unfinished was settled as a loss: said once, on arrival. */}
+        {save.abandoned && (
+          <div className="banner banner-error">
+            <button className="banner-close" onClick={save.dismissAbandoned} aria-label="close">×</button>
+            {save.abandoned.plundered > 0
+              ? t("abandoned_note_gold", { n: save.abandoned.plundered })
+              : t("abandoned_note")}
+          </div>
+        )}
         {/* Said once, on the raid that first arrives at a tier. */}
         {raid.milestone && (
           <div className="banner banner-tier">

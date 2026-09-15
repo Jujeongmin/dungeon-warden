@@ -184,6 +184,19 @@ export interface RaidStartResult {
   availableMinionIds: string[];
   /** Free cells left in the jail, which caps how many can be taken alive. */
   jailFree: number;
+  /**
+   * Set when a raid still open had to be settled before this one: what it
+   * cost, and the save as it stands afterwards.
+   */
+  abandoned?:
+    | (AbandonedRaid & {
+        gold: number;
+        minions: PlacedMinion[];
+        threat: number;
+        wavesRepelled: number;
+        coreBreaches: number;
+      })
+    | null;
 }
 
 /** Aggregated room bonuses. Computed on the server, echoed to the client. */
@@ -240,12 +253,20 @@ export type Entitlements = Record<string, boolean>;
 
 export const EMPTY_ENTITLEMENTS: Entitlements = {};
 
+/** What a raid left open cost when the server settled it. */
+export interface AbandonedRaid {
+  plundered: number;
+  lostMinionIds: string[];
+}
+
 export interface LoadResult {
   dungeon: Dungeon;
   entitlements: Entitlements;
   gold: number;
   created: boolean;
   account?: string;
+  /** Set when opening the game settled a raid left unfinished. */
+  abandoned?: AbandonedRaid | null;
 }
 
 

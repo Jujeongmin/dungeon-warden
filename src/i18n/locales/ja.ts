@@ -57,6 +57,8 @@ export const ja: Record<StringKey, string> = {
   save_now: "保存する",
   start_raid: "防衛開始",
   raid_reviving: "配下の復活まで {t}",
+  abandoned_note: "途中でやめた前回の襲撃は突破扱いになりました — 戦っていた手下は復活待ち",
+  abandoned_note_gold: "途中でやめた前回の襲撃は突破扱いになりました — {n}G 奪われ、戦っていた手下は復活待ち",
   preparing: "準備中…",
   unsaved_changes: "保存していない変更があります。",
   hover_hint: "タイルにカーソルを合わせてください",

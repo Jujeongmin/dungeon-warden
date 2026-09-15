@@ -52,6 +52,8 @@ export const zhHans: Record<StringKey, string> = {
   save_now: "立即保存",
   start_raid: "开始防守",
   raid_reviving: "部下复活还需 {t}",
+  abandoned_note: "上次中途离开的入侵按被攻破处理 — 参战手下正在复活",
+  abandoned_note_gold: "上次中途离开的入侵按被攻破处理 — 被夺走 {n} 金币，参战手下正在复活",
   preparing: "准备中…",
   unsaved_changes: "有尚未保存的更改。",
   hover_hint: "把光标移到格子上看看",

@@ -62,6 +62,12 @@ interface Options {
   research: ResearchEffects;
   onFinished: (result: RaidFinishResult) => void;
   /**
+   * A raid still open was settled as a loss before this one could start: the
+   * save as it stands after that, so the board stops showing the minions and
+   * the gold the loss just took.
+   */
+  onAbandoned?: (settled: NonNullable<RaidStartResult["abandoned"]>) => void;
+  /**
    * Whether the dungeon has been bought room to sprawl in.
    *
    * The deeper_dungeon entitlement. Passed in rather than read here so the
@@ -101,6 +107,7 @@ export function useRaid({
   weaponTiers,
   research,
   onFinished,
+  onAbandoned,
   onEvents,
   initialSpeed,
   readControl,
@@ -333,6 +340,7 @@ export function useRaid({
       }
 
       raidIdRef.current = start.raidId;
+      if (start.abandoned) onAbandoned?.(start.abandoned);
       setMilestone(start.milestoneReached ?? null);
       setAdUsed(false);
 
@@ -385,6 +393,7 @@ export function useRaid({
     research,
     server,
     starting,
+    onAbandoned,
   ]);
 
   /**

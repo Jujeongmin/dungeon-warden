@@ -54,6 +54,8 @@ export const ko = {
   save_now: "지금 저장",
   start_raid: "방어 시작",
   raid_reviving: "부하 부활까지 {t}",
+  abandoned_note: "끝내지 않은 지난 습격은 돌파로 처리됐어요 — 싸우던 부하는 부활 대기 중",
+  abandoned_note_gold: "끝내지 않은 지난 습격은 돌파로 처리됐어요 — 약탈 -{n}G, 싸우던 부하는 부활 대기 중",
   preparing: "준비 중…",
   unsaved_changes: "저장하지 않은 변경이 있습니다.",
   hover_hint: "타일 위에 커서를 올려보세요",

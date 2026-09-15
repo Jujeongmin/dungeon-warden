@@ -51,6 +51,8 @@ export const en: Record<StringKey, string> = {
   save_now: "Save now",
   start_raid: "Begin defense",
   raid_reviving: "Minions back in {t}",
+  abandoned_note: "The raid you left unfinished counted as a breach — the minions in it are reviving",
+  abandoned_note_gold: "The raid you left unfinished counted as a breach — {n} gold plundered, the minions in it are reviving",
   preparing: "Preparing…",
   unsaved_changes: "You have unsaved changes.",
   hover_hint: "Hover a tile to inspect it",

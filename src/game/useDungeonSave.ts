@@ -39,6 +39,7 @@ import {
   type RoomType,
   type SaveResult,
   type TrapType,
+  type AbandonedRaid,
 } from "./types";
 
 const AUTOSAVE_INTERVAL_MS = 60_000;
@@ -174,6 +175,9 @@ export function useDungeonSave() {
     installServerProbe((fn, args) => server.remoteFunction(fn, args as unknown[]));
   }, [server]);
 
+  /** The raid left unfinished that opening the game settled, until dismissed. */
+  const [abandoned, setAbandoned] = useState<AbandonedRaid | null>(null);
+
   const applyLoad = useCallback((result: LoadResult) => {
     // Only ever read to work out what an uncarved dungeon had dug.
     const legacyWalls = result.dungeon.obstacles ?? [];
@@ -225,6 +229,7 @@ export function useDungeonSave() {
 
     setGold(result.gold);
     setEntitlements(result.entitlements ?? EMPTY_ENTITLEMENTS);
+    if (result.abandoned) setAbandoned(result.abandoned);
   }, []);
 
   // Offline fallback so `npm run dev` works before the first deploy.
@@ -247,7 +252,9 @@ export function useDungeonSave() {
     let cancelled = false;
     setStatus("loading");
     server
-      .remoteFunction("loadGame", [])
+      // The one load that settles a raid left open: this is the game being
+      // opened. The reload after a failed save must not - see loadGame.
+      .remoteFunction("loadGame", [{ settle: true }])
       .then((result: LoadResult) => {
         if (cancelled) return;
         applyLoad(result);
@@ -772,6 +779,10 @@ export function useDungeonSave() {
     saveNow,
     resetGame,
     refreshEntitlements,
+    abandoned,
+    dismissAbandoned: () => setAbandoned(null),
+    /** For a raid settled when the next one was opened rather than on load. */
+    noteAbandoned: setAbandoned,
   };
 }
 
