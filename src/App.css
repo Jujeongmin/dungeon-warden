@@ -1238,6 +1238,10 @@ button.primary {
   width: auto;
 }
 
+/* Down in the corridor the panel is gone, so the raid bar has no reason to
+   stop short of it - it wrapped onto two lines for a column that was empty. */
+.app:has(.walkbar) .topstack { padding-right: 8px; }
+
 /* Only gold and the buttons survive on a phone; the rest is in the HUD. */
 .stats .status,
 .stats .pending {
@@ -1479,7 +1483,12 @@ button.primary {
 
 .modal.result {
   padding-top: 0;
-  overflow: hidden;
+  /* Scrolls rather than clips. It was overflow: hidden, and on a phone on its
+     side - 375px tall - the totals and the continue button were below the
+     fold of a dialog that could not be scrolled. The sideways axis stays
+     hidden for the verdict's full-bleed margins. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* The verdict is the whole top of the panel, coloured by which way it went —
@@ -1611,7 +1620,15 @@ button.primary {
   to { opacity: 1; transform: none; }
 }
 
-.modal.result .actions { margin-bottom: 0; }
+/* The way out stays on screen however long the list above it grows. */
+.modal.result .actions {
+  position: sticky;
+  bottom: -20px;
+  margin: 12px -20px -20px;
+  padding: 10px 20px 16px;
+  background: var(--stone-face);
+  border-top: 1px solid var(--edge-dark);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .payout b,
@@ -2396,7 +2413,8 @@ button.ad-gold {
 .stick { position: relative; }
 .stick kbd {
   position: absolute;
-  bottom: -20px;
+  /* Above the ring: under it, the bottom edge of a phone cut it in half. */
+  top: -20px;
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
@@ -2501,6 +2519,27 @@ button.ad-gold {
     line-height: 1.45;
   }
   .group.remove { flex-basis: 34px; }
+  /* The start button on one line: stacked, it took 88px of a 375px screen
+     from the tools above it. */
+  .hud-foot .go {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .hud-foot { padding-top: 6px; }
+  /* The skill cards ran past the foot of a 390px screen once one of them
+     wrapped its effect line to three: two lines at most, and a little less
+     of everything around them. */
+  .skillbar { bottom: 8px; gap: 6px; }
+  .skillbar .skill { padding: 5px 8px; }
+  .skill b { font-size: var(--fs-xs); }
+  .skill i {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   .group i {
     max-width: 100%;
     overflow: hidden;
