@@ -11,6 +11,7 @@ import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
 import { wardenLevel as wardenLevelOf } from "./game/warden";
 import { veteranRank } from "./game/veteran";
+import { activeSkin } from "./game/skins";
 import { blockedKey, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
@@ -544,6 +545,15 @@ export default function App() {
    * owns the camera, this owns the screen around it.
    */
   const [walking, setWalking] = useState(false);
+
+  /*
+   * The warden's skin, handed to the renderer just before the walking effect below
+   * stands the body up. One no longer unlocked falls back to the imp.
+   */
+  const wardenSkin = activeSkin(settings.wardenSkin, wardenLevelOf(meta?.wardenDowns ?? 0), entitlements);
+  useEffect(() => {
+    rendererRef.current?.setWardenSkin(wardenSkin.model, wardenSkin.tint, wardenSkin.glow);
+  }, [wardenSkin.model, wardenSkin.tint, wardenSkin.glow, walking]);
 
   /*
    * Walking is for between raids. During one the camera has somewhere else to
@@ -2514,6 +2524,8 @@ export default function App() {
             setSettingsOpen(false);
           }}
           resetDisabled={raid.raiding}
+          wardenLevel={wardenLevelOf(meta?.wardenDowns ?? 0)}
+          entitlements={entitlements}
           onClose={() => setSettingsOpen(false)}
         />
       )}

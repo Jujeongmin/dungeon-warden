@@ -33,6 +33,12 @@ const out = join(root, "public/assets/warden");
 
 /** The body, and the clips it is given. */
 const BODY = join(src, "bestiary/Exports/GLB (Godot-Unreal)/Imp.glb");
+/**
+ * A second body for the warden to wear, from the same kit and on the same
+ * skeleton - every joint name matches the imp's, so the same clips drive it.
+ * Unlocked as a skin: see src/game/skins.ts.
+ */
+const PUGLIN = join(src, "bestiary/Exports/GLB (Godot-Unreal)/Puglin.glb");
 const CLIPS = join(src, "ual2/Unreal-Godot/UAL2_Standard.glb");
 
 /*
@@ -53,7 +59,7 @@ const WANTED = {
 const TEXTURE_SIZE = 512;
 
 async function main() {
-  for (const file of [BODY, CLIPS]) {
+  for (const file of [BODY, PUGLIN, CLIPS]) {
     if (!existsSync(file)) {
       console.error(`missing ${file}`);
       console.error("Unzip the two packs into art-src/bestiary and art-src/ual2 first.");
@@ -64,33 +70,9 @@ async function main() {
 
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 
-  // --- the body ------------------------------------------------------------
-  const body = await io.read(BODY);
-  /*
-   * The occlusion/roughness/metalness map goes.
-   *
-   * It is the single heaviest texture in the pack and it is describing a
-   * surface nobody will ever inspect: this model is seen a few tiles off, in
-   * a corridor lit by one torch. Flat roughness says
-   * the same thing there for nothing.
-   */
-  for (const material of body.getRoot().listMaterials()) {
-    material.setOcclusionTexture(null);
-    material.setMetallicRoughnessTexture(null);
-    material.setRoughnessFactor(0.85);
-    material.setMetallicFactor(0);
-  }
-  await body.transform(
-    weld(),
-    dedup(),
-    prune({ keepAttributes: false }),
-    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [TEXTURE_SIZE, TEXTURE_SIZE] }),
-    // Positions and weights at 14 and 8 bits rather than full floats: three.js
-    // reads the quantization extension natively, and it is most of the file.
-    quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12, quantizeWeight: 8 }),
-  );
-  const bodyNodes = new Set(body.getRoot().listNodes().map((node) => node.getName()));
-  await io.write(join(out, "warden.glb"), body);
+  // --- the bodies ----------------------------------------------------------
+  const bodyNodes = await bakeBody(io, BODY, "warden.glb");
+  await bakeBody(io, PUGLIN, "warden-puglin.glb");
 
   // --- the clips -----------------------------------------------------------
   const clips = await io.read(CLIPS);
@@ -150,6 +132,7 @@ async function main() {
 
   const size = (file) => `${(readFileSync(file).byteLength / 1024).toFixed(0)}KB`;
   console.log(`warden.glb        ${size(join(out, "warden.glb"))}`);
+  console.log(`warden-puglin.glb ${size(join(out, "warden-puglin.glb"))}`);
   console.log(`warden-clips.glb  ${size(join(out, "warden-clips.glb"))}`);
 
   const kept = Object.values(WANTED).join(", ");
@@ -172,6 +155,37 @@ async function main() {
       "",
     ].join("\n"),
   );
+}
+
+/**
+ * One body, cut down to something a phone can hold.
+ *
+ * The occlusion/roughness/metalness map goes: it is the single heaviest
+ * texture in the pack and it describes a surface nobody will ever inspect -
+ * the body is seen a few tiles off, in a corridor lit by one torch. Flat
+ * roughness says the same thing there for nothing. Returns the node names,
+ * which is what the clips are trimmed against.
+ */
+async function bakeBody(io, file, name) {
+  const body = await io.read(file);
+  for (const material of body.getRoot().listMaterials()) {
+    material.setOcclusionTexture(null);
+    material.setMetallicRoughnessTexture(null);
+    material.setRoughnessFactor(0.85);
+    material.setMetallicFactor(0);
+  }
+  await body.transform(
+    weld(),
+    dedup(),
+    prune({ keepAttributes: false }),
+    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [TEXTURE_SIZE, TEXTURE_SIZE] }),
+    // Positions and weights at 14 and 8 bits rather than full floats: three.js
+    // reads the quantization extension natively, and it is most of the file.
+    quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12, quantizeWeight: 8 }),
+  );
+  const nodes = new Set(body.getRoot().listNodes().map((node) => node.getName()));
+  await io.write(join(out, name), body);
+  return nodes;
 }
 
 await main();

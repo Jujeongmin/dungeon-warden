@@ -80,6 +80,8 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   warden: [/^warden$/, /^skeleton_rogue$/, /^skeleton_warrior$/],
   /** Motion for the warden, on the same rig. Carries no mesh of its own. */
   warden_clips: [/^warden-clips$/],
+  /** A second body for the warden, unlocked as a skin: see src/game/skins.ts. */
+  warden_puglin: [/^warden-puglin$/],
 
   // Minions — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage

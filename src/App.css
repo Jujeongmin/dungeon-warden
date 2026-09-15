@@ -471,6 +471,26 @@ h3.section {
 /* The party has seen the warden: bigger than a number, and the colour of trouble. */
 .floater.noticed { color: #ff6a52; font-size: var(--fs-lg); }
 
+/* The warden's skins in settings: locked ones stay in the row and say what
+   opens them, so the reward is known before it is earned. */
+.setting-row.skin-row { flex-wrap: wrap; gap: 8px; }
+.skin-picks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.skin-picks button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 10px;
+  font-size: var(--fs-xs);
+}
+.skin-picks button small { font-size: var(--fs-2xs); color: var(--muted); }
+.skin-picks button.active { border-color: var(--accent); color: var(--accent); }
+
 /* Starts fully visible: a damage number that fades in is a damage number the
    player misses. */
 @keyframes floatUp {

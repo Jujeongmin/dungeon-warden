@@ -2,6 +2,8 @@ import { useEscape } from "./useEscape";
 import { useT } from "../i18n";
 import { LOCALE_LABEL, type Locale } from "../i18n/strings";
 import type { Settings } from "../game/settings";
+import type { Entitlements } from "../game/types";
+import { WARDEN_SKINS, skinUnlocked } from "../game/skins";
 
 interface Props {
   settings: Settings;
@@ -9,6 +11,9 @@ interface Props {
   onReplayTutorial: () => void;
   onResetDungeon: () => void;
   resetDisabled: boolean;
+  /** Which warden skins are unlocked follows from these. */
+  wardenLevel: number;
+  entitlements: Entitlements;
   onClose: () => void;
 }
 
@@ -38,6 +43,8 @@ export function SettingsDialog({
   onReplayTutorial,
   onResetDungeon,
   resetDisabled,
+  wardenLevel,
+  entitlements,
   onClose,
 }: Props) {
   useEscape(onClose);
@@ -102,6 +109,32 @@ export function SettingsDialog({
           <button onClick={() => onChange({ haptics: !settings.haptics })}>
             {settings.haptics ? t("settings_haptics_on") : t("settings_haptics_off")}
           </button>
+        </div>
+
+        {/* How the warden looks. A locked skin stays in the row and says what
+            opens it, so the reward is known before it is earned. */}
+        <div className="setting-row skin-row">
+          <span>{t("settings_skin")}</span>
+          <span className="skin-picks">
+            {WARDEN_SKINS.map((skin) => {
+              const open = skinUnlocked(skin, wardenLevel, entitlements);
+              const lock =
+                skin.unlock.kind === "level"
+                  ? t("skin_locked_level", { n: skin.unlock.level })
+                  : t("skin_locked_shop");
+              return (
+                <button
+                  key={skin.id}
+                  className={settings.wardenSkin === skin.id ? "active" : ""}
+                  disabled={!open}
+                  onClick={() => onChange({ wardenSkin: skin.id })}
+                >
+                  {t(skin.label)}
+                  {!open && <small>{lock}</small>}
+                </button>
+              );
+            })}
+          </span>
         </div>
 
         <div className="setting-row">

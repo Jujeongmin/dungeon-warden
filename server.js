@@ -335,6 +335,9 @@ const PRODUCTS = {
   // entitlement already granted is never revoked.
   deeper_dungeon: { grants: "extraObstacles", repeatable: false },
   larger_garrison: { grants: "extraMinions", repeatable: false },
+  // Cosmetic: a recoloured warden and nothing the simulation reads. Sold
+  // alongside a skin earned for free at warden level 3 - see src/game/skins.ts.
+  warden_skin_ember: { grants: "skinEmber", repeatable: false },
 };
 
 /** How much each entitlement is worth, applied on top of the research caps. */

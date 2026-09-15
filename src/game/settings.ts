@@ -53,6 +53,8 @@ export interface Settings {
   strikeSeen: boolean;
   /** Vibration on a swing, a blow taken, and a body lost. A no-op where unsupported. */
   haptics: boolean;
+  /** Which warden skin to wear, if it is unlocked. See src/game/skins.ts. */
+  wardenSkin: string;
 }
 
 const KEY = "dw.settings";
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   possessSeen: false,
   strikeSeen: false,
   haptics: true,
+  wardenSkin: "imp",
 };
 
 export function loadSettings(): Settings {

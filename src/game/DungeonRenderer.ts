@@ -80,6 +80,17 @@ const WALK_BAR_SCALE = 0.4;
 const WARDEN_WIDTH = 0.62;
 /** And how tall it stands, which is what the eye height follows from. */
 const WARDEN_HEIGHT = 1.15;
+/**
+ * And how wide it may come out at that height, in tiles.
+ *
+ * The imp is about as wide as it is tall and lands at 1.2. A body built squat
+ * - the puglin, arms and stick out - scaled to the same height came out nearly
+ * two tiles across and filled the corridor wall to wall, so the width caps the
+ * scale as well.
+ */
+const WARDEN_MAX_SPAN = 1.25;
+/** How strongly a glowing skin smoulders. */
+const SKIN_GLOW = 0.4;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -2136,6 +2147,10 @@ export class DungeonRenderer {
   private warden: THREE.Object3D | null = null;
   /** The ring at its feet. Apart from the body so the body's scale cannot size it. */
   private wardenMark: THREE.Mesh | null = null;
+  /** The model and tint the warden wears when it walks as itself: its skin. */
+  private wardenModel = "warden";
+  private wardenTint: number | null = null;
+  private wardenGlow: number | null = null;
   /** Which kind of body is being ridden, or null for the warden's own. */
   private possessedType: string | null = null;
   /** Set by faceThreatOnArrival; the next position turns the view and clears it. */
@@ -2200,15 +2215,18 @@ export class DungeonRenderer {
   private spawnWarden(): void {
     this.disposeWarden();
     const key = this.possessedType;
-    const body = key ? this.spawnModel(key, UNIT_TILES) : this.spawnModel("warden", WARDEN_WIDTH);
+    const body = key ? this.spawnModel(key, UNIT_TILES) : (this.spawnModel(this.wardenModel, WARDEN_WIDTH) ?? this.spawnModel("warden", WARDEN_WIDTH));
     if (!body) return;
 
     if (!key) {
       body.updateMatrixWorld(true);
       const raw = new THREE.Box3().setFromObject(body);
       const tall = raw.max.y - raw.min.y;
+      const wide = Math.max(raw.max.x - raw.min.x, raw.max.z - raw.min.z);
       if (tall > 0.01) {
-        body.scale.multiplyScalar(WARDEN_HEIGHT / tall);
+        body.scale.multiplyScalar(
+          Math.min(WARDEN_HEIGHT / tall, wide > 0.01 ? WARDEN_MAX_SPAN / wide : Infinity),
+        );
         body.updateMatrixWorld(true);
         const grown = new THREE.Box3().setFromObject(body);
         body.position.y -= grown.min.y;
@@ -2221,6 +2239,25 @@ export class DungeonRenderer {
       const mesh = child as THREE.SkinnedMesh;
       if (mesh.isMesh) mesh.frustumCulled = false;
     });
+    // A recoloured skin. spawnModel cloned the materials, so the tint reaches
+    // this body and no other.
+    if (!key && this.wardenTint !== null) DungeonRenderer.tint(body, this.wardenTint, 1);
+    // A glowing skin smoulders all over, not only where the emissive map says.
+    if (!key && this.wardenGlow !== null) {
+      const glow = new THREE.Color(this.wardenGlow);
+      body.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const material of materials as THREE.MeshStandardMaterial[]) {
+          if (!material.emissive) continue;
+          material.emissiveMap = null;
+          material.emissive.copy(glow);
+          material.emissiveIntensity = SKIN_GLOW;
+          material.needsUpdate = true;
+        }
+      });
+    }
 
     /*
      * Motion from wherever this body's motion lives.
@@ -2229,7 +2266,7 @@ export class DungeonRenderer {
      * same skeleton; the garrison and the adventurers borrow the shared rig
      * clips, exactly as the board animates them.
      */
-    const own = this.loaded.get(key ?? "warden")?.animations ?? [];
+    const own = this.loaded.get(key ?? this.wardenModel)?.animations ?? [];
     const rigged = key ? [] : (this.loaded.get("warden_clips")?.animations ?? []);
     const clips = own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips;
     this.setupAnimation("warden", body, clips);
@@ -2295,6 +2332,16 @@ export class DungeonRenderer {
    *
    * Passing null hands the view back to the warden's own body.
    */
+  setWardenSkin(model: string, tint: number | null, glow: number | null = null): void {
+    if (this.wardenModel === model && this.wardenTint === tint && this.wardenGlow === glow) return;
+    this.wardenModel = model;
+    this.wardenTint = tint;
+    this.wardenGlow = glow;
+    // Redrawn at once if the warden is out walking as itself; a ridden minion
+    // is left as it is.
+    if (this.walk && this.possessedType === null) this.spawnWarden();
+  }
+
   setPossessed(key: string | null): void {
     if (this.possessedType === key) return;
     this.possessedType = key;

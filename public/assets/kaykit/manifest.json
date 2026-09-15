@@ -233,6 +233,12 @@
       "name": "warden-clips",
       "group": "warden",
       "bytes": 160740
+    },
+    {
+      "url": "/assets/warden/warden-puglin.glb",
+      "name": "warden-puglin",
+      "group": "warden",
+      "bytes": 252764
     }
   ]
 }
