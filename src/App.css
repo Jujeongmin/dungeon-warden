@@ -2421,15 +2421,36 @@ button.ad-gold {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 132px);
   transform: translateX(-50%);
   z-index: 3;
-  width: min(34%, 240px);
-  height: 15px;
+  /* Wider and taller than it was: at 15px high and 240px across, a line of
+     Korean with the level and the hit points on it was cut off top, bottom
+     and end. The level now has a line of its own above the bar. */
+  width: min(46%, 300px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.walk-life-level {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+  color: var(--accent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+.walk-life-bar {
+  position: relative;
+  width: 100%;
+  height: 20px;
   display: grid;
   place-items: center;
   overflow: hidden;
   border-radius: 99px;
   border: 1px solid rgba(232, 164, 76, 0.32);
   background: rgba(20, 15, 11, 0.62);
-  pointer-events: none;
 }
 
 .walk-life-fill {
@@ -2441,15 +2462,20 @@ button.ad-gold {
 
 .walk-life span {
   position: relative;
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  line-height: 1;
   color: var(--ink);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
 }
 
 @media (max-height: 520px) {
   .walk-strike { width: 74px; height: 74px; }
-  .walk-life { bottom: calc(env(safe-area-inset-bottom, 0px) + 44px); }
-  .strike-hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 128px); }
+  /* Clear of the button row: with the level on a line of its own the block is
+     twice the height it was, and at 44px it sat on the skill and hop buttons. */
+  .walk-life { bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); }
+  .strike-hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 162px); }
 }
 
 /*

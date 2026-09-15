@@ -2340,13 +2340,18 @@ export default function App() {
 
       {possessed && (
         <div className="walk-life">
-          <div
-            className="walk-life-fill"
-            style={{ width: `${Math.max(0, Math.min(1, possessed.hp / possessed.maxHp)) * 100}%` }}
-          />
-          <span>
-            {t("warden_level", { n: wardenLevelOf(meta?.wardenDowns ?? 0) })} · {Math.max(0, Math.ceil(possessed.hp))}
-          </span>
+          {/* The level on a line of its own, above the bar rather than inside it:
+              squeezed into a 15px pill beside the hit points, both were clipped. */}
+          <b className="walk-life-level">{t("warden_level", { n: wardenLevelOf(meta?.wardenDowns ?? 0) })}</b>
+          <div className="walk-life-bar">
+            <div
+              className="walk-life-fill"
+              style={{ width: `${Math.max(0, Math.min(1, possessed.hp / possessed.maxHp)) * 100}%` }}
+            />
+            <span>
+              {Math.max(0, Math.ceil(possessed.hp))} / {Math.ceil(possessed.maxHp)}
+            </span>
+          </div>
         </div>
       )}
 
