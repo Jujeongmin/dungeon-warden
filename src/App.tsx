@@ -967,6 +967,15 @@ export default function App() {
   const units: UnitView[] = useMemo(() => {
     if (raid.raidState) {
       const live: UnitView[] = [];
+      /*
+       * A finished raid stands everyone down.
+       *
+       * The last step of a raid is frozen on the result screen, and whoever
+       * was mid-swing stayed mid-swing - the clip loops, so the board showed
+       * a garrison hacking at nothing for as long as the dialog was up and,
+       * once the placed roster took over, for good.
+       */
+      const over = raid.raidState.status === "repelled" || raid.raidState.status === "breached";
       for (const m of raid.raidState.minions) {
         if (!m.alive) continue;
         // Ridden: the renderer draws it itself, under the camera that
@@ -978,14 +987,14 @@ export default function App() {
           m.type === "convert" ? `a_${placed?.cls ?? "knight"}` : `m_${m.type}`;
         live.push({
           id: `m:${m.id}`, x: m.x, y: m.y, kind, hp: m.hp, maxHp: m.maxHp,
-          action: m.action, facing: m.facing,
+          action: over ? "idle" : m.action, facing: m.facing,
         });
       }
       for (const a of raid.raidState.adventurers) {
         if (!a.alive || !a.spawned) continue;
         live.push({
           id: `a:${a.id}`, x: a.x, y: a.y, kind: `a_${a.cls}`, hp: a.hp, maxHp: a.maxHp,
-          action: a.action, facing: a.facing,
+          action: over ? "idle" : a.action, facing: a.facing,
           // The party carries health bars; the garrison does not. See UnitView.
           showHealth: true,
           // The champion is announced by being bigger than everyone else on
@@ -1007,6 +1016,9 @@ export default function App() {
         kind: m.type === "convert" ? `a_${m.cls ?? "knight"}` : `m_${m.type}`,
         hp: m.revivesAt && m.revivesAt > now ? 0 : stats.hp,
         maxHp: stats.hp,
+        // Said outright: a mesh kept from the raid keeps whatever clip it
+        // was last told, and between raids that is always the wrong one.
+        action: "idle" as const,
       };
     });
   }, [raid.raidState, minions, weaponTiers, possessedId]);
@@ -2267,6 +2279,7 @@ export default function App() {
             onPointerCancel={stickRelease}
           >
             <div ref={knobRef} className="knob" />
+            {HAS_MOUSE && <kbd>WASD</kbd>}
           </div>
           {possessed && (
             <button
@@ -2285,16 +2298,19 @@ export default function App() {
               )}
               {(raid.raidState?.possessedSkill ?? 0) > 0 &&
                 ` ${Math.ceil(raid.raidState?.possessedSkill ?? 0)}`}
+              {HAS_MOUSE && <kbd>E</kbd>}
             </button>
           )}
           {possessed && (
             <button className="walk-hop" onClick={() => hopRef.current(1)}>
               {t("walk_hop")}
+              {HAS_MOUSE && <kbd>Q</kbd>}
             </button>
           )}
           {possessed && (
             <button className="walk-strike" onClick={() => strikeRef.current()}>
               {t("walk_attack")}
+              {HAS_MOUSE && <kbd>Space</kbd>}
             </button>
           )}
           <button

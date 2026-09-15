@@ -2362,6 +2362,46 @@ button.ad-gold {
 
 .walk-skill:disabled { opacity: 0.55; }
 
+/* The key each control answers to, on the control itself. Only on a machine
+   with a mouse, which is the one that has a keyboard to press them on - a
+   thumb on a phone has no use for "E". The one-time hint above the bar said
+   it once and then never again, which is how nobody learned Q. */
+.walkbar kbd {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  min-width: 1.4em;
+  border: 1px solid rgba(232, 164, 76, 0.45);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  line-height: 1.25;
+  text-align: center;
+  color: var(--accent);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* Under the word on the round swing button, not beside it. */
+.walk-strike kbd {
+  display: block;
+  width: fit-content;
+  margin: 4px auto 0;
+}
+
+/* The stick's keys sit under the ring, out of the thumb's way. */
+.stick { position: relative; }
+.stick kbd {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .walk-skill + .walk-hop { margin-left: 10px; }
 
 .walk-strike + .walk-exit { margin-left: 12px; }
