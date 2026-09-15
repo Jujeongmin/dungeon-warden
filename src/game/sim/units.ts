@@ -45,9 +45,14 @@ export interface AdventurerStats {
  * between melee and ranged: the warrior is twice the health at half the reach,
  * so it is what you put where the route runs close and the mage is what you
  * put where it does not.
+ *
+ * The warrior was 90/9, and at that a starting dungeon's two of them in the
+ * road lost to a knight who had died once - by two hit points, every time,
+ * with nothing left to buy. 100/10 holds the road against that knight and
+ * still loses to a barbarian who has come back, which is the next lesson.
  */
 export const MINION_STATS: Record<Exclude<MinionType, "convert">, MinionStats> = {
-  warrior: { hp: 90, damage: 9, attackInterval: 1.0, range: 2.4 },
+  warrior: { hp: 100, damage: 10, attackInterval: 1.0, range: 2.4 },
   mage: { hp: 45, damage: 7, attackInterval: 1.4, range: 4.2 },
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RaidSim, SIM_DT } from "../src/game/sim/RaidSim";
+import { RaidSim, SIM_DT, WARDEN_GUARD, WARDEN_MIGHT } from "../src/game/sim/RaidSim";
 import { arenaFor, blockedKey, coreOf, entranceOf } from "../src/game/arena";
 import { MINION_STATS } from "../src/game/sim/units";
 import type { PartyMember, PlacedMinion } from "../src/game/types";
@@ -8,10 +8,11 @@ import type { PartyMember, PlacedMinion } from "../src/game/types";
  * The warden climbing into one of its own minions.
  *
  * The rule the whole feature rests on: a ridden body is still a minion. It
- * has the stats it was bought with, it stands where a minion may stand, it is
+ * has the hit points it was bought with, it stands where a minion may stand, it is
  * fought when it blocks the road, and when it dies the warden is put back on
- * the board with nothing to show for it. The only two things it gains are the
- * two a placed minion has never had - it walks, and it swings when told.
+ * the board with nothing to show for it. What it gains is the warden's weight
+ * behind its blows and against the ones it takes, and the two things a placed
+ * minion has never had - it walks, and it swings when told.
  */
 
 const arena = arenaFor([]);
@@ -166,7 +167,7 @@ describe("swinging a body", () => {
     sim.requestAttack();
     sim.step();
 
-    expect(sim.state.adventurers[0].hp).toBe(before - MINION_STATS.warrior.damage);
+    expect(sim.state.adventurers[0].hp).toBeCloseTo(before - MINION_STATS.warrior.damage * WARDEN_MIGHT, 5);
   });
 
   it("spends the cooldown on a swing that connects with nothing", () => {
@@ -235,5 +236,38 @@ describe("where a blow came from", () => {
       if (sim.state.status !== "running") break;
     }
     throw new Error("the trap never fired");
+  });
+});
+
+describe("the warden's weight behind a body", () => {
+  /** How much the first blow that lands on a warrior in the road takes off. */
+  function firstWound(ridden: boolean): number {
+    const sim = new RaidSim({
+      minions: [{ id: "m1", type: "warrior", x: entrance.x, y: entrance.y + 2 }],
+      traps: [],
+      terrain: new Set<number>(),
+      party,
+      arena,
+      entrance,
+      core,
+      lures: [],
+      seed: 1,
+    });
+    if (ridden) sim.possess("m1");
+    let last = sim.state.minions[0].hp;
+    for (let i = 0; i < 20 * 30; i++) {
+      if (ridden) sim.setControl({ x: 0, y: 0, facing: 0 });
+      sim.step();
+      const hp = sim.state.minions[0].hp;
+      if (hp < last) return last - hp;
+      last = hp;
+    }
+    return 0;
+  }
+
+  it("softens the blows that land on it", () => {
+    const bare = firstWound(false);
+    expect(bare).toBeGreaterThan(0);
+    expect(firstWound(true)).toBeCloseTo(bare * WARDEN_GUARD, 5);
   });
 });

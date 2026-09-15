@@ -73,6 +73,18 @@ export function hasChampion(threat: number): boolean {
   return threat >= CHAMPION_THREAT;
 }
 
+/**
+ * The highest level anyone is fielded at: one above what the town would hire.
+ * Mirrored from `levelCap` in pickParty.
+ *
+ * Adventurers level every time they die and never level down, so without a
+ * cap a dungeon that won once met a veteran it could not beat at threat 0 -
+ * and losing, which is the only thing that lowers threat, could not help.
+ */
+export function veteranCap(threat: number): number {
+  return 2 + Math.floor(threat / 3);
+}
+
 export interface PartyPreviewMember extends PartyMember {
   /** False for a recruit the server has not created yet. */
   known: boolean;
@@ -125,6 +137,7 @@ export function previewParty(
   // is the one who becomes the champion.
   ready.sort((a, b) => b.level - a.level);
   const party = ready.slice(0, size);
+  for (const member of party) member.level = Math.min(member.level, veteranCap(threat));
   if (party.length > 0 && hasChampion(threat)) party[0].champion = true;
   return party;
 }

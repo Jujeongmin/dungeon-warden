@@ -82,6 +82,14 @@ describe("the client mirror of the server's party rules", () => {
     expect(hasChampion(CHAMPION_THREAT)).toBe(true);
   });
 
+  it("caps a veteran at the same level", () => {
+    expect(server).toContain("const levelCap = 2 + Math.floor(threat / 3);");
+    expect(server).toContain("level: Math.min(member.level, levelCap),");
+    // Aldric died five times at threat 0: he still arrives at level 2.
+    expect(previewParty([record({ level: 6 })], 0, 0)[0].level).toBe(2);
+    expect(previewParty([record({ level: 6 })], 9, 0)[0].level).toBe(5);
+  });
+
   it("recruits at the level the server would hire at", () => {
     expect(server).toContain("level: 1 + Math.floor(threat / 3),");
     expect(previewParty([], 9, 0)[0].level).toBe(4);

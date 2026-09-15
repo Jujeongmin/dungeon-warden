@@ -54,6 +54,17 @@ export const SHOVE_STAGGER = 0.8;
 /** How long a mage waits between blasts, and what one is worth against a normal blow. */
 export const BLAST_COOLDOWN = 8;
 export const BLAST_MULTIPLIER = 2.5;
+/**
+ * What the warden's own hand is worth inside a body.
+ *
+ * A ridden minion used to be exactly the minion - the same blows on the same
+ * clock, only aimed by hand - and measured against the minion left to itself
+ * it changed nothing: a road that fell without the warden fell with it. The
+ * warden is the dungeon's master, and climbing in costs its attention and
+ * risks the body, so the body hits harder and takes less while it is there.
+ */
+export const WARDEN_MIGHT = 1.25;
+export const WARDEN_GUARD = 0.8;
 
 export interface SimMinion {
   id: string;
@@ -1045,6 +1056,11 @@ export class RaidSim {
     );
   }
 
+  /** A blow landing on a minion, softened while the warden is inside it. */
+  private blowOn(minion: SimMinion, damage: number): number {
+    return minion.id === this.possessedId ? damage * WARDEN_GUARD : damage;
+  }
+
   private stepAdventurers(): void {
     for (const adventurer of this.adventurers) {
       if (!adventurer.alive || !adventurer.spawned || adventurer.downed > 0) continue;
@@ -1077,7 +1093,7 @@ export class RaidSim {
         if (adventurer.cooldown === 0) {
           adventurer.cooldown = stats.attackInterval;
           if (quarry.shield <= 0) {
-            quarry.hp -= stats.damage;
+            quarry.hp -= this.blowOn(quarry, stats.damage);
             if (quarry.hp <= 0) this.killMinion(quarry);
           }
         }
@@ -1094,7 +1110,7 @@ export class RaidSim {
           // A blessed minion still occupies the corridor, it just takes no
           // damage — the skill buys time rather than removing the fight.
           if (guard.shield <= 0) {
-            guard.hp -= stats.damage;
+            guard.hp -= this.blowOn(guard, stats.damage);
             if (guard.hp <= 0) this.killMinion(guard);
           }
         }
@@ -1163,10 +1179,10 @@ export class RaidSim {
   /**
    * Drives the ridden body from the player's input instead of from the rules.
    *
-   * It is the same minion in every other respect - the same stats, the same
-   * hit points, the same place in the road - so nothing here can hand the
-   * warden a unit the board could not have bought. What it gains is the two
-   * things a placed minion has never had: it can walk, and it swings when
+   * It is the same minion in every other respect - the same hit points, the
+   * same place in the road - with the warden's weight behind it: blows worth
+   * WARDEN_MIGHT and wounds cut by WARDEN_GUARD. What it gains besides is the
+   * two things a placed minion has never had: it can walk, and it swings when
    * told rather than whenever something wanders into reach.
    *
    * Walking is the real power. The garrison is not in the pathfinding blocked
@@ -1223,7 +1239,7 @@ export class RaidSim {
     minion.cooldown = stats.attackInterval;
     minion.action = "attack";
     const target = this.nearestAdventurer(minion.x, minion.y, stats.range);
-    if (target) this.damageAdventurer(target, stats.damage, "melee", minion);
+    if (target) this.damageAdventurer(target, stats.damage * WARDEN_MIGHT, "melee", minion);
   }
 
   /**
@@ -1246,7 +1262,7 @@ export class RaidSim {
 
     if (minion.type === "mage") {
       this.bodySkillCooldowns.set(minion.id, BLAST_COOLDOWN);
-      this.damageAdventurer(target, stats.damage * BLAST_MULTIPLIER, "melee", minion);
+      this.damageAdventurer(target, stats.damage * WARDEN_MIGHT * BLAST_MULTIPLIER, "melee", minion);
       return;
     }
 

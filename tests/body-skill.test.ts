@@ -4,6 +4,7 @@ import {
   RaidSim,
   SHOVE_COOLDOWN,
   SIM_DT,
+  WARDEN_MIGHT,
 } from "../src/game/sim/RaidSim";
 import { arenaFor, coreOf, entranceOf } from "../src/game/arena";
 import { MINION_STATS } from "../src/game/sim/units";
@@ -100,7 +101,10 @@ describe("a mage's blast", () => {
     sim.requestSkill();
     sim.step();
 
-    expect(before - sim.state.adventurers[0].hp).toBeCloseTo(MINION_STATS.mage.damage * BLAST_MULTIPLIER, 5);
+    expect(before - sim.state.adventurers[0].hp).toBeCloseTo(
+      MINION_STATS.mage.damage * WARDEN_MIGHT * BLAST_MULTIPLIER,
+      5,
+    );
   });
 });
 

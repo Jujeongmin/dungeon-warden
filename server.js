@@ -123,8 +123,15 @@ const MIN_REVIVE_SCALE = 0.25;
 const TREASURY_REWARD = 25;
 const TREASURY_THREAT = 1;
 
-/** How long a minion killed in a raid stays down before it can fight again. */
-const BASE_REVIVE_MS = 3 * 60 * 1000;
+/**
+ * How long a minion killed in a raid stays down before it can fight again.
+ *
+ * Three minutes was longer than the raid, the build and the result screen put
+ * together, three times over: a lost raid left the player looking at an empty
+ * corridor with nothing to do but wait. A minute and a half is still long
+ * enough that losing a garrison costs the next raid.
+ */
+const BASE_REVIVE_MS = 90 * 1000;
 
 // ---------------------------------------------------------------------------
 // Research
@@ -580,6 +587,14 @@ function pickParty(dungeon, threat, now) {
   ready.sort((a, b) => b.level - a.level);
   const party = ready.slice(0, size);
 
+  // A veteran fights at most one level above what this dungeon would hire.
+  // Every death levels an adventurer and nothing ever levels one down, so
+  // without this a dungeon that won once met a stronger knight at threat 0
+  // for good - losing, which lowers threat, could never get it back. The
+  // record keeps its real level and fields it again as threat rises.
+  // Mirrored in src/game/party.ts.
+  const levelCap = 2 + Math.floor(threat / 3);
+
   // The party is sorted by level, so its leader is the strongest thing the
   // town can field - which is exactly who should be wearing the crown.
   const champion = threat >= CHAMPION_THREAT && party.length > 0 ? party[0].id : null;
@@ -591,7 +606,7 @@ function pickParty(dungeon, threat, now) {
     id: member.id,
     cls: member.cls,
     name: member.name,
-    level: member.level,
+    level: Math.min(member.level, levelCap),
     champion: member.id === champion,
   }));
 }

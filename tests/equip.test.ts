@@ -87,10 +87,12 @@ describe("equip best", () => {
   });
 
   it("ranks by unarmed damage, so what a minion already holds cannot move it", () => {
-    // A mage carrying a T3 out-damages a bare warrior. It is still the mage.
+    // A mage carrying a T3 hits as hard as a bare warrior. It is still the mage.
+    // (It used to hit harder; the warrior was raised to 10 and they now tie,
+    // which is still the case the ordering has to get right.)
     const minions = [{ ...mage("m"), weaponId: "t3" }, warrior("w")];
     const armed = minionStatsFor(minions[0], 3).damage;
-    expect(armed).toBeGreaterThan(minionStatsFor(minions[1], 0).damage);
+    expect(armed).toBeGreaterThanOrEqual(minionStatsFor(minions[1], 0).damage);
 
     const loot: LootItem[] = [{ id: "t3", srcCls: "knight", tier: 3 }];
     expect(pairing(minions, loot).get("w")).toBe("t3");
