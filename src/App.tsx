@@ -820,7 +820,10 @@ export default function App() {
    * would empty the purse in a gesture nobody meant to make.
    */
   const paintableRef = useRef(false);
-  paintableRef.current = tool.kind === "dig" || tool.kind === "fill";
+  // Never during a raid. The dig tool is what the panel opens holding, and a
+  // press that starts a paint stroke never becomes a tap - so every tap on a
+  // minion to climb into it was being spent digging instead.
+  paintableRef.current = !raid.raiding && (tool.kind === "dig" || tool.kind === "fill");
 
   const dragRef = useRef<(x: number, y: number) => void>(() => {});
   dragRef.current = (x, y) => {
@@ -1154,7 +1157,12 @@ export default function App() {
       // strip is handed over, never both.
       const column = frame ? box.top - frame.top < frame.height * 0.5 && box.width < frame.width * 0.6 : false;
       if (column && frame && !walking) {
-        renderer.setBottomInset(0);
+        // During a raid the skill cards run along the foot of the board, and
+        // the core is the bottom row of it: framed without them, they hid it.
+        const skills = raid.raiding ? document.querySelector(".skillbar") : null;
+        renderer.setBottomInset(
+          skills ? Math.max(0, frame.bottom - skills.getBoundingClientRect().top) : 0,
+        );
         renderer.setRightInset(Math.max(0, frame.right - box.left));
       } else {
         renderer.setRightInset(0);
@@ -1166,7 +1174,7 @@ export default function App() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length]);
+  }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length, raid.raiding]);
 
   useEffect(() => {
     rendererRef.current?.setUnits(units);
@@ -1491,11 +1499,15 @@ export default function App() {
    * Three states, and the escape hatch matters as much as the lock:
    *   - null: no tutorial, no restriction.
    *   - a tile: the step is asking for a tap, and that is where.
-   *   - "none": the step is asking for a button press, so the board is shut.
+   *   - "none": the step is asking for a build tool to be picked up, so the
+   *     board is shut until it is.
    *
    * A suggested tile the player has already built on is dropped upstream,
    * and that case falls back to null rather than to "none" - being unable to
-   * place anywhere is how a tutorial traps someone.
+   * place anywhere is how a tutorial traps someone. So does a step that names
+   * no tool at all, like equipping loot from the manage tab: it used to shut
+   * the board too, and a returning player with a weapon waiting could not
+   * place a single thing, with nothing but an error sound to say why.
    *
    * Through a ref because the tap handler is written above this point.
    */
@@ -1504,7 +1516,7 @@ export default function App() {
     ? null
     : pointer && pointer.kind === "tile"
       ? { x: pointer.x, y: pointer.y }
-      : teaching.target?.kind === "tile"
+      : teaching.target?.kind === "tile" || !teaching.step.tool
         ? null
         : "none";
 

@@ -61,7 +61,10 @@ const SWING_MS = 450;
  */
 const CHASE_DISTANCE = 3.5;
 const CHASE_ELEVATION = 0.66;
-const CHASE_ELEVATION_MIN = 0.38;
+// Not lower: looking across a one-tile corridor from below this, the line from
+// the camera to the body passes under the top of the near wall and the rock
+// hides the body's legs behind a slab that fills half the screen.
+const CHASE_ELEVATION_MIN = 0.6;
 const CHASE_ELEVATION_MAX = 1.25;
 /** How far above its feet the camera aims: about the ridden body's chest. */
 const CHASE_AIM = 0.55;
