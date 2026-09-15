@@ -389,6 +389,10 @@ export default function App() {
         // Said over the adventurer, because that is the one the player now
         // has to watch.
         renderer.spawnRing(event.x, event.y, 0xff6a52);
+        // Heard and felt as well as seen: down in the corridor the camera is
+        // behind the body, and the adventurer that turned may be off screen.
+        audio.play("noticed", 250);
+        buzz(settings.haptics, BUZZ.noticed);
         const at = renderer.project(event.x, event.y);
         if (at) {
           floaterSeq.current += 1;
@@ -424,7 +428,7 @@ export default function App() {
     setFloaters((current) => [...current, ...added].slice(-24));
     const ids = new Set(added.map((f) => f.id));
     window.setTimeout(() => setFloaters((c) => c.filter((f) => !ids.has(f.id))), 1000);
-  }, [t]);
+  }, [t, settings.haptics]);
 
   /*
    * Room bought in the shop, under the key it was always granted with.

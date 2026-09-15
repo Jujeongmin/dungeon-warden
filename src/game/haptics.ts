@@ -33,4 +33,6 @@ export const BUZZ = {
   hurt: 40,
   /** The body lost: long enough to be unmistakable, broken so it is not a ring. */
   lost: [70, 50, 140],
+  /** Seen by the party: two taps, a warning rather than a wound. */
+  noticed: [25, 60, 25],
 };

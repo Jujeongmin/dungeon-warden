@@ -29,7 +29,9 @@ export type Cue =
   | "swing"
   | "possess"
   | "bodyLost"
-  | "step";
+  | "step"
+  // An adventurer has seen the warden in a body and is coming for it.
+  | "noticed";
 
 interface ToneSpec {
   /** Start frequency in Hz. */
@@ -86,6 +88,12 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 60, seconds: 0.4, type: "sine", gain: 0.08 },
   ],
   // Thrown out of one: the same fall, cut short and dropping further.
+  // Two short rising notes, higher than anything else down there: a warning,
+  // not an impact, and heard over a fight without being mistaken for one.
+  noticed: [
+    { from: 520, to: 700, seconds: 0.07, type: "square", gain: 0.05 },
+    { from: 700, to: 940, seconds: 0.09, type: "square", gain: 0.045 },
+  ],
   bodyLost: [
     { from: 300, to: 40, seconds: 0.45, type: "sawtooth", gain: 0.08 },
     { from: 45, seconds: 0.6, type: "sine", gain: 0.09 },
@@ -116,6 +124,7 @@ const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   defeat: [/jingles.*lose/, /lose/, /^fail/, /^gameover/],
   swing: [/swoosh/, /^swing/, /whoosh/],
   possess: [],
+  noticed: [],
   bodyLost: [],
   step: [/^footstep_concrete/, /^footstep/],
 };
