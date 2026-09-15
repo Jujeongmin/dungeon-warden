@@ -5,6 +5,7 @@ import {
   type AdventurerClass,
   type MinionType,
 } from "../types";
+import { veteranHpScale, veteranRank } from "../veteran";
 
 export interface MinionStats {
   hp: number;
@@ -120,11 +121,16 @@ export function minionStatsFor(minion: {
   type: MinionType;
   cls?: AdventurerClass;
   level?: number;
+  /** Raids survived, which earns stars: see src/game/veteran.ts. */
+  veteran?: number;
 }, weaponTier = 0): MinionStats {
-  const base: MinionStats =
+  const raw: MinionStats =
     minion.type === "convert"
       ? convertStats(minion.cls ?? "knight", minion.level ?? 1)
       : MINION_STATS[minion.type as Exclude<MinionType, "convert">];
+  const rank = veteranRank(minion.veteran ?? 0);
+  const base: MinionStats =
+    rank > 0 ? { ...raw, hp: Math.round(raw.hp * veteranHpScale(rank)) } : raw;
 
   if (weaponTier <= 0) return base;
   return { ...base, damage: Math.round(base.damage * (1 + LOOT_DAMAGE_BONUS * weaponTier)) };

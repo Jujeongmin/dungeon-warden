@@ -10,6 +10,7 @@ import { minionStatsFor } from "./game/sim/units";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
 import { wardenLevel as wardenLevelOf } from "./game/warden";
+import { veteranRank } from "./game/veteran";
 import { blockedKey, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
@@ -1606,6 +1607,16 @@ export default function App() {
     return path ? new Set(path.map((p) => p.y * arena.w + p.x)) : null;
   }, [arena, entrance, core, terrain, meta, rooms]);
 
+  /*
+   * What stands on the hovered tile, with its stars - the one place a
+   * veteran's rank is read before the raid that uses it.
+   */
+  const hoveredMinion = hover ? minions.find((m) => m.x === hover.x && m.y === hover.y) : undefined;
+  const hoveredRank = hoveredMinion ? veteranRank(hoveredMinion.veteran ?? 0) : 0;
+  const hoveredNote = hoveredMinion
+    ? ` · ${t(MINION_LABEL[hoveredMinion.type])}${hoveredRank > 0 ? ` ${"★".repeat(hoveredRank)}` : ""}`
+    : "";
+
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
@@ -2118,7 +2129,7 @@ export default function App() {
               {adNotice && <p className="hint small">{adNotice}</p>}
 
               <p className="hint small">
-                {hover ? `${t("tile")} (${hover.x}, ${hover.y})` : t("hover_hint")}
+                {hover ? `${t("tile")} (${hover.x}, ${hover.y})${hoveredNote}` : t("hover_hint")}
                 {lastSavedAt && ` · ${t("saved_at")} ${new Date(lastSavedAt).toLocaleTimeString()}`}
               </p>
             </>

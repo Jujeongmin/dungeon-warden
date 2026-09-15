@@ -1041,6 +1041,8 @@ function sanitizeMinions(nextMinions, prevMinions, loot) {
       x: minion.x,
       y: minion.y,
       revivesAt: stored.revivesAt || null,
+      // Raids survived: the server's count, never the payload's.
+      veteran: stored.veteran || 0,
       cls: stored.cls,
       level: stored.level,
       weaponId,
@@ -1705,10 +1707,16 @@ class Server {
     // Minions that fell go on a revive timer; altars shorten it.
     const downTime = Math.round(BASE_REVIVE_MS * effects.reviveScale);
     const lost = Array.isArray(lostMinionIds) ? lostMinionIds : [];
+    // Every minion this server sent in that came out standing is one raid more
+    // seasoned - see src/game/veteran.ts. A raid opened before minionIds was
+    // recorded seasons nobody rather than guessing who fought.
+    const fielded = Array.isArray(pending.minionIds) ? pending.minionIds : [];
     dungeon.minions = (dungeon.minions || []).map((minion) =>
-      lost.indexOf(minion.id) === -1
-        ? minion
-        : { ...minion, revivesAt: now + downTime },
+      lost.indexOf(minion.id) !== -1
+        ? { ...minion, revivesAt: now + downTime }
+        : fielded.indexOf(minion.id) !== -1
+          ? { ...minion, veteran: (minion.veteran || 0) + 1 }
+          : minion,
     );
 
     const threatDelta =

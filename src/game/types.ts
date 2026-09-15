@@ -24,6 +24,8 @@ export interface PlacedMinion {
   level?: number;
   /** Id of the looted weapon this minion carries. */
   weaponId?: string | null;
+  /** Raids this minion has lived through. The server's count. */
+  veteran?: number;
 }
 
 export interface LootItem {
