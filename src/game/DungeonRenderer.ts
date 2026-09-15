@@ -147,6 +147,8 @@ export interface RendererCallbacks {
   onTileTap: (x: number, y: number) => void;
   /** A tap that was not a drag, while walking: down there it means hit. */
   onWalkTap?: () => void;
+  /** A footfall, while walking - the warden's own or a ridden body's. */
+  onStep?: () => void;
   /**
    * A secondary click on a tile - right mouse button only, so it exists on a
    * desktop and simply never fires on a phone, where the toolbar's remove
@@ -344,6 +346,9 @@ const STONE = {
  * it never hides the corridor from this camera angle.
  */
 const ROCK_HEIGHT = 0.85;
+
+/** Seconds between footfalls. A trudge, not a run. */
+const STEP_SECONDS = 0.42;
 
 /** How high off the floor a shot is drawn, and how thick. Chest height. */
 const BOLT_HEIGHT = 0.42;
@@ -2160,6 +2165,8 @@ export class DungeonRenderer {
   private wardenEye = EYE_HEIGHT;
   /** Whether the body moved this frame, for idle against walk. */
   private wardenMoving = false;
+  /** Seconds of walking since the last footfall. */
+  private stepClock = 0;
   /** Keys held, for walking on a keyboard. */
   private keys = new Set<string>();
   /** A stick or pad, -1..1 on each axis. Overrides the keys while pushed. */
@@ -2691,6 +2698,19 @@ export class DungeonRenderer {
     if (!this.walk) return;
     const { forward, strafe } = this.moveAxes();
     this.wardenMoving = forward !== 0 || strafe !== 0;
+
+    // Footfalls on a clock of time spent moving, so they stop the moment the
+    // stick is let go and never stack up while standing still. Counted
+    // before the ridden body hands off below, because it walks too.
+    if (this.wardenMoving) {
+      this.stepClock += delta;
+      if (this.stepClock >= STEP_SECONDS) {
+        this.stepClock -= STEP_SECONDS;
+        this.callbacks.onStep?.();
+      }
+    } else {
+      this.stepClock = STEP_SECONDS * 0.6;
+    }
     /*
      * A ridden body is walked by the simulation, not from here.
      *

@@ -558,6 +558,7 @@ export default function App() {
     const body = raid.raidState?.minions.find((m) => m.id === left);
     if (!body || body.alive) return;
     rendererRef.current?.shake(0.5);
+    audio.play("bodyLost");
     setBodyLost(true);
   }, [possessedId, raid.raidState]);
 
@@ -601,7 +602,8 @@ export default function App() {
   const strikeRef = useRef<() => void>(() => {});
   strikeRef.current = () => {
     if (!possessedId) return;
-    audio.play("hit");
+    // The swing, not the hit: whether it connects is the simulation's to say.
+    audio.play("swing");
     raid.attack();
     rendererRef.current?.swing();
     if (!settings.strikeSeen) patchSettings({ strikeSeen: true });
@@ -692,7 +694,7 @@ export default function App() {
         (m) => m.alive && Math.round(m.x) === x && Math.round(m.y) === y,
       );
       if (body && raid.possess(body.id)) {
-        audio.play("skill");
+        audio.play("possess");
         if (!settings.possessSeen) patchSettings({ possessSeen: true });
       }
       else if (body) audio.play("error");
@@ -796,6 +798,7 @@ export default function App() {
     const renderer = new DungeonRenderer(canvasRef.current, {
       onTileTap: (x, y) => tapRef.current(x, y),
       onWalkTap: () => strikeRef.current(),
+      onStep: () => audio.play("step", 200),
       onTileAlt: (x, y, sx, sy) => altRef.current(x, y, sx, sy),
       onTileDrag: (x, y) => dragRef.current(x, y),
       // Digging and filling are the only tools a drag runs along.

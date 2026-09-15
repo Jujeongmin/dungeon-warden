@@ -22,7 +22,14 @@ export type Cue =
   | "trap"
   | "skill"
   | "victory"
-  | "defeat";
+  | "defeat"
+  // Down in a ridden body. First person is half sound: a swing nobody hears
+  // is a swing that did not happen, and a corridor walked in silence is a
+  // camera being moved.
+  | "swing"
+  | "possess"
+  | "bodyLost"
+  | "step";
 
 interface ToneSpec {
   /** Start frequency in Hz. */
@@ -70,6 +77,21 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 220, seconds: 0.16, type: "sawtooth", gain: 0.07 },
     { from: 150, seconds: 0.32, type: "sawtooth", gain: 0.07 },
   ],
+  // Air moving, not a hit: the blow lands or it does not, and the hit cue is
+  // what says it landed.
+  swing: [{ from: 520, to: 140, seconds: 0.12, type: "sawtooth", gain: 0.035 }],
+  // Dropping into a body: a low fall, then the room closing round you.
+  possess: [
+    { from: 480, to: 90, seconds: 0.28, type: "triangle", gain: 0.07 },
+    { from: 60, seconds: 0.4, type: "sine", gain: 0.08 },
+  ],
+  // Thrown out of one: the same fall, cut short and dropping further.
+  bodyLost: [
+    { from: 300, to: 40, seconds: 0.45, type: "sawtooth", gain: 0.08 },
+    { from: 45, seconds: 0.6, type: "sine", gain: 0.09 },
+  ],
+  // Bone on stone. Quiet, because it repeats.
+  step: [{ from: 110, to: 70, seconds: 0.05, type: "triangle", gain: 0.03 }],
 };
 
 /**
@@ -92,6 +114,10 @@ const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   skill: [/^powerup/, /^magic/, /^spell/, /confirm/],
   victory: [/jingles.*win/, /win/, /^success/, /^complete/],
   defeat: [/jingles.*lose/, /lose/, /^fail/, /^gameover/],
+  swing: [/swoosh/, /^swing/, /whoosh/],
+  possess: [],
+  bodyLost: [],
+  step: [/^footstep_concrete/, /^footstep/],
 };
 
 /**
