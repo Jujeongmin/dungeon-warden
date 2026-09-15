@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useVXShop } from "@verse8/platform";
 import { useT } from "../i18n";
 import type { Entitlements } from "../game/types";
+import { ownsProduct } from "../game/products";
 
 const VERSE_ID = import.meta.env.VITE_AGENT8_VERSE as string | undefined;
 
@@ -63,10 +64,9 @@ export function ShopDialog({ entitlements, onPurchased, onClose }: Props) {
 
         <ul className="shop-list">
           {items.map((item) => {
-            // Entitlements are keyed by product id, so a product the player
-            // already owns marks itself without this file knowing what any of
-            // them are.
-            const owned = entitlements[item.productId] === true;
+            // Entitlements are keyed by what a product grants, not by its id,
+            // so the id is translated first - see src/game/products.ts.
+            const owned = ownsProduct(entitlements, item.productId);
             const blocked = owned || !item.purchasable || item.purchaseLimitReached;
 
             return (
