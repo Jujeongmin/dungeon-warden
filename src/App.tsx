@@ -32,6 +32,7 @@ import { LocaleProvider, type Translate } from "./i18n";
 import { previewParty } from "./game/party";
 import { DIG_COST, dugSet, garrisonScale, rockSet } from "./game/dig";
 import { isBroke } from "./game/relief";
+import { BUZZ, buzz } from "./game/haptics";
 import { planRebuild } from "./game/rebuild";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
@@ -559,8 +560,28 @@ export default function App() {
     if (!body || body.alive) return;
     rendererRef.current?.shake(0.5);
     audio.play("bodyLost");
+    buzz(settings.haptics, BUZZ.lost);
     setBodyLost(true);
-  }, [possessedId, raid.raidState]);
+  }, [possessedId, raid.raidState, settings.haptics]);
+
+  /*
+   * A blow landing on the body the warden is inside.
+   *
+   * The simulation reports damage to adventurers and not to the garrison, so
+   * this is read off the ridden body's hit points going down instead. Reset
+   * whenever the ride changes hands, so climbing into a wounded body does not
+   * buzz for wounds it already had.
+   */
+  const ridingHp = useRef<{ id: string | null; hp: number }>({ id: null, hp: 0 });
+  useEffect(() => {
+    const last = ridingHp.current;
+    if (!possessed) {
+      ridingHp.current = { id: null, hp: 0 };
+      return;
+    }
+    if (last.id === possessed.id && possessed.hp < last.hp) buzz(settings.haptics, BUZZ.hurt);
+    ridingHp.current = { id: possessed.id, hp: possessed.hp };
+  }, [possessed, possessed?.hp, settings.haptics]);
 
   /*
    * Whose arms the player sees, and where those arms are standing.
@@ -604,6 +625,7 @@ export default function App() {
     if (!possessedId) return;
     // The swing, not the hit: whether it connects is the simulation's to say.
     audio.play("swing");
+    buzz(settings.haptics, BUZZ.swing);
     raid.attack();
     rendererRef.current?.swing();
     if (!settings.strikeSeen) patchSettings({ strikeSeen: true });

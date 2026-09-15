@@ -51,6 +51,8 @@ export interface Settings {
    */
   possessSeen: boolean;
   strikeSeen: boolean;
+  /** Vibration on a swing, a blow taken, and a body lost. A no-op where unsupported. */
+  haptics: boolean;
 }
 
 const KEY = "dw.settings";
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tutorialDone: false,
   possessSeen: false,
   strikeSeen: false,
+  haptics: true,
 };
 
 export function loadSettings(): Settings {

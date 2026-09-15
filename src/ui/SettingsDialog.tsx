@@ -92,6 +92,16 @@ export function SettingsDialog({
         </div>
         <p className="hint small">{t("settings_quality_note")}</p>
 
+        {/* Felt rather than heard, so it gets its own switch: a player who
+            turns the sound down on a bus may still want the buzz, and one
+            holding the phone on a table may want neither. */}
+        <div className="setting-row">
+          <span>{t("settings_haptics")}</span>
+          <button onClick={() => onChange({ haptics: !settings.haptics })}>
+            {settings.haptics ? t("settings_haptics_on") : t("settings_haptics_off")}
+          </button>
+        </div>
+
         <div className="setting-row">
           <span>{t("settings_tutorial")}</span>
           <button onClick={onReplayTutorial}>{t("settings_replay")}</button>
