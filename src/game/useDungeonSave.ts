@@ -475,7 +475,6 @@ export function useDungeonSave() {
     [research, gold, server, saveNow],
   );
 
-  /** Removes whatever occupies the tile. No refund, matching the server. */
   /**
    * Takes one tile of rock out.
    *

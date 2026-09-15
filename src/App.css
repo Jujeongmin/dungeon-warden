@@ -499,6 +499,36 @@ h3.section {
   line-height: 1.6;
 }
 
+/* Stuck: a line and the two ways out, side by side. */
+.banner-broke {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-right: 16px;
+  border-color: rgba(232, 164, 76, 0.55);
+}
+
+.banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.banner-actions button {
+  padding: 6px 12px;
+  font-size: var(--fs-2xs);
+  border-radius: 99px;
+}
+
+/* Relief is not earnings, so it does not wear the gold of the reward. */
+.payout .relief {
+  display: block;
+  font-size: var(--fs-2xs);
+  color: #b9d7a8;
+}
+
 .banner-error {
   border-color: rgba(215, 106, 90, 0.6);
   color: #ffbdb2;
@@ -1193,7 +1223,13 @@ button.primary {
 
 .legend { display: none; }
 
-.topstack { padding: 0 8px; }
+.topstack {
+  padding: 0 8px;
+  /* The panel owns the right column of a sideways stage, full height. Banners
+     centred across the whole width slid under it, and the stuck banner lost
+     its second button there - so the stack stops where the panel starts. */
+  padding-right: calc(min(42%, 360px) + 16px);
+}
 
 .tutorial {
   align-self: stretch;

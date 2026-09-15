@@ -200,6 +200,12 @@ export interface RaidFinishResult {
   outcome: RaidOutcome;
   reward: number;
   plundered: number;
+  /**
+   * The part of the reward that is not earnings but a floor. Already inside
+   * `reward`; carried apart so the result can say which is which. See
+   * src/game/relief.ts. Absent from a server that predates it.
+   */
+  relief?: number;
   gold: number;
   threat: number;
   wavesRepelled: number;

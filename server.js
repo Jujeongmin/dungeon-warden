@@ -276,6 +276,12 @@ function wavesFor(threat) {
 const RAID_CHAMPION_REWARD = 60;
 const RAID_PLUNDER_RATE = 0.15;
 const RAID_PLUNDER_CAP = 120;
+// The least gold a finished raid leaves a dungeon with: one warrior and a
+// little digging. Without it a run of breaches ends the game without saying
+// so - no gold, a garrison on revive timers, and another loss coming. Paid
+// only to fill the gap, so losing on purpose buys nothing. Mirrored in
+// src/game/relief.ts.
+const RELIEF_FLOOR = 60;
 
 // Order matters: this is the sequence classes join the roster in as threat
 // rises, so a new dungeon only ever faces knights.
@@ -1508,6 +1514,7 @@ class Server {
 
     let reward = 0;
     let plundered = 0;
+    const goldBefore = await $asset.get("gold");
 
     // A louder dungeon pays better, which is what makes raising threat a
     // choice rather than a penalty.
@@ -1524,10 +1531,14 @@ class Server {
         (RAID_BREACH_REWARD_PER_KILL * kills + (championStopped ? RAID_CHAMPION_REWARD : 0)) *
           threatBonus,
       );
-      const gold = await $asset.get("gold");
       const rate = RAID_PLUNDER_RATE * effects.plunderScale;
-      plundered = Math.min(Math.floor(gold * rate), RAID_PLUNDER_CAP);
+      plundered = Math.min(Math.floor(goldBefore * rate), RAID_PLUNDER_CAP);
     }
+
+    // Whatever the outcome, never leave the purse under the floor.
+    const goldAfter = goldBefore + reward - plundered;
+    const relief = goldAfter >= RELIEF_FLOOR ? 0 : RELIEF_FLOOR - goldAfter;
+    reward += relief;
 
     if (plundered > 0) await $asset.burn("gold", plundered);
     if (reward > 0) await $asset.mint("gold", reward);
@@ -1599,6 +1610,7 @@ class Server {
     return {
       outcome,
       reward,
+      relief,
       championStopped,
       plundered,
       gold: await $asset.get("gold"),

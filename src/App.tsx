@@ -31,6 +31,8 @@ import { loadSettings, saveSettings, pixelRatioFor, type Settings } from "./game
 import { LocaleProvider, type Translate } from "./i18n";
 import { previewParty } from "./game/party";
 import { DIG_COST, dugSet, garrisonScale, rockSet } from "./game/dig";
+import { isBroke } from "./game/relief";
+import { planRebuild } from "./game/rebuild";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
 import {
@@ -1263,6 +1265,17 @@ export default function App() {
 
   const adGold = useAdGold(save.setGoldFromServer);
 
+  /*
+   * Whether the dungeon is stuck, and what starting over would hand back.
+   *
+   * Checked on the party clock rather than on every render: a revive timer
+   * running out is a moment nothing fires an event for, and five seconds is
+   * far finer than the timer. Never during a raid - the fight is already on,
+   * and there is nothing to spend gold on until it ends.
+   */
+  const stuck = !raid.raidOpen && screen !== "title" && isBroke(gold, minions, partyClock);
+  const stuckRefund = stuck ? planRebuild({ arena, dug, minions, traps, rooms }).refund : 0;
+
   const onGoldAd = useCallback(async () => {
     const outcome = await adGold.claim();
     if (outcome === "paid") {
@@ -1565,6 +1578,37 @@ export default function App() {
               ×
             </button>
             {t("aftermath_note")}
+          </div>
+        )}
+
+        {/*
+         * Stuck: no gold for a warrior and nobody ready to fight.
+         *
+         * Both ways out already existed - starting over refunds every tile and
+         * body, and the ad pays - but a player in that hole was never told,
+         * and the next raid only dug it deeper. Said here, with the refund
+         * counted, and the two ways out as the buttons on it.
+         */}
+        {stuck && (
+          <div className="banner banner-broke">
+            <span>{t("broke_note")}</span>
+            <div className="banner-actions">
+              {stuckRefund > 0 && (
+                <button
+                  onClick={() => {
+                    const ok = save.rebuild();
+                    audio.play(ok ? "dig" : "error");
+                  }}
+                >
+                  {t("broke_rebuild", { n: stuckRefund })}
+                </button>
+              )}
+              {adGold.status && adGold.status.remaining > 0 && (
+                <button disabled={!adGold.ready || adGold.busy} onClick={() => void onGoldAd()}>
+                  {`+${adGold.status.reward} · ${t("ad_watch")}`}
+                </button>
+              )}
+            </div>
           </div>
         )}
 

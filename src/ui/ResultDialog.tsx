@@ -62,6 +62,13 @@ export function ResultDialog({ result, onClose }: Props) {
                 {t("result_plundered")} −{result.plundered}
               </span>
             )}
+            {/* Said as relief rather than folded silently into the number, so
+                a player who lost does not read it as having won something. */}
+            {(result.relief ?? 0) > 0 && (
+              <span className="relief">
+                {t("result_relief")} +{result.relief}
+              </span>
+            )}
           </div>
         )}
 
