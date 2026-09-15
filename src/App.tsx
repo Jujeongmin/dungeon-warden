@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DungeonRenderer, MarkerView, UnitView } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS, FREE_RAID_SPEED, PAID_RAID_SPEED } from "./game/useRaid";
@@ -16,7 +16,11 @@ import { audio } from "./game/audio";
 import { useAdGold } from "./game/useAdGold";
 import type { SimEvent } from "./game/sim/RaidSim";
 import { installDevTools } from "./game/devtools";
-import { ShopDialog } from "./ui/ShopDialog";
+/*
+ * The shop is the only thing that needs the platform SDK, and most sessions
+ * never open it - so it and the SDK arrive when someone does.
+ */
+const ShopDialog = lazy(() => import("./ui/ShopDialog").then((m) => ({ default: m.ShopDialog })));
 import { LeaderboardDialog } from "./ui/LeaderboardDialog";
 import { TitleScreen } from "./ui/TitleScreen";
 import { SettingsDialog } from "./ui/SettingsDialog";
@@ -2513,11 +2517,13 @@ export default function App() {
       )}
 
       {shopOpen && (
-        <ShopDialog
-          entitlements={entitlements}
-          onPurchased={() => void save.refreshEntitlements()}
-          onClose={() => setShopOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <ShopDialog
+            entitlements={entitlements}
+            onPurchased={() => void save.refreshEntitlements()}
+            onClose={() => setShopOpen(false)}
+          />
+        </Suspense>
       )}
 
       {boardOpen && (

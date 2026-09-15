@@ -22,7 +22,7 @@
       "url": "/assets/kaykit/adventurers/Barbarian.glb",
       "name": "barbarian",
       "group": "kaykit/adventurers",
-      "bytes": 386648
+      "bytes": 249332
     },
     {
       "url": "/assets/kaykit/dungeon/barrel_large.gltf",
@@ -88,13 +88,13 @@
       "url": "/assets/kaykit/adventurers/Knight.glb",
       "name": "knight",
       "group": "kaykit/adventurers",
-      "bytes": 341688
+      "bytes": 224780
     },
     {
       "url": "/assets/kaykit/adventurers/Mage.glb",
       "name": "mage",
       "group": "kaykit/adventurers",
-      "bytes": 352472
+      "bytes": 231780
     },
     {
       "url": "/assets/kaykit/dungeon/pillar_decorated.gltf",
@@ -106,25 +106,25 @@
       "url": "/assets/kaykit/adventurers/Ranger.glb",
       "name": "ranger",
       "group": "kaykit/adventurers",
-      "bytes": 484712
+      "bytes": 308496
     },
     {
       "url": "/assets/kaykit/animations/Rig_Medium_General.glb",
       "name": "rig_medium_general",
       "group": "kaykit/animations",
-      "bytes": 828240
+      "bytes": 74484
     },
     {
       "url": "/assets/kaykit/animations/Rig_Medium_MovementBasic.glb",
       "name": "rig_medium_movementbasic",
       "group": "kaykit/animations",
-      "bytes": 689624
+      "bytes": 29092
     },
     {
       "url": "/assets/kaykit/adventurers/Rogue.glb",
       "name": "rogue",
       "group": "kaykit/adventurers",
-      "bytes": 409188
+      "bytes": 262908
     },
     {
       "url": "/assets/kaykit/dungeon/rubble_half.gltf",
@@ -142,25 +142,25 @@
       "url": "/assets/kaykit/skeletons/Skeleton_Mage.glb",
       "name": "skeleton_mage",
       "group": "kaykit/skeletons",
-      "bytes": 265676
+      "bytes": 181308
     },
     {
       "url": "/assets/kaykit/skeletons/Skeleton_Minion.glb",
       "name": "skeleton_minion",
       "group": "kaykit/skeletons",
-      "bytes": 318520
+      "bytes": 212444
     },
     {
       "url": "/assets/kaykit/skeletons/Skeleton_Rogue.glb",
       "name": "skeleton_rogue",
       "group": "kaykit/skeletons",
-      "bytes": 331180
+      "bytes": 219148
     },
     {
       "url": "/assets/kaykit/skeletons/Skeleton_Warrior.glb",
       "name": "skeleton_warrior",
       "group": "kaykit/skeletons",
-      "bytes": 367484
+      "bytes": 243904
     },
     {
       "url": "/assets/kaykit/dungeon/stairs_long.gltf",
@@ -193,34 +193,10 @@
       "bytes": 2940
     },
     {
-      "url": "/assets/kaykit/dungeon/wall_corner.gltf",
-      "name": "wall_corner",
-      "group": "kaykit/dungeon",
-      "bytes": 2988
-    },
-    {
-      "url": "/assets/kaykit/dungeon/wall_crossing.gltf",
-      "name": "wall_crossing",
-      "group": "kaykit/dungeon",
-      "bytes": 2979
-    },
-    {
-      "url": "/assets/kaykit/dungeon/wall_endcap.gltf",
-      "name": "wall_endcap",
-      "group": "kaykit/dungeon",
-      "bytes": 2985
-    },
-    {
       "url": "/assets/kaykit/dungeon/wall_gated.gltf",
       "name": "wall_gated",
       "group": "kaykit/dungeon",
       "bytes": 2982
-    },
-    {
-      "url": "/assets/kaykit/dungeon/wall_Tsplit.gltf",
-      "name": "wall_tsplit",
-      "group": "kaykit/dungeon",
-      "bytes": 2989
     },
     {
       "url": "/assets/warden/warden.glb",
