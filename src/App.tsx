@@ -33,6 +33,7 @@ import { previewParty } from "./game/party";
 import { DIG_COST, dugSet, garrisonScale, rockSet } from "./game/dig";
 import { isBroke } from "./game/relief";
 import { BUZZ, buzz } from "./game/haptics";
+import { nextBody } from "./game/sim/hop";
 import { planRebuild } from "./game/rebuild";
 import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
@@ -631,9 +632,34 @@ export default function App() {
     if (!settings.strikeSeen) patchSettings({ strikeSeen: true });
   };
 
+  /**
+   * Straight into the next body along the road, without leaving the corridor.
+   *
+   * Changing bodies used to mean the map, a tap, and back down again. Held in
+   * a ref for the same reason the swing is: the listener below is attached
+   * once, and the garrison it walks changes every frame.
+   */
+  const hopRef = useRef<(step: 1 | -1) => void>(() => {});
+  hopRef.current = (step) => {
+    if (!possessedId || !raid.raidState || !entrance) return;
+    const to = nextBody(raid.raidState.minions, possessedId, entrance, step);
+    if (!to || !raid.possess(to)) {
+      audio.play("error");
+      return;
+    }
+    audio.play("possess");
+  };
+
   useEffect(() => {
     if (!possessedId) return;
     const onKey = (event: KeyboardEvent) => {
+      // Q or Tab to the next body, Shift to go back the way you came. Tab
+      // would otherwise walk focus round the page's buttons instead.
+      if (event.key.toLowerCase() === "q" || event.code === "Tab") {
+        event.preventDefault();
+        if (!event.repeat) hopRef.current(event.shiftKey ? -1 : 1);
+        return;
+      }
       // Space is the swing; F because half of everyone reaches for it.
       if (event.code !== "Space" && event.key !== " " && event.key.toLowerCase() !== "f") return;
       if (event.repeat) return;
@@ -2166,6 +2192,11 @@ export default function App() {
           >
             <div ref={knobRef} className="knob" />
           </div>
+          {possessed && (
+            <button className="walk-hop" onClick={() => hopRef.current(1)}>
+              {t("walk_hop")}
+            </button>
+          )}
           {possessed && (
             <button className="walk-strike" onClick={() => strikeRef.current()}>
               {t("walk_attack")}

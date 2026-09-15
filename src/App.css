@@ -2298,6 +2298,21 @@ button.ad-gold {
 
 .walk-strike:active { transform: scale(0.94); }
 
+/* The hop sits beside the swing: the same thumb, one reach further in. */
+.walk-hop {
+  flex: none;
+  margin-left: auto;
+  align-self: flex-end;
+  padding: 8px 14px;
+  font-size: var(--fs-2xs);
+  border-radius: 99px;
+  color: var(--ink);
+  border: 1px solid rgba(232, 164, 76, 0.35);
+  background: rgba(20, 15, 11, 0.62);
+}
+
+.walk-hop + .walk-strike { margin-left: 10px; }
+
 .walk-strike + .walk-exit { margin-left: 12px; }
 
 /* What is left of the body being ridden.
