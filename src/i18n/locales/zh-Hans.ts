@@ -63,6 +63,8 @@ export const zhHans: Record<StringKey, string> = {
 
   hint_remove: "回收格子上的手下、陷阱或房间。全额退回。",
   hint_minion: "放在通道格上。",
+  hint_minion_road: "路上：挡路并迎战",
+  hint_minion_side: "路旁：射击路过的敌人",
   hint_trap: "设置在通道格上。",
   hint_room: "需要 2×2 的通道。",
   hint_skill_target: "请选择目标格。",

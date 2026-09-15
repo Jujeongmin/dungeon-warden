@@ -1550,6 +1550,21 @@ export default function App() {
         ? null
         : "none";
 
+  /*
+   * The tiles the party will walk, for telling road from roadside under the
+   * cursor.
+   *
+   * The opening teaches the nook, and players still stood their whole garrison
+   * in the corridor - a save played for real had every minion in the road and
+   * lost every raid. What a minion does is decided by which of the two it is
+   * standing on, so the placement hint says which, on the tile, before the tap.
+   */
+  const routeKeys = useMemo(() => {
+    if (!meta) return null;
+    const path = buildRaidPath(arena, entrance, core, lureTiles(rooms), new Set(terrain));
+    return path ? new Set(path.map((p) => p.y * arena.w + p.x)) : null;
+  }, [arena, entrance, core, terrain, meta, rooms]);
+
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
@@ -1569,9 +1584,15 @@ export default function App() {
     }
     if (tool.kind === "minion") {
       const spent = `${minions.length}/${effects.minionCap}`;
+      // Nothing over rock: nothing can be put there, so there is nothing to say.
+      const key = hover ? hover.y * arena.w + hover.x : -1;
+      const where =
+        hover && routeKeys && !terrain.has(key)
+          ? ` · ${t(routeKeys.has(key) ? "hint_minion_road" : "hint_minion_side")}`
+          : "";
       return spread < 1
-        ? `${t("hint_minion")} ${spent} · ×${spread.toFixed(2)}`
-        : `${t("hint_minion")} ${spent}`;
+        ? `${t("hint_minion")} ${spent} · ×${spread.toFixed(2)}${where}`
+        : `${t("hint_minion")} ${spent}${where}`;
     }
     if (tool.kind === "trap") return `${t("hint_trap")} ${traps.length}/${MAX_TRAPS}`;
     return `${t(ROOM_DESCRIPTION[tool.type] as StringKey)} ${t("hint_room")} ${rooms.length}/${MAX_ROOMS}`;

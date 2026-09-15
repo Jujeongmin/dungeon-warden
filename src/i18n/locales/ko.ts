@@ -65,6 +65,8 @@ export const ko = {
 
   hint_remove: "타일 위의 부하 · 함정 · 방을 회수합니다. 전액 돌려받습니다.",
   hint_minion: "통로 타일에 배치합니다.",
+  hint_minion_road: "길 위: 적을 막고 맞서 싸움",
+  hint_minion_side: "길 옆: 지나가는 적을 쏨",
   hint_trap: "통로 타일에 설치합니다.",
   hint_room: "2×2 통로가 필요합니다.",
   hint_skill_target: "대상 타일을 선택하세요.",

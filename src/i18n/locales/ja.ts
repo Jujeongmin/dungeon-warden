@@ -68,6 +68,8 @@ export const ja: Record<StringKey, string> = {
 
   hint_remove: "タイルの手下・罠・部屋を撤去します。全額戻ります。",
   hint_minion: "通路のタイルに配置します。",
+  hint_minion_road: "道の上: 立ちふさがって戦う",
+  hint_minion_side: "道の横: 通る敵を撃つ",
   hint_trap: "通路のタイルに設置します。",
   hint_room: "2×2 の通路が必要です。",
   hint_skill_target: "対象のタイルを選んでください。",

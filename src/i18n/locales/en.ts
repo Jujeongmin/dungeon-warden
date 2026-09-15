@@ -62,6 +62,8 @@ export const en: Record<StringKey, string> = {
 
   hint_remove: "Removes the minion, trap or room on a tile. Full refund.",
   hint_minion: "Place on a corridor tile.",
+  hint_minion_road: "On the road: blocks and fights",
+  hint_minion_side: "Beside it: shoots whoever passes",
   hint_trap: "Set on a corridor tile.",
   hint_room: "Needs a clear 2×2 of corridor.",
   hint_skill_target: "Pick a target tile.",
