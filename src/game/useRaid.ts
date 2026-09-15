@@ -75,6 +75,8 @@ interface Options {
    * the number under the dig tool is the number the raid runs on.
    */
   roomier?: boolean;
+  /** The warden's level, from its lifetime downs: weights the body it rides. */
+  wardenLevel?: number;
   /** Where the speed control starts, remembered from last session. */
   initialSpeed?: RaidSpeed;
   /**
@@ -112,6 +114,7 @@ export function useRaid({
   initialSpeed,
   readControl,
   roomier,
+  wardenLevel,
 }: Options) {
   const eventsRef = useRef(onEvents);
   eventsRef.current = onEvents;
@@ -372,6 +375,7 @@ export function useRaid({
         minionDamageScale: research.minionDamageScale * garrisonScale(dug.length, roomier),
         minionHpScale: research.minionHpScale * garrisonScale(dug.length, roomier),
         trapDamageScale: research.trapDamageScale,
+        wardenLevel,
       });
       simRef.current = sim;
       setRaidState(sim.state);
@@ -394,6 +398,7 @@ export function useRaid({
     server,
     starting,
     onAbandoned,
+    wardenLevel,
   ]);
 
   /**

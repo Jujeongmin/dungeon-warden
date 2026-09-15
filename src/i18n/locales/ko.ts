@@ -106,6 +106,8 @@ export const ko = {
   result_plundered: "약탈당한 골드",
   result_relief: "재정비 지원금",
   result_warden: "직접 쓰러뜨림",
+  result_warden_level: "워든 Lv{n} 달성",
+  warden_level: "워든 Lv{n}",
   broke_note: "골드도, 싸울 부하도 없습니다.",
   broke_rebuild: "다시 짓고 환급받기 +{n}",
   result_waves: "누적 격퇴",

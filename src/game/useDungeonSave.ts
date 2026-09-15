@@ -61,6 +61,8 @@ export interface DungeonMeta {
   threat: number;
   wavesRepelled: number;
   coreBreaches: number;
+  /** Lifetime warden downs, which is the warden's level: see src/game/warden.ts. */
+  wardenDowns: number;
 }
 
 function metaOf(dungeon: Dungeon): DungeonMeta {
@@ -70,6 +72,7 @@ function metaOf(dungeon: Dungeon): DungeonMeta {
     threat: dungeon.threat ?? 0,
     wavesRepelled: dungeon.wavesRepelled ?? 0,
     coreBreaches: dungeon.coreBreaches ?? 0,
+    wardenDowns: dungeon.wardenDowns ?? 0,
   };
 }
 
@@ -640,6 +643,7 @@ export function useDungeonSave() {
       threat: number;
       wavesRepelled: number;
       coreBreaches: number;
+      wardenDownsTotal?: number;
       minions?: PlacedMinion[];
       loot?: LootItem[];
       prisoners?: Prisoner[];
@@ -660,6 +664,7 @@ export function useDungeonSave() {
               threat: next.threat,
               wavesRepelled: next.wavesRepelled,
               coreBreaches: next.coreBreaches,
+              wardenDowns: next.wardenDownsTotal ?? current.wardenDowns,
             }
           : current,
       );

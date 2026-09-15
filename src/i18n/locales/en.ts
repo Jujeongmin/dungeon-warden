@@ -101,6 +101,8 @@ export const en: Record<StringKey, string> = {
   result_plundered: "Gold plundered",
   result_relief: "Rebuilding fund",
   result_warden: "By your own hand",
+  result_warden_level: "Warden reached Lv{n}",
+  warden_level: "Warden Lv{n}",
   broke_note: "No gold, and nobody ready to fight.",
   broke_rebuild: "Start over for a refund +{n}",
   result_waves: "Total repelled",

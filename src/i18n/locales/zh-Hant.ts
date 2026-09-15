@@ -102,6 +102,8 @@ export const zhHant: Record<StringKey, string> = {
   result_plundered: "被奪走的金幣",
   result_relief: "重建補助",
   result_warden: "親手擊倒",
+  result_warden_level: "看守升至 Lv{n}",
+  warden_level: "看守 Lv{n}",
   broke_note: "沒有金幣，也沒有能戰鬥的手下。",
   broke_rebuild: "重建並退款 +{n}",
   result_waves: "累計擊退",

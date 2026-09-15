@@ -1,3 +1,4 @@
+import { wardenGuardScale, wardenMightScale } from "../warden";
 import type {
   AdventurerClass,
   MinionType,
@@ -281,6 +282,8 @@ export interface RaidSimOptions {
   weaponTiers?: Record<string, number>;
   /** Research multipliers. 1 = nothing researched. */
   minionDamageScale?: number;
+  /** The warden's level, which weights the body it rides. 1 when absent. */
+  wardenLevel?: number;
   minionHpScale?: number;
   trapDamageScale?: number;
 }
@@ -353,9 +356,14 @@ export class RaidSim {
   private bodySkillCooldowns = new Map<string, number>();
   /** Which tile the ridden body was on last step, so hunts re-route on a step. */
   private possessedTile = { x: -1, y: -1 };
+  /** The ridden body's blow and wound multipliers, with the warden's level in them. */
+  private wardenMight = WARDEN_MIGHT;
+  private wardenGuard = WARDEN_GUARD;
 
   constructor(options: RaidSimOptions) {
     this.seed = options.seed;
+    this.wardenMight = WARDEN_MIGHT * wardenMightScale(options.wardenLevel ?? 1);
+    this.wardenGuard = WARDEN_GUARD * wardenGuardScale(options.wardenLevel ?? 1);
     this.trapCooldownScale = options.trapCooldownScale ?? 1;
     this.jailFree = options.jailFree ?? 0;
 
@@ -1115,7 +1123,7 @@ export class RaidSim {
 
   /** A blow landing on a minion, softened while the warden is inside it. */
   private blowOn(minion: SimMinion, damage: number): number {
-    return minion.id === this.possessedId ? damage * WARDEN_GUARD : damage;
+    return minion.id === this.possessedId ? damage * this.wardenGuard : damage;
   }
 
   private stepAdventurers(): void {
@@ -1296,7 +1304,7 @@ export class RaidSim {
     minion.cooldown = stats.attackInterval;
     minion.action = "attack";
     const target = this.nearestAdventurer(minion.x, minion.y, stats.range);
-    if (target) this.damageAdventurer(target, stats.damage * WARDEN_MIGHT, "melee", minion);
+    if (target) this.damageAdventurer(target, stats.damage * this.wardenMight, "melee", minion);
   }
 
   /**
@@ -1343,7 +1351,7 @@ export class RaidSim {
         minion.y = ny;
       }
       minion.action = "attack";
-      this.damageAdventurer(prey, stats.damage * WARDEN_MIGHT * LUNGE_MULTIPLIER, "melee", minion);
+      this.damageAdventurer(prey, stats.damage * this.wardenMight * LUNGE_MULTIPLIER, "melee", minion);
       return;
     }
 
@@ -1353,7 +1361,7 @@ export class RaidSim {
 
     if (minion.type === "mage") {
       this.bodySkillCooldowns.set(minion.id, BLAST_COOLDOWN);
-      this.damageAdventurer(target, stats.damage * WARDEN_MIGHT * BLAST_MULTIPLIER, "melee", minion);
+      this.damageAdventurer(target, stats.damage * this.wardenMight * BLAST_MULTIPLIER, "melee", minion);
       return;
     }
 

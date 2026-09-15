@@ -161,6 +161,8 @@ export interface Dungeon {
   threat: number;
   wavesRepelled: number;
   coreBreaches: number;
+  /** Adventurers the warden put down itself, over the dungeon's life. Absent on older saves. */
+  wardenDowns?: number;
   createdAt: number;
   updatedAt: number;
   lastSeenAt: number;
@@ -223,6 +225,8 @@ export interface RaidFinishResult {
   wardenBonus?: number;
   /** How many of those there were. */
   wardenDowns?: number;
+  /** The lifetime count after this raid, which is the warden's level. */
+  wardenDownsTotal?: number;
   gold: number;
   threat: number;
   wavesRepelled: number;

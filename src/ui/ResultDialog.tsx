@@ -1,3 +1,4 @@
+import { wardenLevel } from "../game/warden";
 import { useEscape } from "./useEscape";
 import { useT } from "../i18n";
 import { useCountUp } from "./useCountUp";
@@ -23,6 +24,13 @@ interface Props {
  */
 export function ResultDialog({ result, onClose }: Props) {
   useEscape(onClose);
+  // A warden level reached on this raid: before it, the lifetime count was
+  // the total less this raid's own downs.
+  const total = result.wardenDownsTotal;
+  const levelUp =
+    total !== undefined && wardenLevel(total) > wardenLevel(total - (result.wardenDowns ?? 0))
+      ? wardenLevel(total)
+      : null;
   const t = useT();
   const repelled = result.outcome === "repelled";
   // Only the payout counts up. A running total that ticks would be four
@@ -87,6 +95,9 @@ export function ResultDialog({ result, onClose }: Props) {
               <span className="chip warden">
                 {t("result_warden")} ×{result.wardenDowns} · +{result.wardenBonus ?? 0}
               </span>
+            )}
+            {levelUp !== null && (
+              <span className="chip warden">{t("result_warden_level", { n: levelUp })}</span>
             )}
             {captured.map((name) => (
               <span key={`c-${name}`} className="chip captured">

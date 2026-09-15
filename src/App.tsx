@@ -9,6 +9,7 @@ import { useRaid, RAID_SPEEDS } from "./game/useRaid";
 import { minionStatsFor } from "./game/sim/units";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
+import { wardenLevel as wardenLevelOf } from "./game/warden";
 import { blockedKey, coreOf, entranceOf, inArena } from "./game/arena";
 import { RESEARCH, RESEARCH_BY_ID, isAvailable } from "./game/research";
 import { TUTORIAL, guideFor } from "./game/tutorial";
@@ -455,6 +456,9 @@ export default function App() {
     weaponTiers,
     research: unlocked,
     roomier,
+    // What the warden has put down itself, ever: the body it rides is that
+    // much heavier. See src/game/warden.ts.
+    wardenLevel: wardenLevelOf(save.meta?.wardenDowns ?? 0),
     onFinished: save.applyRaidResult,
     onAbandoned: (settled) => {
       save.applyRaidResult(settled);
@@ -1696,6 +1700,8 @@ export default function App() {
             <span className="pending">
               {t("stat_threat")} {meta.threat}
               {tier && <b className="tier"> {t(tier.label as StringKey)}</b>}
+              {" · "}
+              {t("warden_level", { n: wardenLevelOf(meta.wardenDowns) })}
             </span>
           )}
           <span className={`status status-${status}`}>
@@ -2338,7 +2344,9 @@ export default function App() {
             className="walk-life-fill"
             style={{ width: `${Math.max(0, Math.min(1, possessed.hp / possessed.maxHp)) * 100}%` }}
           />
-          <span>{Math.max(0, Math.ceil(possessed.hp))}</span>
+          <span>
+            {t("warden_level", { n: wardenLevelOf(meta?.wardenDowns ?? 0) })} · {Math.max(0, Math.ceil(possessed.hp))}
+          </span>
         </div>
       )}
 

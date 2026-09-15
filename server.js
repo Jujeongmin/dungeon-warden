@@ -1719,6 +1719,9 @@ class Server {
     dungeon.threat = threat;
     dungeon.wavesRepelled = (dungeon.wavesRepelled || 0) + (outcome === "repelled" ? 1 : 0);
     dungeon.coreBreaches = (dungeon.coreBreaches || 0) + (outcome === "breached" ? 1 : 0);
+    // The warden's lifetime count, which is its level - see src/game/warden.ts.
+    // Only the downs paid for above, so it grows exactly as the bonus does.
+    dungeon.wardenDowns = (dungeon.wardenDowns || 0) + wardenDowns;
     dungeon.updatedAt = Date.now();
     dungeon.lastSeenAt = Date.now();
 
@@ -1730,6 +1733,7 @@ class Server {
       relief,
       wardenBonus,
       wardenDowns,
+      wardenDownsTotal: dungeon.wardenDowns,
       championStopped,
       plundered,
       gold: await $asset.get("gold"),
