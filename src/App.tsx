@@ -1221,24 +1221,33 @@ export default function App() {
   useEffect(() => {
     const measure = () => {
       const renderer = rendererRef.current;
-      const panel = hudRef.current;
-      if (!renderer || !panel) return;
-      // Measured against the stage, not the window: on a wide screen the game
-      // is a letterboxed column and the window is mostly backdrop.
-      const stage = panel.offsetParent as HTMLElement | null;
-      const frame = stage?.getBoundingClientRect() ?? null;
+      if (!renderer) return;
 
       if (screen === "title") {
-        // The panel is hidden behind the title, so it covers nothing - and
-        // measuring it would read a box of zeroes as a full-height sheet.
+        /*
+         * The slab covers the left of the room; the title itself is the frame.
+         *
+         * Not the panel: it is display:none behind the title, has no offset
+         * parent, and measuring against it read the slab as covering nothing -
+         * so the room was framed across the whole canvas and half of it sat
+         * behind the menu on a phone.
+         */
         const slab = document.querySelector(".title-slab");
-        const left = slab && frame ? slab.getBoundingClientRect().right - frame.left : 0;
+        const titleBox = document.querySelector(".title")?.getBoundingClientRect() ?? null;
+        const left = slab && titleBox ? slab.getBoundingClientRect().right - titleBox.left : 0;
         renderer.setBottomInset(0);
         renderer.setRightInset(0);
         renderer.setTopInset(0);
         renderer.setLeftInset(Math.max(0, left));
         return;
       }
+
+      const panel = hudRef.current;
+      if (!panel) return;
+      // Measured against the stage, not the window: on a wide screen the game
+      // is a letterboxed column and the window is mostly backdrop.
+      const stage = panel.offsetParent as HTMLElement | null;
+      const frame = stage?.getBoundingClientRect() ?? null;
 
       renderer.setLeftInset(0);
       // The bar and its banners cover the top of the board. Not while
@@ -1268,8 +1277,25 @@ export default function App() {
     };
 
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    // Measured a frame after the resize, not during it: a rotation or a window
+    // crossing a breakpoint resizes before the new layout exists, and the
+    // title slab was read at its old width.
+    // Watched on the page box as well as the window: not every viewport change
+    // arrives as a resize event.
+    let pending = 0;
+    const onResize = () => {
+      cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(measure);
+    };
+    window.addEventListener("resize", onResize);
+    // An observer fires after layout, so it can measure at once.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => measure());
+    observer?.observe(document.documentElement);
+    return () => {
+      cancelAnimationFrame(pending);
+      window.removeEventListener("resize", onResize);
+      observer?.disconnect();
+    };
   }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length, raid.raiding, rendererReady]);
 
   // The title shows the dungeon off: lit up and slowly circling. See setShowcase.

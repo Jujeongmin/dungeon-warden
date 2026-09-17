@@ -126,7 +126,8 @@ const KEY_INTENSITY = 0.72;
  */
 const SHOWCASE_SPIN = 0.06; // radians a second: one turn in under two minutes
 const SHOWCASE_PITCH = THREE.MathUtils.degToRad(40);
-const SHOWCASE_ZOOM = 0.8;
+/** Tiles across the room the showcase keeps in view beside the menu. */
+const SHOWCASE_SPAN = 12;
 const SHOWCASE_LIGHT = 1.8;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
@@ -2662,6 +2663,23 @@ export class DungeonRenderer {
     return true;
   }
 
+  /**
+   * How far back the showcase camera stands.
+   *
+   * Far enough that the room fits in the part of the canvas the menu does not
+   * cover, whichever way it has turned, and never so close that the far end
+   * of the room leaves the top of the screen.
+   */
+  private showcaseDistance(): number {
+    const width = this.canvas.clientWidth || 1;
+    const height = this.canvas.clientHeight || 1;
+    const visible = Math.max(80, width - this.leftInset);
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
+    const across = (SHOWCASE_SPAN * height) / (2 * tanHalf * visible * 0.95);
+    const deep = (SHOWCASE_SPAN * Math.sin(SHOWCASE_PITCH) * 1.2) / (2 * tanHalf * 0.9);
+    return Math.max(across, deep);
+  }
+
   /** Lights the dungeon up and sets it circling behind the title, or stops. */
   setShowcase(on: boolean): void {
     if (this.showcase === on) return;
@@ -2714,7 +2732,7 @@ export class DungeonRenderer {
   private updateOrbitCamera(): void {
     if (this.showcase) {
       const orbit = this.elapsed * SHOWCASE_SPIN;
-      const distance = this.distance * SHOWCASE_ZOOM;
+      const distance = this.showcaseDistance();
       const flat = Math.cos(SHOWCASE_PITCH) * distance;
       this.camera.position.set(
         this.target.x + Math.sin(orbit) * flat,

@@ -2666,3 +2666,30 @@ button.ad-gold {
   .title-embers { display: none; }
   .title-name { animation: none; }
 }
+
+/*
+ * The title on a short landscape screen.
+ *
+ * At phone height the slab took half the width and still pushed the settings
+ * button off the bottom, and the room behind it was mostly covered. The slab
+ * narrows, everything in it tightens, and the three menu buttons share a row.
+ */
+@media (max-height: 520px) {
+  .title-slab {
+    width: 44%;
+    min-width: 0;
+    max-width: 290px;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  .title-sigil { width: 22px; height: 22px; margin-bottom: 4px; }
+  .title-kicker { margin-bottom: 4px; letter-spacing: var(--ls-normal); word-break: keep-all; }
+  .title-name { margin-bottom: 4px; }
+  .title-line { font-size: var(--fs-xs); line-height: 1.45; word-break: keep-all; }
+  .title-foot { gap: 8px; }
+  .title-save { padding: 6px 0; }
+  .title-start { padding: 9px 12px; }
+  .title-menu { flex-direction: row; gap: 6px; margin-top: 6px; }
+  .title-menu button { padding: 8px 2px; font-size: var(--fs-xs); word-break: keep-all; }
+  .title-note { margin-top: 6px; font-size: var(--fs-2xs); word-break: keep-all; }
+}
