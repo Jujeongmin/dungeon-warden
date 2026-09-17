@@ -391,7 +391,16 @@ export function useDungeonSave() {
 
   // Gold is charged at the moment of placing, so what is in the purse is
    // already net of everything built so far.
-  const canAfford = useCallback((extra: number): boolean => extra <= gold, [gold]);
+  /*
+   * The purse as of the last change, not the last render.
+   *
+   * A drag digs several tiles inside one pointer event, and each of them
+   * asked the purse from the render before the drag - so a drag could spend
+   * gold it had already spent. Kept in step here and by dig and fill.
+   */
+  const goldRef = useRef(gold);
+  goldRef.current = gold;
+  const canAfford = useCallback((extra: number): boolean => extra <= goldRef.current, []);
 
   const placeMinion = useCallback(
     (type: MinionType, x: number, y: number): boolean => {
@@ -506,7 +515,13 @@ export function useDungeonSave() {
     if (!touching) return false;
     if (!canAfford(DIG_COST)) return false;
 
-    setDug([...dugRef.current, dugTile(x, y)]);
+    // The ref moves now, not on the next render: a drag digs a run of tiles
+    // in one pointer event, and each one has to see the tile dug before it.
+    // Without this only the first tile of each event went in.
+    const next = [...dugRef.current, dugTile(x, y)];
+    dugRef.current = next;
+    goldRef.current -= DIG_COST;
+    setDug(next);
     setGold((current) => current - DIG_COST);
     return true;
   }, [canAfford]);
@@ -537,6 +552,8 @@ export function useDungeonSave() {
     const next = dugRef.current.filter((tile) => tile.id !== dugId(x, y));
     if (connects(arena, dugRef.current) && !connects(arena, next)) return false;
 
+    dugRef.current = next;
+    goldRef.current += Math.floor(DIG_COST * REFUND_RATE);
     setDug(next);
     setGold((current) => current + Math.floor(DIG_COST * REFUND_RATE));
     return true;
