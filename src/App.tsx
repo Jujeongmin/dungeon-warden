@@ -90,6 +90,12 @@ const BODY_LOST_MS = 1800;
 /** How far a blow has to reach before it is worth drawing the reach, in tiles. */
 const BOLT_MIN_SPAN = 1.6;
 
+/** m:ss, rounded up so a wait never reads 0:00 while it is still running. */
+function clockText(ms: number): string {
+  const seconds = Math.ceil(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function remaining(at: number, t: Translate): string {
   const minutes = Math.max(0, Math.ceil((at - Date.now()) / MS_PER_MINUTE));
   return minutes <= 0 ? t("soon") : t("minutes", { n: minutes });
@@ -1088,6 +1094,18 @@ export default function App() {
           action: over ? "idle" : m.action, facing: m.facing,
         });
       }
+      // Placed but not sent in: still on a revive timer from an earlier raid.
+      // Shown where they stand, see-through, so a missing minion is visibly
+      // resting rather than gone.
+      const fielded = new Set(raid.raidState.minions.map((m) => m.id));
+      for (const p of minions) {
+        if (fielded.has(p.id)) continue;
+        live.push({
+          id: `m:${p.id}`, x: p.x, y: p.y,
+          kind: p.type === "convert" ? `a_${p.cls ?? "knight"}` : `m_${p.type}`,
+          hp: 1, maxHp: 1, action: "idle", resting: true,
+        });
+      }
       for (const a of raid.raidState.adventurers) {
         if (!a.alive || !a.spawned) continue;
         live.push({
@@ -1104,7 +1122,6 @@ export default function App() {
       return live;
     }
 
-    const now = Date.now();
     return minions.map((m) => {
       const stats = minionStatsFor(m, weaponTiers[m.id] ?? 0);
       return {
@@ -1112,14 +1129,17 @@ export default function App() {
         x: m.x,
         y: m.y,
         kind: m.type === "convert" ? `a_${m.cls ?? "knight"}` : `m_${m.type}`,
-        hp: m.revivesAt && m.revivesAt > now ? 0 : stats.hp,
+        hp: stats.hp,
         maxHp: stats.hp,
+        // On the party clock, so a minion stands up solid within a few
+        // seconds of its timer ending rather than at the next unrelated change.
+        resting: Boolean(m.revivesAt && m.revivesAt > partyClock),
         // Said outright: a mesh kept from the raid keeps whatever clip it
         // was last told, and between raids that is always the wrong one.
         action: "idle" as const,
       };
     });
-  }, [raid.raidState, minions, weaponTiers, possessedId]);
+  }, [raid.raidState, minions, weaponTiers, possessedId, partyClock]);
 
   const markers: MarkerView[] = useMemo(() => {
     const list: MarkerView[] = traps.map((t) => ({
@@ -1558,6 +1578,20 @@ export default function App() {
     return Math.min(
       ...minions.map((m) => (m.revivesAt && m.revivesAt > partyClock ? m.revivesAt - partyClock : 0)),
     );
+  }, [minions, partyClock]);
+
+  /*
+   * Some of the garrison, not all, still down.
+   *
+   * They are left out of the next defence, and nothing said so: the board
+   * showed them standing and the raid began without them. How many, and how
+   * long until the next one is back.
+   */
+  const resting = useMemo(() => {
+    const waits = minions
+      .map((m) => (m.revivesAt && m.revivesAt > partyClock ? m.revivesAt - partyClock : 0))
+      .filter((wait) => wait > 0);
+    return { count: waits.length, next: waits.length > 0 ? Math.min(...waits) : 0 };
   }, [minions, partyClock]);
 
   const onGoldAd = useCallback(async () => {
@@ -2449,9 +2483,12 @@ export default function App() {
               */}
             {connected && !raid.starting && reviveLeft > 0 && (
               <span className="go-sub go-warn">
-                {t("raid_reviving", {
-                  t: `${Math.floor(Math.ceil(reviveLeft / 1000) / 60)}:${String(Math.ceil(reviveLeft / 1000) % 60).padStart(2, "0")}`,
-                })}
+                {t("raid_reviving", { t: clockText(reviveLeft) })}
+              </span>
+            )}
+            {connected && !raid.starting && reviveLeft === 0 && resting.count > 0 && (
+              <span className="go-sub go-warn">
+                {t("raid_resting", { n: resting.count, t: clockText(resting.next) })}
               </span>
             )}
             {connected && !raid.starting && reviveLeft === 0 && nextParty.length > 0 && (

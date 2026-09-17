@@ -21,6 +21,11 @@ import type {
 
 const HAS_VERSE = Boolean(import.meta.env.VITE_AGENT8_VERSE);
 
+/** Minions not on a revive timer: the roster the server would field. */
+function standingIds(minions: PlacedMinion[], now: number): string[] {
+  return minions.filter((m) => !m.revivesAt || m.revivesAt <= now).map((m) => m.id);
+}
+
 /** Guards against a tab that was backgrounded dumping a huge catch-up burst. */
 const MAX_STEPS_PER_FRAME = 8;
 
@@ -320,7 +325,7 @@ export function useRaid({
           threat: 0,
           party: waves[0],
           waves,
-          availableMinionIds: minions.map((m) => m.id),
+          availableMinionIds: standingIds(minions, Date.now()),
           jailFree: 0,
           daily: day,
         };
@@ -349,7 +354,7 @@ export function useRaid({
               id: `w${wave}-${member.id}`,
             })),
           ),
-          availableMinionIds: minions.map((m) => m.id),
+          availableMinionIds: standingIds(minions, Date.now()),
           jailFree,
         };
       }

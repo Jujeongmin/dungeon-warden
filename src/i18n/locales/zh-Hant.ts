@@ -58,6 +58,7 @@ export const zhHant: Record<StringKey, string> = {
   save_now: "立即儲存",
   start_raid: "開始防守",
   raid_reviving: "部下復活還需 {t}",
+  raid_resting: "休養中的部下 {n} 名 · {t}",
   abandoned_note: "上次中途離開的入侵按被攻破處理 — 參戰手下正在復活",
   abandoned_note_gold: "上次中途離開的入侵按被攻破處理 — 被奪走 {n} 金幣，參戰手下正在復活",
   preparing: "準備中…",

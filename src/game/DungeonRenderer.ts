@@ -104,6 +104,8 @@ const SKIN_GLOW = 0.4;
  * a shove, and is jumped to rather than slid across.
  */
 const FOLLOW_RATE = 18;
+/** How solid a minion on its revive timer is drawn. See UnitView.resting. */
+const RESTING_OPACITY = 0.35;
 const FOLLOW_SNAP = 1.5;
 /**
  * How near the chase camera a unit can be before it is hidden. Anything
@@ -232,6 +234,13 @@ export interface UnitView {
    * there - and a shade of brown is not a number.
    */
   showHealth?: boolean;
+  /**
+   * Still down from an earlier raid, and not fighting in this one.
+   *
+   * Drawn see-through: a fallen minion sits out a revive timer, and drawn
+   * solid it looked ready - then was simply missing once the raid began.
+   */
+  resting?: boolean;
 }
 
 /** One tile of the map left behind by a raid. */
@@ -907,6 +916,11 @@ export class DungeonRenderer {
         flash > 0 ? 0xffd9b0 : usesModel ? 0xffffff : (UNIT_COLORS[unit.kind] ?? 0xffffff),
         flash > 0 ? 1 + flash : 0.35 + 0.65 * health,
       );
+      const resting = unit.resting === true;
+      if (object.userData.resting !== resting) {
+        object.userData.resting = resting;
+        DungeonRenderer.fade(object, resting ? RESTING_OPACITY : 1);
+      }
     }
 
     for (const [id, object] of this.unitMeshes) {
@@ -1051,6 +1065,21 @@ export class DungeonRenderer {
   }
 
   /** Multiplies every material on an object, used for the wounded look. */
+  /** See-through, or solid again at 1. Readouts hanging off the model are left alone. */
+  private static fade(object: THREE.Object3D, opacity: number): void {
+    object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || mesh.userData.ui) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        material.transparent = opacity < 1;
+        material.opacity = opacity;
+        material.depthWrite = opacity >= 1;
+        material.needsUpdate = true;
+      }
+    });
+  }
+
   private static tint(object: THREE.Object3D, base: number, factor: number): void {
     object.traverse((child) => {
       const mesh = child as THREE.Mesh;
