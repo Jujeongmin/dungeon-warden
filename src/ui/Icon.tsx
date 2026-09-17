@@ -18,6 +18,7 @@ export type IconName =
   | "trophy"
   | "shop"
   | "settings"
+  | "help"
   | "home"
   | "lock"
   | "crown"
@@ -37,6 +38,8 @@ const PATHS: Record<IconName, string> = {
   shop: "M7 8V6a5 5 0 0 1 10 0v2h3l-1.2 12.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 8h3zm2 0h6V6a3 3 0 0 0-6 0v2z",
   // Cog: a ring with six teeth.
   settings: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm9 3.5a9 9 0 0 1-.1 1.3l2 1.6-2 3.5-2.4-1a9 9 0 0 1-2.2 1.3L16 21h-4l-.3-2.3a9 9 0 0 1-2.2-1.3l-2.4 1-2-3.5 2-1.6a9 9 0 0 1 0-2.6l-2-1.6 2-3.5 2.4 1a9 9 0 0 1 2.2-1.3L12 3h4l.3 2.3a9 9 0 0 1 2.2 1.3l2.4-1 2 3.5-2 1.6A9 9 0 0 1 21 12z",
+  // A question mark in a ring: how the game works.
+  help: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-.1 11.6a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM12 6a3.6 3.6 0 0 0-3.7 3.4h2.2A1.5 1.5 0 0 1 12 8.1c.9 0 1.5.6 1.5 1.3 0 .6-.3 1-1.1 1.5-1 .6-1.6 1.3-1.6 2.6v.5h2.1v-.3c0-.7.3-1 1.1-1.5 1-.6 1.7-1.4 1.7-2.8C15.7 7.4 14.1 6 12 6z",
   // Roof over a doorway.
   home: "M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3z",
   // Shackle over a closed body.

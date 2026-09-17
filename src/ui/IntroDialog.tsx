@@ -3,6 +3,7 @@ import { useT } from "../i18n";
 
 interface Props {
   onClose: () => void;
+  onGuide: () => void;
 }
 
 /**
@@ -13,7 +14,7 @@ interface Props {
  * shown by the build panel and the path preview, so this only has to land
  * the reversal: two short lines, not an explanation of how to play.
  */
-export function IntroDialog({ onClose }: Props) {
+export function IntroDialog({ onClose, onGuide }: Props) {
   useEscape(onClose);
   const t = useT();
 
@@ -30,6 +31,7 @@ export function IntroDialog({ onClose }: Props) {
         </ol>
 
         <div className="actions">
+          <button onClick={onGuide}>{t("menu_guide")}</button>
           <button className="primary" onClick={onClose}>{t("intro_go")}</button>
         </div>
       </div>

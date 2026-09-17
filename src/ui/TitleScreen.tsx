@@ -12,6 +12,7 @@ interface Props {
   onSettings: () => void;
   onLeaderboard: () => void;
   onShop: () => void;
+  onGuide: () => void;
 }
 
 /**
@@ -36,6 +37,7 @@ export function TitleScreen({
   onSettings,
   onLeaderboard,
   onShop,
+  onGuide,
 }: Props) {
   const t = useT();
 
@@ -76,6 +78,7 @@ export function TitleScreen({
             <div className="title-menu">
               <button onClick={onLeaderboard}>{t("menu_leaderboard")}</button>
               <button onClick={onShop}>{t("menu_shop")}</button>
+              <button onClick={onGuide}>{t("menu_guide")}</button>
               <button onClick={onSettings}>{t("menu_settings")}</button>
             </div>
 

@@ -26,6 +26,7 @@ import { LeaderboardDialog } from "./ui/LeaderboardDialog";
 import { TitleScreen } from "./ui/TitleScreen";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { IntroDialog } from "./ui/IntroDialog";
+import { GuideDialog } from "./ui/GuideDialog";
 import { ResultDialog } from "./ui/ResultDialog";
 import { useCountUp } from "./ui/useCountUp";
 import { Icon } from "./ui/Icon";
@@ -239,6 +240,7 @@ export default function App() {
   const [screen, setScreen] = useState<"title" | "game">("title");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const t = useMemo<Translate>(
     () => (key, vars) => translate(settings.locale, key, vars),
@@ -1895,6 +1897,14 @@ export default function App() {
           </button>
           <button
             className="icon-toggle"
+            onClick={() => { audio.play("click"); setGuideOpen(true); }}
+            title={t("menu_guide")}
+            aria-label={t("menu_guide")}
+          >
+            <Icon name="help" />
+          </button>
+          <button
+            className="icon-toggle"
             onClick={() => { audio.play("click"); setSettingsOpen(true); }}
             title={t("menu_settings")}
             aria-label={t("menu_settings")}
@@ -2671,6 +2681,7 @@ export default function App() {
           offline={isOffline}
           onStart={enterGame}
           onSettings={() => setSettingsOpen(true)}
+          onGuide={() => setGuideOpen(true)}
           onLeaderboard={() => setBoardOpen(true)}
           onShop={() => setShopOpen(true)}
         />
@@ -2719,7 +2730,18 @@ export default function App() {
         />
       )}
 
-      {introOpen && <IntroDialog onClose={() => setIntroOpen(false)} />}
+      {introOpen && (
+        <IntroDialog
+          onClose={() => setIntroOpen(false)}
+          onGuide={() => {
+            // One dialog at a time: the guide covers what the intro says.
+            setIntroOpen(false);
+            setGuideOpen(true);
+          }}
+        />
+      )}
+
+      {guideOpen && <GuideDialog onClose={() => setGuideOpen(false)} />}
     </div>
 
     {/* Outside .app on purpose: the guard hides the stage rather than
