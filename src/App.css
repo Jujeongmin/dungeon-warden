@@ -2772,3 +2772,8 @@ button.ad-gold {
 @media (max-height: 520px) {
   .guide-list li { padding: 6px 0; font-size: var(--fs-xs); line-height: 1.5; }
 }
+
+/* The way in is the wide one; the guide sits beside it at its own width,
+   so neither label breaks over two lines in a narrow dialog. */
+.intro-actions button { white-space: nowrap; }
+.intro-actions .primary { flex: 1 1 auto; }

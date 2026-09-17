@@ -30,7 +30,7 @@ export function IntroDialog({ onClose, onGuide }: Props) {
           <li><b>{t("intro_2_b")}</b> {t("intro_2")}</li>
         </ol>
 
-        <div className="actions">
+        <div className="actions intro-actions">
           <button onClick={onGuide}>{t("menu_guide")}</button>
           <button className="primary" onClick={onClose}>{t("intro_go")}</button>
         </div>

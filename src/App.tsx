@@ -2321,10 +2321,19 @@ export default function App() {
 
               {adNotice && <p className="hint small">{adNotice}</p>}
 
-              <p className="hint small">
-                {hover ? `${t("tile")} (${hover.x}, ${hover.y})${hoveredNote}` : t("hover_hint")}
-                {lastSavedAt && ` · ${t("saved_at")} ${new Date(lastSavedAt).toLocaleTimeString()}`}
-              </p>
+              {/* A touch screen has no cursor to hover with, so it is not
+                  asked to. */}
+              {(hover || HAS_MOUSE || lastSavedAt) && (
+                <p className="hint small">
+                  {hover
+                    ? `${t("tile")} (${hover.x}, ${hover.y})${hoveredNote}`
+                    : HAS_MOUSE
+                      ? t("hover_hint")
+                      : null}
+                  {lastSavedAt &&
+                    `${hover || HAS_MOUSE ? " · " : ""}${t("saved_at")} ${new Date(lastSavedAt).toLocaleTimeString()}`}
+                </p>
+              )}
             </>
           )}
 
