@@ -79,6 +79,7 @@ export const ja: Record<StringKey, string> = {
   hint_trap: "通路のタイルに設置します。",
   hint_room: "2×2 の通路が必要です。",
   hint_skill_target: "対象のタイルを選んでください。",
+  hint_pick: "上から置くものを選んでください",
 
   count_minions: "手下",
   count_traps: "罠",
@@ -230,9 +231,9 @@ export const ja: Record<StringKey, string> = {
   res_tp2: "精密発動 II",
   res_tp2_n: "罠のダメージ +40%",
   res_expand1: "ダンジョン拡張 I",
-  res_expand1_n: "部屋 12 → 16",
+  res_expand1_n: "ダンジョンの奥行き 12 → 16",
   res_expand2: "ダンジョン拡張 II",
-  res_expand2_n: "部屋 16 → 20",
+  res_expand2_n: "ダンジョンの奥行き 16 → 20",
 
   minion_warrior: "スケルトンアーチャー",
   minion_mage: "スケルトンメイジ",

@@ -74,6 +74,7 @@ export const zhHant: Record<StringKey, string> = {
   hint_trap: "設置在通道格上。",
   hint_room: "需要 2×2 的通道。",
   hint_skill_target: "請選擇目標格。",
+  hint_pick: "請先在上方選擇要放置的東西",
 
   count_minions: "手下",
   count_traps: "陷阱",
@@ -225,9 +226,9 @@ export const zhHant: Record<StringKey, string> = {
   res_tp2: "精密擊發 II",
   res_tp2_n: "陷阱傷害 +40%",
   res_expand1: "地城擴建 I",
-  res_expand1_n: "房間 12 → 16",
+  res_expand1_n: "地下城縱深 12 → 16",
   res_expand2: "地城擴建 II",
-  res_expand2_n: "房間 16 → 20",
+  res_expand2_n: "地下城縱深 16 → 20",
 
   minion_warrior: "骷髏弓手",
   minion_mage: "骷髏法師",

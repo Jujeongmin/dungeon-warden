@@ -76,6 +76,7 @@ export const ko = {
   hint_trap: "통로 타일에 설치합니다.",
   hint_room: "2×2 통로가 필요합니다.",
   hint_skill_target: "대상 타일을 선택하세요.",
+  hint_pick: "위에서 놓을 것을 고르세요",
 
   count_minions: "부하",
   count_traps: "함정",
@@ -236,9 +237,9 @@ export const ko = {
   res_tp2: "정밀 격발 II",
   res_tp2_n: "함정 피해 +40%",
   res_expand1: "던전 확장 I",
-  res_expand1_n: "방 12 → 16",
+  res_expand1_n: "던전 길이 12 → 16칸",
   res_expand2: "던전 확장 II",
-  res_expand2_n: "방 16 → 20",
+  res_expand2_n: "던전 길이 16 → 20칸",
 
   // Content names
   minion_warrior: "스켈레톤 궁수",

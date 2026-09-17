@@ -139,3 +139,37 @@ describe("the opening it teaches", () => {
     expect(raid(followTheTutorial()).state.minions.every((m) => m.alive)).toBe(true);
   });
 });
+
+describe("steps that ask for two", () => {
+  const ctx = (over: Partial<TutorialContext>): TutorialContext => ({
+    entrance,
+    core,
+    minions: [],
+    traps: [],
+    wavesRepelled: 0,
+    coreBreaches: 0,
+    loot: 0,
+    toolId: "dig",
+    group: "dig",
+    dug: 12,
+    isDug: () => false,
+    connected: true,
+    ...over,
+  });
+
+  it("counts the nooks cut so far", () => {
+    expect(guideFor(ctx({ dug: 12 }))?.progress).toEqual({ done: 0, of: 2 });
+    expect(guideFor(ctx({ dug: 13 }))?.progress).toEqual({ done: 1, of: 2 });
+  });
+
+  it("counts the archers placed so far", () => {
+    const one: PlacedMinion[] = [{ id: "m1", type: "warrior", x: core.x + 1, y: core.y - 3 }];
+    const guide = guideFor(ctx({ dug: 14, toolId: "warrior", group: "minion", minions: one }));
+    expect(guide?.step.id).toBe("minion");
+    expect(guide?.progress).toEqual({ done: 1, of: 2 });
+  });
+
+  it("says nothing about counts until the tool is in hand", () => {
+    expect(guideFor(ctx({ dug: 13, toolId: "none" }))?.progress ?? null).toBeNull();
+  });
+});

@@ -102,7 +102,10 @@ type Tool =
   | { kind: "remove" }
   | { kind: "minion"; type: MinionType }
   | { kind: "trap"; type: TrapType }
-  | { kind: "room"; type: RoomType };
+  | { kind: "room"; type: RoomType }
+  // Nothing in hand: a drawer was opened and nothing in it picked yet. A tap
+  // on the board does nothing rather than placing whatever was held before.
+  | { kind: "none" };
 
 /**
  * Which model stands in for each tool in the toolbar.
@@ -489,7 +492,9 @@ export default function App() {
       : `m_${possessed.type}`
     : null;
 
-  const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "remove" as const };
+  // An unknown id is nothing in hand. It used to fall back to the remove
+  // tool, which made any bad id a tap that took things off the board.
+  const tool: Tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? { kind: "none" };
 
   // Browsers only allow an AudioContext to start from a gesture.
   useEffect(() => {
@@ -853,6 +858,11 @@ export default function App() {
      * tutorial's own wall simply un-finishes that step and brings the ring
      * back - so the guide heals rather than dead-ends.
      */
+    if (tool.kind === "none") {
+      audio.play("error");
+      return;
+    }
+
     const guided = guidedTapRef.current;
     if (guided && tool.kind !== "remove") {
       const wrongTile = guided === "none" || x !== guided.x || y !== guided.y;
@@ -1680,6 +1690,7 @@ export default function App() {
   const toolHint = (() => {
     if (raid.pendingSkill)
       return `${t(SKILL_LABEL[raid.pendingSkill] as StringKey)} — ${t("hint_skill_target")}`;
+    if (tool.kind === "none") return t("hint_pick");
     if (tool.kind === "dig") return t("hint_dig");
     if (tool.kind === "fill") {
       return HAS_MOUSE ? `${t("hint_fill")} · ${t("hint_remove_alt")}` : t("hint_fill");
@@ -1920,7 +1931,10 @@ export default function App() {
             <b className="tutorial-count">
               {teaching.index + 1}/{TUTORIAL.length}
             </b>
-            <p>{t(teaching.hint as StringKey)}</p>
+            <p>
+              {t(teaching.hint as StringKey)}
+              {teaching.progress ? ` (${teaching.progress.done}/${teaching.progress.of})` : ""}
+            </p>
             <button
               className="icon-btn"
               onClick={() => patchSettings({ tutorialDone: true })}
@@ -2092,7 +2106,19 @@ export default function App() {
                       key={entry.id}
                       className={group === entry.id ? "group active" : "group"}
                       data-tut={`tool:group-${entry.id}`}
-                      onClick={() => { audio.play("click"); setGroup(entry.id); }}
+                      onClick={() => {
+                        audio.play("click");
+                        setGroup(entry.id);
+                        // Only a tool from the open drawer stays in hand. Opening
+                        // the rooms drawer with a spike trap still held made the
+                        // next tap on the board lay a trap nobody could see chosen.
+                        // The dig drawer hands the pick straight back.
+                        setToolId((current) =>
+                          TOOLS.find((tool) => tool.id === current)?.group === entry.id
+                            ? current
+                            : entry.id === "dig" ? "dig" : "none",
+                        );
+                      }}
                       disabled={raid.raiding}
                     >
                       <b>{t(entry.label)}</b>

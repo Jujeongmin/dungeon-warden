@@ -73,6 +73,7 @@ export const en: Record<StringKey, string> = {
   hint_trap: "Set on a corridor tile.",
   hint_room: "Needs a clear 2×2 of corridor.",
   hint_skill_target: "Pick a target tile.",
+  hint_pick: "Pick something to place above",
 
   count_minions: "Minions",
   count_traps: "Traps",
@@ -224,9 +225,9 @@ export const en: Record<StringKey, string> = {
   res_tp2: "Precision Triggers II",
   res_tp2_n: "Trap damage +40%",
   res_expand1: "Dungeon Expansion I",
-  res_expand1_n: "Room 12 → 16",
+  res_expand1_n: "Dungeon depth 12 → 16",
   res_expand2: "Dungeon Expansion II",
-  res_expand2_n: "Room 16 → 20",
+  res_expand2_n: "Dungeon depth 16 → 20",
 
   minion_warrior: "Skeleton Archer",
   minion_mage: "Skeleton Mage",

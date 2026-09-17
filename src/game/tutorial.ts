@@ -58,6 +58,14 @@ export interface TutorialStep {
   placeAt?: (context: TutorialContext) => { x: number; y: number } | null;
   /** True once the player has done the thing. */
   done: (context: TutorialContext) => boolean;
+  /**
+   * How far through a step that asks for more than one.
+   *
+   * The nook and archer steps each need two, and after the first the line
+   * read exactly as before - so the player who had done it once could not
+   * tell why the guide had not moved on.
+   */
+  progress?: (context: TutorialContext) => { done: number; of: number };
 }
 
 /**
@@ -147,6 +155,7 @@ export const TUTORIAL: TutorialStep[] = [
       if (!isDug(core.x - 1, y)) return { x: core.x - 1, y };
       return null;
     },
+    progress: ({ dug }) => ({ done: Math.min(2, Math.max(0, dug - CORRIDOR_TILES)), of: 2 }),
     done: ({ dug, connected }) => connected && dug >= CORRIDOR_TILES + 2,
   },
   {
@@ -175,6 +184,7 @@ export const TUTORIAL: TutorialStep[] = [
     // Into the nooks that were just cut, in the order they were cut.
     placeAt: ({ core, minions }) =>
       core ? { x: core.x + (minions.length === 0 ? 1 : -1), y: core.y - 3 } : null,
+    progress: ({ minions }) => ({ done: Math.min(2, minions.length), of: 2 }),
     done: ({ minions }) => minions.length >= 2,
   },
   {
@@ -229,6 +239,8 @@ export interface TutorialGuide {
   /** Translation key for the one line to show. */
   hint: string;
   target: TutorialTarget;
+  /** Shown beside the line while placing, for a step that asks for more than one. */
+  progress?: { done: number; of: number } | null;
 }
 
 /**
@@ -266,6 +278,7 @@ export function guideFor(context: TutorialContext): TutorialGuide | null {
       index,
       step,
       hint: held && step.placeHint ? step.placeHint : step.hint,
+      progress: held && step.progress ? step.progress(context) : null,
       target: held
         ? tile
           ? { kind: "tile", x: tile.x, y: tile.y }

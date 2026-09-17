@@ -74,6 +74,7 @@ export const zhHans: Record<StringKey, string> = {
   hint_trap: "设置在通道格上。",
   hint_room: "需要 2×2 的通道。",
   hint_skill_target: "请选择目标格。",
+  hint_pick: "请先在上方选择要放置的东西",
 
   count_minions: "手下",
   count_traps: "陷阱",
@@ -225,9 +226,9 @@ export const zhHans: Record<StringKey, string> = {
   res_tp2: "精密击发 II",
   res_tp2_n: "陷阱伤害 +40%",
   res_expand1: "地下城扩建 I",
-  res_expand1_n: "房间 12 → 16",
+  res_expand1_n: "地下城纵深 12 → 16",
   res_expand2: "地下城扩建 II",
-  res_expand2_n: "房间 16 → 20",
+  res_expand2_n: "地下城纵深 16 → 20",
 
   minion_warrior: "骷髅弓手",
   minion_mage: "骷髅法师",
