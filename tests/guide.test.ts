@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GUIDE, SERVER_RULES, WAVE_TIMEOUT_SECONDS } from "../src/game/guide";
 import { translate, type Locale } from "../src/i18n/strings";
+import { JAIL_CELLS_PER_ROOM } from "../src/game/rooms";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const server = read("../server.js");
@@ -25,6 +26,7 @@ describe("the guide", () => {
     expect(serverConst("BARRACKS_MINION_BONUS")).toBe(SERVER_RULES.barracksMinions);
     expect(serverConst("TREASURY_REWARD")).toBe(SERVER_RULES.treasuryGold);
     expect(serverConst("RAID_CHAMPION_REWARD")).toBe(SERVER_RULES.championGold);
+    expect(serverConst("JAIL_CELLS_PER_ROOM")).toBe(JAIL_CELLS_PER_ROOM);
   });
 
   it("quotes the simulation's wave timeout", () => {

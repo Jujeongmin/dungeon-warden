@@ -38,7 +38,7 @@ export const SPAWN_INTERVAL_SECONDS = 0.9;
 export const DOWNED_SECONDS = 3;
 
 /** How close a living minion must be to drag a downed adventurer away. */
-const CAPTURE_RADIUS = 1.6;
+export const CAPTURE_RADIUS = 1.6;
 
 /**
  * How fast a ridden body walks, in tiles per second.

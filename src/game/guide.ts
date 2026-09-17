@@ -1,6 +1,9 @@
 import type { StringKey } from "../i18n/strings";
 import { DIG_COST } from "./dig";
 import { RELIEF_FLOOR } from "./relief";
+import { RESEARCH_BY_ID } from "./research";
+import { JAIL_CELLS_PER_ROOM } from "./rooms";
+import { CAPTURE_RADIUS, DOWNED_SECONDS } from "./sim/RaidSim";
 import { CHAMPION_THREAT, LOOT_DAMAGE_BONUS, MAX_MINIONS, MAX_ROOMS, MAX_TRAPS } from "./types";
 import { VETERAN_HP_PER_RANK, VETERAN_RAIDS } from "./veteran";
 
@@ -32,7 +35,7 @@ export const SERVER_RULES = {
 /** Mirrored from RaidSim's wave timeout, checked by the same test. */
 export const WAVE_TIMEOUT_SECONDS = 180;
 
-export type GuideSection = "basics" | "gold" | "minions" | "build" | "party" | "warden" | "more";
+export type GuideSection = "basics" | "gold" | "minions" | "build" | "prison" | "party" | "warden" | "more";
 
 export interface GuideLine {
   key: StringKey;
@@ -88,8 +91,24 @@ export const GUIDE: Array<{ id: GuideSection; title: StringKey; lines: GuideLine
       { key: "guide_build_2", vars: { n: MAX_ROOMS } },
       { key: "guide_build_3", vars: { g: SERVER_RULES.treasuryGold } },
       { key: "guide_build_4", vars: { n: SERVER_RULES.barracksMinions } },
-      { key: "guide_build_5", vars: { s: SERVER_RULES.convertSecondsPerLevel } },
+      { key: "guide_build_5" },
       { key: "guide_build_6" },
+    ],
+  },
+  {
+    id: "prison",
+    title: "guide_prison",
+    lines: [
+      {
+        key: "guide_prison_1",
+        vars: { cost: RESEARCH_BY_ID.get("room_jail")?.cost ?? 0, cells: JAIL_CELLS_PER_ROOM },
+      },
+      { key: "guide_prison_2", vars: { down: DOWNED_SECONDS, r: CAPTURE_RADIUS } },
+      { key: "guide_prison_3" },
+      { key: "guide_prison_4", vars: { s: SERVER_RULES.convertSecondsPerLevel } },
+      { key: "guide_prison_5" },
+      { key: "guide_prison_6" },
+      { key: "guide_prison_7" },
     ],
   },
   {

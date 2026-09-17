@@ -10,7 +10,7 @@ const MIN_PLUNDER_SCALE = 0.3;
 const ALTAR_REVIVE_STEP = 0.6;
 const MIN_REVIVE_SCALE = 0.25;
 
-const JAIL_CELLS_PER_ROOM = 2;
+export const JAIL_CELLS_PER_ROOM = 2;
 
 export const EMPTY_ROOM_EFFECTS: RoomEffects = {
   minionCap: BASE_MAX_MINIONS,
