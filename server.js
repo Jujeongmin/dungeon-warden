@@ -1223,8 +1223,13 @@ function sanitizeMinions(nextMinions, prevMinions, loot) {
  *
  * The server does the placing because a convert is the only minion a client is
  * never allowed to create — see the ILLEGAL_CONVERT check in priceMinions.
+ *
+ * A convert counts toward the minion cap like any other minion. With the
+ * garrison full, a prisoner whose sentence is up stays locked up until there
+ * is room: placing it anyway left a roster over the cap, and every save after
+ * that was refused with TOO_MANY_MINIONS.
  */
-function resolveConversions(dungeon, arena, now) {
+function resolveConversions(dungeon, arena, now, minionCap) {
   const prisoners = Array.isArray(dungeon.prisoners) ? dungeon.prisoners : [];
   if (prisoners.length === 0) return { converted: [], prisoners };
 
@@ -1263,6 +1268,12 @@ function resolveConversions(dungeon, arena, now) {
 
   for (const prisoner of prisoners) {
     if (prisoner.convertsAt > now) {
+      remaining.push(prisoner);
+      continue;
+    }
+
+    if ((dungeon.minions || []).length >= minionCap) {
+      // No room in the garrison: keep them locked up and try again next load.
       remaining.push(prisoner);
       continue;
     }
@@ -1410,7 +1421,12 @@ class Server {
        * and settling that one would take the fight out from under it.
        */
       const abandoned = settle ? await settleAbandonedRaid({ ...state, dungeon }, now) : null;
-      const converted = resolveConversions(dungeon, arena, now).converted;
+      const converted = resolveConversions(
+        dungeon,
+        arena,
+        now,
+        roomEffects(dungeon.rooms || [], entitlements).minionCap,
+      ).converted;
 
       decayThreat(dungeon, now);
       dungeon.lastSeenAt = now;

@@ -2380,7 +2380,13 @@ export default function App() {
                   <h3 className="section">{t("manage_jail")} {prisoners.length}/{effects.jailCapacity}</h3>
                   {prisoners.map((p) => (
                     <p key={p.advId} className="hint small">
-                      {p.name} Lv{p.level} — {t("converts_in", { t: remaining(p.convertsAt, t) })}
+                      {p.name} Lv{p.level} — {
+                        // Due, but the garrison is full: the server keeps them locked up
+                        // until a minion is removed, so say that rather than "soon".
+                        p.convertsAt <= Date.now() && minions.length >= effects.minionCap
+                          ? t("converts_blocked")
+                          : t("converts_in", { t: remaining(p.convertsAt, t) })
+                      }
                     </p>
                   ))}
                 </>
