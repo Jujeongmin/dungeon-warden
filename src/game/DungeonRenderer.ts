@@ -105,6 +105,12 @@ const SKIN_GLOW = 0.4;
  */
 const FOLLOW_RATE = 18;
 const FOLLOW_SNAP = 1.5;
+/**
+ * How near the chase camera a unit can be before it is hidden. Anything
+ * closer is between the camera and the body, or around the lens, and
+ * drawn it fills the screen with the inside of a model.
+ */
+const CAMERA_CLEARANCE = 1.1;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -904,6 +910,26 @@ export class DungeonRenderer {
 
       this.disposeObject(this.unitGroup, object);
       this.impacts.delete(id);
+    }
+  }
+
+  /** Hides units standing on the chase camera, and shows them again once clear. */
+  private hideUnitsAtCamera(): void {
+    const camera = this.camera.position;
+    const live = new Set(this.unitMeshes.values());
+    for (const object of this.hiddenByCamera) {
+      if (!live.has(object)) this.hiddenByCamera.delete(object);
+    }
+    for (const object of live) {
+      const near =
+        this.walk !== null &&
+        Math.hypot(object.position.x - camera.x, object.position.z - camera.z) < CAMERA_CLEARANCE;
+      if (near) {
+        object.visible = false;
+        this.hiddenByCamera.add(object);
+      } else if (this.hiddenByCamera.delete(object)) {
+        object.visible = true;
+      }
     }
   }
 
@@ -2189,6 +2215,8 @@ export class DungeonRenderer {
   private faceOnArrival = false;
   /** Where the simulation last put the ridden body. The view eases toward it. */
   private rideTarget: { x: number; z: number } | null = null;
+  /** Units hidden for standing on the camera. See CAMERA_CLEARANCE. */
+  private hiddenByCamera = new Set<THREE.Object3D>();
   /** Wall-clock time the current swing ends at. */
   private swingUntil = 0;
   /** Whether the body moved this frame, for idle against walk. */
@@ -3162,6 +3190,7 @@ export class DungeonRenderer {
     this.updateWarden();
 
     this.updateCamera();
+    this.hideUnitsAtCamera();
     this.renderer.render(this.scene, this.camera);
   };
 

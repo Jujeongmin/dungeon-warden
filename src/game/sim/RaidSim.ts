@@ -49,6 +49,16 @@ const CAPTURE_RADIUS = 1.6;
  */
 const POSSESSED_SPEED = 2.6;
 
+/**
+ * How close a ridden body may walk to a standing adventurer.
+ *
+ * The party does not walk through a minion in its road - it stops and
+ * fights it - and a body under the warden's hand does not walk through the
+ * party either. Walked straight through, the two models sat inside each
+ * other and the camera behind the body ended up inside the adventurer.
+ */
+export const RIDE_CLEARANCE = 0.6;
+
 /** How long a warrior waits between shoves, and how long a shoved adventurer reels. */
 export const SHOVE_COOLDOWN = 6;
 export const SHOVE_STAGGER = 0.8;
@@ -1256,6 +1266,23 @@ export class RaidSim {
    * a fight and stepping out of it ends one. A warden who knows that can hold
    * a corridor mouth with one skeleton.
    */
+  /**
+   * Whether a step takes the ridden body into a standing adventurer.
+   *
+   * Only a step that closes the gap is refused: an adventurer can walk into
+   * the body, and a body that could not then step back out would be stuck.
+   * A downed adventurer is lying on the floor and can be walked over.
+   */
+  private pressesIntoParty(fromX: number, fromY: number, toX: number, toY: number): boolean {
+    for (const adventurer of this.adventurers) {
+      if (!adventurer.alive || !adventurer.spawned || adventurer.downed > 0) continue;
+      const after = distance(toX, toY, adventurer.x, adventurer.y);
+      if (after >= RIDE_CLEARANCE) continue;
+      if (after < distance(fromX, fromY, adventurer.x, adventurer.y)) return true;
+    }
+    return false;
+  }
+
   private stepPossessed(minion: SimMinion): void {
     const stats = this.minionStats.get(minion.id)!;
     minion.cooldown = Math.max(0, minion.cooldown - SIM_DT);
@@ -1269,8 +1296,8 @@ export class RaidSim {
       const ny = minion.y + this.control.y * step;
       // One axis at a time, so a body pressed into a corner slides along the
       // wall instead of stopping dead against it.
-      if (this.standable(nx, minion.y)) minion.x = nx;
-      if (this.standable(minion.x, ny)) minion.y = ny;
+      if (this.standable(nx, minion.y) && !this.pressesIntoParty(minion.x, minion.y, nx, minion.y)) minion.x = nx;
+      if (this.standable(minion.x, ny) && !this.pressesIntoParty(minion.x, minion.y, minion.x, ny)) minion.y = ny;
       minion.action = "walk";
     } else {
       minion.action = "idle";

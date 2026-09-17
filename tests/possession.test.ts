@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RaidSim, SIM_DT, WARDEN_GUARD, WARDEN_MIGHT } from "../src/game/sim/RaidSim";
+import { RIDE_CLEARANCE, RaidSim, SIM_DT, WARDEN_GUARD, WARDEN_MIGHT } from "../src/game/sim/RaidSim";
 import { arenaFor, blockedKey, coreOf, entranceOf } from "../src/game/arena";
 import { MINION_STATS } from "../src/game/sim/units";
 import type { PartyMember, PlacedMinion } from "../src/game/types";
@@ -312,5 +312,46 @@ describe("walking a body into the party", () => {
     });
     for (let i = 0; i < 20000 && sim.state.status === "running"; i++) sim.step();
     expect(sim.state.status).toBe("breached");
+  });
+});
+
+describe("a body and the party it walks into", () => {
+  /*
+   * Found by playing: a ridden body walked straight through an adventurer,
+   * the two models sat inside each other and the chase camera ended up in
+   * the adventurer. The party does not walk through a minion in its road -
+   * it stops and fights - so a ridden body does not walk through the party.
+   */
+  it("stops short of an adventurer instead of walking through it", () => {
+    const sim = makeSim([minion("m1", entrance.x, entrance.y + 4)]);
+    expect(sim.possess("m1")).toBe(true);
+
+    let closest = Infinity;
+    for (let i = 0; i < Math.round(5 / SIM_DT); i++) {
+      if (sim.state.status !== "running" || !sim.state.possessedId) break;
+      sim.setControl({ x: 0, y: -1, facing: Math.PI });
+      sim.step();
+      const body = sim.state.minions.find((m) => m.id === "m1")!;
+      for (const a of sim.state.adventurers) {
+        if (!a.alive || !a.spawned || a.downed > 0) continue;
+        closest = Math.min(closest, Math.hypot(a.x - body.x, a.y - body.y));
+      }
+    }
+    expect(closest).toBeGreaterThanOrEqual(RIDE_CLEARANCE - 1e-6);
+  });
+
+  it("can always step away from an adventurer it is already inside", () => {
+    // The knight comes in through the door, and the body is standing on it.
+    const sim = makeSim([minion("m1", entrance.x, entrance.y)]);
+    expect(sim.possess("m1")).toBe(true);
+    for (let i = 0; i < 40 && !sim.state.adventurers.some((a) => a.spawned); i++) sim.step();
+
+    const before = sim.state.minions.find((m) => m.id === "m1")!.y;
+    for (let i = 0; i < Math.round(0.5 / SIM_DT); i++) {
+      sim.setControl({ x: 0, y: 1, facing: 0 });
+      sim.step();
+    }
+    const after = sim.state.minions.find((m) => m.id === "m1")!.y;
+    expect(after).toBeGreaterThan(before);
   });
 });
