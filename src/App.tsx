@@ -583,6 +583,14 @@ export default function App() {
   const wasRiding = useRef<string | null>(null);
   useEffect(() => {
     if (possessedId) {
+      /*
+       * Turned towards the fight once per body, not once per step.
+       *
+       * This effect reruns on every simulation step, and turning here each
+       * time kept snapping the view onto the nearest adventurer - so strafing
+       * past one with A or D walked the body round it and the camera spun.
+       */
+      if (wasRiding.current === possessedId) return;
       wasRiding.current = possessedId;
       setWalking(true);
       rendererRef.current?.faceThreatOnArrival();
