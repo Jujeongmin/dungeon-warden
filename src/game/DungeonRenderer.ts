@@ -106,6 +106,9 @@ const SKIN_GLOW = 0.4;
 const FOLLOW_RATE = 18;
 /** How solid a minion on its revive timer is drawn. See UnitView.resting. */
 const RESTING_OPACITY = 0.35;
+/** Pixel size of a head tag's canvas. */
+const LABEL_W = 128;
+const LABEL_H = 52;
 const FOLLOW_SNAP = 1.5;
 /**
  * How near the chase camera a unit can be before it is hidden. Anything
@@ -241,6 +244,8 @@ export interface UnitView {
    * solid it looked ready - then was simply missing once the raid began.
    */
   resting?: boolean;
+  /** A short tag over the unit's head - a resting minion's time left. */
+  label?: string;
 }
 
 /** One tile of the map left behind by a raid. */
@@ -564,6 +569,8 @@ export class DungeonRenderer {
    */
   private pathArrows: Array<{ mesh: THREE.Mesh; step: number }> = [];
   private ghostPathMarkers: THREE.Object3D[] = [];
+  /** Head tags, by unit id. See syncLabel. */
+  private labels = new Map<string, THREE.Sprite>();
   /** Health bars, by unit id, so they can be turned to the camera each frame. */
   private healthBars = new Map<string, THREE.Object3D>();
   private barGeometry = new THREE.PlaneGeometry(1, 1);
@@ -916,6 +923,7 @@ export class DungeonRenderer {
         flash > 0 ? 0xffd9b0 : usesModel ? 0xffffff : (UNIT_COLORS[unit.kind] ?? 0xffffff),
         flash > 0 ? 1 + flash : 0.35 + 0.65 * health,
       );
+      this.syncLabel(unit.id, object, unit.label);
       const resting = unit.resting === true;
       if (object.userData.resting !== resting) {
         object.userData.resting = resting;
@@ -931,6 +939,7 @@ export class DungeonRenderer {
       // The bar is a child of the model, so it goes with it either way - this
       // is just the bookkeeping that stops updateHealthBars walking corpses.
       this.healthBars.delete(id);
+      this.syncLabel(id, object, undefined);
 
       const impact = this.impacts.get(id);
       if (impact && (impact.kLife > 0 || impact.punch > 0)) {
@@ -1165,6 +1174,68 @@ export class DungeonRenderer {
     // Anchored at the left edge, so it empties from the right the way every
     // health bar has since the first one.
     fill.position.set(-(0.64 - width) / 2, 0, 0.001);
+  }
+
+  /**
+   * A tag over one unit's head, or none.
+   *
+   * A sprite, so it faces the camera on its own, and a child of the unit so
+   * it goes where the unit goes. Redrawn only when the text changes - once a
+   * second for a countdown.
+   */
+  private syncLabel(id: string, host: THREE.Object3D, text: string | undefined): void {
+    let sprite = this.labels.get(id);
+    if (!text) {
+      if (!sprite) return;
+      sprite.removeFromParent();
+      sprite.material.map?.dispose();
+      sprite.material.dispose();
+      this.labels.delete(id);
+      return;
+    }
+
+    if (!sprite) {
+      const canvas = document.createElement("canvas");
+      canvas.width = LABEL_W;
+      canvas.height = LABEL_H;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }),
+      );
+      sprite.renderOrder = 12;
+      sprite.userData.ui = true;
+      this.labels.set(id, sprite);
+    }
+    if (sprite.parent !== host) host.add(sprite);
+
+    if (sprite.userData.text !== text) {
+      sprite.userData.text = text;
+      const texture = sprite.material.map as THREE.CanvasTexture;
+      const canvas = texture.image as HTMLCanvasElement;
+      const g = canvas.getContext("2d");
+      if (g) {
+        g.clearRect(0, 0, LABEL_W, LABEL_H);
+        g.fillStyle = "rgba(14, 10, 8, 0.82)";
+        g.strokeStyle = "rgba(232, 164, 76, 0.7)";
+        g.lineWidth = 3;
+        g.beginPath();
+        g.roundRect(2, 2, LABEL_W - 4, LABEL_H - 4, (LABEL_H - 4) / 2);
+        g.fill();
+        g.stroke();
+        g.fillStyle = "#f0b660";
+        g.font = `700 ${Math.round(LABEL_H * 0.56)}px Pretendard, system-ui, sans-serif`;
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillText(text, LABEL_W / 2, LABEL_H / 2 + 2);
+      }
+      texture.needsUpdate = true;
+    }
+
+    // In the host's space, which is scaled to the tile: see syncHealthBar.
+    const scale = host.scale.x || 1;
+    sprite.position.set(0, 1.4 / scale, 0);
+    sprite.scale.set(0.84 / scale, (0.84 * LABEL_H) / LABEL_W / scale, 1);
   }
 
   /** Turns every bar to face the camera. Cheap: a handful of quaternion copies. */

@@ -1029,6 +1029,18 @@ export default function App() {
    * regroup window and costs one array rebuild.
    */
   const [partyClock, setPartyClock] = useState(() => Date.now());
+
+  /*
+   * A second hand, running only while some minion is on its revive timer -
+   * raid or not - so the time over its head counts down.
+   */
+  const [restClock, setRestClock] = useState(() => Date.now());
+  const anyResting = minions.some((m) => Boolean(m.revivesAt && m.revivesAt > restClock));
+  useEffect(() => {
+    if (!anyResting) return;
+    const id = window.setInterval(() => setRestClock(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [anyResting]);
   useEffect(() => {
     if (raid.raiding) return;
     const id = window.setInterval(() => setPartyClock(Date.now()), 5000);
@@ -1104,6 +1116,7 @@ export default function App() {
           id: `m:${p.id}`, x: p.x, y: p.y,
           kind: p.type === "convert" ? `a_${p.cls ?? "knight"}` : `m_${p.type}`,
           hp: 1, maxHp: 1, action: "idle", resting: true,
+          label: p.revivesAt && p.revivesAt > restClock ? clockText(p.revivesAt - restClock) : undefined,
         });
       }
       for (const a of raid.raidState.adventurers) {
@@ -1133,13 +1146,14 @@ export default function App() {
         maxHp: stats.hp,
         // On the party clock, so a minion stands up solid within a few
         // seconds of its timer ending rather than at the next unrelated change.
-        resting: Boolean(m.revivesAt && m.revivesAt > partyClock),
+        resting: Boolean(m.revivesAt && m.revivesAt > restClock),
+        label: m.revivesAt && m.revivesAt > restClock ? clockText(m.revivesAt - restClock) : undefined,
         // Said outright: a mesh kept from the raid keeps whatever clip it
         // was last told, and between raids that is always the wrong one.
         action: "idle" as const,
       };
     });
-  }, [raid.raidState, minions, weaponTiers, possessedId, partyClock]);
+  }, [raid.raidState, minions, weaponTiers, possessedId, restClock]);
 
   const markers: MarkerView[] = useMemo(() => {
     const list: MarkerView[] = traps.map((t) => ({
@@ -1576,9 +1590,9 @@ export default function App() {
   const reviveLeft = useMemo(() => {
     if (minions.length === 0) return 0;
     return Math.min(
-      ...minions.map((m) => (m.revivesAt && m.revivesAt > partyClock ? m.revivesAt - partyClock : 0)),
+      ...minions.map((m) => (m.revivesAt && m.revivesAt > restClock ? m.revivesAt - restClock : 0)),
     );
-  }, [minions, partyClock]);
+  }, [minions, restClock]);
 
   /*
    * Some of the garrison, not all, still down.
@@ -1589,10 +1603,10 @@ export default function App() {
    */
   const resting = useMemo(() => {
     const waits = minions
-      .map((m) => (m.revivesAt && m.revivesAt > partyClock ? m.revivesAt - partyClock : 0))
+      .map((m) => (m.revivesAt && m.revivesAt > restClock ? m.revivesAt - restClock : 0))
       .filter((wait) => wait > 0);
     return { count: waits.length, next: waits.length > 0 ? Math.min(...waits) : 0 };
-  }, [minions, partyClock]);
+  }, [minions, restClock]);
 
   const onGoldAd = useCallback(async () => {
     const outcome = await adGold.claim();
