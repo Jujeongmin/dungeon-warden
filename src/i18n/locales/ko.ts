@@ -275,6 +275,7 @@ export const ko = {
   group_room: "방",
   tool_remove: "회수",
   tool_rebuild: "다시 짓기",
+  tool_rebuild_confirm: "한 번 더 누르면 전부 허물기 (+{n}G)",
   legend_rock: "암반",
   legend_floor: "통로",
   legend_entrance: "입구",

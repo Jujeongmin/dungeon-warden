@@ -262,6 +262,7 @@ export const en: Record<StringKey, string> = {
   group_room: "Rooms",
   tool_remove: "Remove",
   tool_rebuild: "Start over",
+  tool_rebuild_confirm: "Tap again to clear it all (+{n}G)",
   legend_rock: "Rock",
   legend_floor: "Corridor",
   legend_entrance: "Entrance",

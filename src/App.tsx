@@ -1518,6 +1518,23 @@ export default function App() {
   const stuckRefund = stuck ? planRebuild({ arena, dug, minions, traps, rooms }).refund : 0;
 
   /*
+   * The rebuild button asks twice.
+   *
+   * One tap took the whole dungeon back to bare rock - every tile, minion,
+   * trap and room - and it sits right under the tool hint, where a thumb
+   * reaching for the board lands. The gold comes back, the layout does not.
+   * The first tap now arms it and says what it will do and for how much; a
+   * second within a few seconds does it.
+   */
+  const [rebuildArmed, setRebuildArmed] = useState(false);
+  useEffect(() => {
+    if (!rebuildArmed) return;
+    const timer = window.setTimeout(() => setRebuildArmed(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [rebuildArmed]);
+  const rebuildRefund = rebuildArmed ? planRebuild({ arena, dug, minions, traps, rooms }).refund : 0;
+
+  /*
    * Milliseconds until the first minion is standing again, or 0.
    *
    * A defence begun while the whole garrison is still on its revive timer
@@ -2182,9 +2199,15 @@ export default function App() {
                   forty taps of the remove tool first. */}
               <div className="actions">
                 <button
-                  className="rebuild"
+                  className={rebuildArmed ? "rebuild armed" : "rebuild"}
                   disabled={raid.raiding}
                   onClick={() => {
+                    if (!rebuildArmed) {
+                      audio.play("click");
+                      setRebuildArmed(true);
+                      return;
+                    }
+                    setRebuildArmed(false);
                     const ok = save.rebuild();
                     audio.play(ok ? "dig" : "error");
                     if (ok) {
@@ -2193,7 +2216,7 @@ export default function App() {
                     }
                   }}
                 >
-                  {t("tool_rebuild")}
+                  {rebuildArmed ? t("tool_rebuild_confirm", { n: rebuildRefund }) : t("tool_rebuild")}
                 </button>
               </div>
 

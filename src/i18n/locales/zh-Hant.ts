@@ -263,6 +263,7 @@ export const zhHant: Record<StringKey, string> = {
   group_room: "房間",
   tool_remove: "回收",
   tool_rebuild: "重新開挖",
+  tool_rebuild_confirm: "再按一次全部拆除 (+{n}G)",
   legend_rock: "岩盤",
   legend_floor: "通道",
   legend_entrance: "入口",

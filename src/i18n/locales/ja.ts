@@ -268,6 +268,7 @@ export const ja: Record<StringKey, string> = {
   group_room: "部屋",
   tool_remove: "撤去",
   tool_rebuild: "作り直す",
+  tool_rebuild_confirm: "もう一度押すとすべて取り壊し (+{n}G)",
   legend_rock: "岩盤",
   legend_floor: "通路",
   legend_entrance: "入口",
