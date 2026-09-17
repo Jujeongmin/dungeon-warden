@@ -130,23 +130,29 @@ const FILE_PATTERNS: Record<Cue, RegExp[]> = {
 };
 
 /**
- * The background loop, matched out of the same manifest as the cues.
+ * The background music, one loop per mood.
  *
- * There is only one, so it does not need a cue name — anything that reads as
- * ambience or a loop is it.
+ * Building and walking the dungeon has its own track; a raid has another, and
+ * the two crossfade when the defence starts and when it is over. Matched out of
+ * the same manifest as the cues. The build mood falls back to the room tone
+ * that shipped before there was music, and a raid with no track of its own
+ * keeps whatever is already playing.
  */
-const MUSIC_PATTERNS: RegExp[] = [/ambience/, /ambient/, /^music/, /loop/];
+export type MusicMood = "build" | "raid";
+
+const MUSIC_PATTERNS: Record<MusicMood, RegExp[]> = {
+  build: [/^music_build/, /ambience/, /ambient/],
+  raid: [/^music_raid/, /battle/],
+};
 
 /**
- * How loud the loop sits under everything else.
+ * How loud each loop sits under everything else.
  *
- * Well under the cues: this is a room tone, and a player should notice it stop
- * rather than notice it start. The duck is what the raid does to it, so a
- * fight is still carried by its own hits.
+ * Under the cues in both: a fight is carried by its hits and traps, and the
+ * raid track is there to raise the stakes, not to cover them.
  */
-const MUSIC_LEVEL = 0.34;
-const MUSIC_DUCKED = 0.15;
-/** Long enough that neither end of the loop is an event. */
+const MUSIC_LEVEL: Record<MusicMood, number> = { build: 0.34, raid: 0.28 };
+/** Long enough that neither end of a loop, nor the handover, is an event. */
 const MUSIC_FADE = 1.8;
 
 const MANIFEST_URL = publicUrl("assets/audio/manifest.json");
@@ -169,12 +175,15 @@ class AudioEngine {
   /** Cues fired within this window collapse into one, so a wave of hits does not roar. */
   private lastPlayed = new Map<Cue, number>();
 
-  /** The background loop. `undefined` means "not looked for yet". */
-  private musicBuffer: AudioBuffer | null | undefined = undefined;
+  /** Each mood's loop, once looked for. Absent means not looked for yet. */
+  private musicBuffers = new Map<MusicMood, AudioBuffer | null>();
+  private musicLoading = new Map<MusicMood, Promise<AudioBuffer | null>>();
+  /** The loop playing now, and whose it is. */
   private musicSource: AudioBufferSourceNode | null = null;
   private musicGain: GainNode | null = null;
+  private musicPlaying: MusicMood | null = null;
   private musicWanted = false;
-  private musicTarget = MUSIC_LEVEL;
+  private musicMood: MusicMood = "build";
   /** The player's music fader, multiplied into every ramp below. */
   private musicScale = 1;
 
@@ -307,23 +316,29 @@ class AudioEngine {
   }
 
   /**
-   * Starts the background loop, or does nothing if there is no music file.
+   * Starts the current mood's loop, crossfading from whatever is playing.
    *
    * Deliberately not synthesised when the file is missing, unlike the cues: a
    * missing click can be a beep and still be a click, but two minutes of
-   * generated room tone is not music, it is a fault the player would want to
-   * turn off.
+   * generated music is a fault the player would want to turn off.
    */
   async startMusic(): Promise<void> {
     this.musicWanted = true;
     // No context yet means no gesture yet. The wish is recorded and `unlock`
     // honours it, rather than this failing quietly and never being retried.
-    if (!this.context || !this.master || this.musicSource) return;
-
-    const buffer = await this.loadMusic();
-    // The player may have left, or muted and unmuted, while this was loading.
-    if (!buffer || !this.musicWanted || this.musicSource) return;
     if (!this.context || !this.master) return;
+    const mood = this.musicMood;
+    if (this.musicPlaying === mood && this.musicSource) return;
+
+    const buffer = await this.loadMusic(mood);
+    // The player may have left, muted, or moved on to the other mood while
+    // this was loading.
+    if (!this.musicWanted || mood !== this.musicMood || !this.context || !this.master) return;
+    if (this.musicPlaying === mood && this.musicSource) return;
+    // A mood with no track of its own leaves the current loop playing.
+    if (!buffer) return;
+
+    this.fadeOutMusic();
 
     const gain = this.context.createGain();
     gain.gain.value = 0.0001;
@@ -337,18 +352,45 @@ class AudioEngine {
 
     this.musicGain = gain;
     this.musicSource = source;
-    this.rampMusic(this.musicTarget, MUSIC_FADE);
+    this.musicPlaying = mood;
+    this.rampMusic(MUSIC_FADE);
+
+    // The raid track is fetched while the dungeon is being built, so the
+    // defence starts with its music rather than a second of silence.
+    if (mood === "build") void this.loadMusic("raid");
   }
 
   /** Fades the loop out and releases it. */
   stopMusic(): void {
     this.musicWanted = false;
+    this.fadeOutMusic();
+  }
+
+  /**
+   * Which loop should be playing: the dungeon's own, or the raid's.
+   *
+   * Crossfades when it changes and music is on; otherwise it is remembered for
+   * the next start.
+   */
+  setMusicMood(mood: MusicMood): void {
+    if (this.musicMood === mood) return;
+    this.musicMood = mood;
+    if (this.musicWanted) void this.startMusic();
+  }
+
+  /** The music fader, kept apart from the master so it can sit under the cues. */
+  setMusicLevel(level: number): void {
+    this.musicScale = Math.min(1, Math.max(0, level));
+    this.rampMusic(0.5);
+  }
+
+  private fadeOutMusic(): void {
     const source = this.musicSource;
     const gain = this.musicGain;
-    if (!source || !gain || !this.context) return;
-
     this.musicSource = null;
     this.musicGain = null;
+    this.musicPlaying = null;
+    if (!source || !gain || !this.context) return;
 
     const end = this.context.currentTime + MUSIC_FADE * 0.5;
     gain.gain.cancelScheduledValues(this.context.currentTime);
@@ -358,61 +400,53 @@ class AudioEngine {
     source.stop(end + 0.05);
   }
 
-  /**
-   * Pulls the loop down while something louder is happening.
-   *
-   * The raid is the case: hits, traps and the result jingle all have to cut
-   * through, and they do it by the music getting out of the way rather than by
-   * everything else getting louder.
-   */
-  /** The music fader, kept apart from the master so it can sit under the cues. */
-  setMusicLevel(level: number): void {
-    this.musicScale = Math.min(1, Math.max(0, level));
-    this.rampMusic(this.musicTarget, 0.5);
-  }
-
-  duckMusic(ducked: boolean): void {
-    this.musicTarget = ducked ? MUSIC_DUCKED : MUSIC_LEVEL;
-    this.rampMusic(this.musicTarget, 0.9);
-  }
-
-  private rampMusic(level: number, seconds: number): void {
-    if (!this.musicGain || !this.context) return;
+  private rampMusic(seconds: number): void {
+    if (!this.musicGain || !this.context || !this.musicPlaying) return;
     const now = this.context.currentTime;
     this.musicGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.setValueAtTime(Math.max(this.musicGain.gain.value, 0.0001), now);
-    const scaled = level * this.musicScale;
+    const scaled = MUSIC_LEVEL[this.musicPlaying] * this.musicScale;
     this.musicGain.gain.exponentialRampToValueAtTime(Math.max(scaled, 0.0001), now + seconds);
   }
 
-  private async loadMusic(): Promise<AudioBuffer | null> {
-    if (this.musicBuffer !== undefined) return this.musicBuffer;
-    if (!this.context) return null;
+  private loadMusic(mood: MusicMood): Promise<AudioBuffer | null> {
+    if (this.musicBuffers.has(mood)) return Promise.resolve(this.musicBuffers.get(mood)!);
+    const pending = this.musicLoading.get(mood);
+    if (pending) return pending;
+    if (!this.context) return Promise.resolve(null);
 
     // An empty list is "the manifest has not arrived", not "there is no music
     // file". Caching a null here is what kept the loop permanently silent:
     // startMusic ran the instant the player entered the dungeon, which is the
     // same gesture that starts the manifest fetch, so it lost the race and
     // then remembered losing it.
-    if (this.entries.length === 0) return null;
+    if (this.entries.length === 0) return Promise.resolve(null);
 
-    const entry = MUSIC_PATTERNS.map((pattern) =>
-      this.entries.find((candidate) => pattern.test(candidate.name)),
-    ).find(Boolean);
-
+    const entry = MUSIC_PATTERNS[mood]
+      .map((pattern) => this.entries.find((candidate) => pattern.test(candidate.name)))
+      .find(Boolean);
     if (!entry) {
-      this.musicBuffer = null;
-      return null;
+      this.musicBuffers.set(mood, null);
+      return Promise.resolve(null);
     }
 
-    try {
-      const response = await fetch(entry.url);
-      const bytes = await response.arrayBuffer();
-      this.musicBuffer = await this.context.decodeAudioData(bytes);
-    } catch {
-      this.musicBuffer = null;
-    }
-    return this.musicBuffer;
+    const context = this.context;
+    const task = (async () => {
+      try {
+        const response = await fetch(entry.url);
+        const bytes = await response.arrayBuffer();
+        const buffer = await context.decodeAudioData(bytes);
+        this.musicBuffers.set(mood, buffer);
+        return buffer;
+      } catch {
+        this.musicBuffers.set(mood, null);
+        return null;
+      } finally {
+        this.musicLoading.delete(mood);
+      }
+    })();
+    this.musicLoading.set(mood, task);
+    return task;
   }
 
   private playTone(cue: Cue): void {

@@ -133,3 +133,16 @@ quality 0 (about 58 kbps, 44.1 kHz stereo) with the `ffmpeg-static` binary -
 volume. It is not synthesised when missing, unlike the cues —
 a generated click is still a click, but two minutes of generated room tone is
 a fault rather than music, so the game simply runs silent without it.
+
+## Music — "Epic Boss Battle [Seamlessly Looping]", by Juhani Junkala (SubspaceAudio)
+
+<https://opengameart.org/content/boss-battle-music> · CC0
+
+| File | Source |
+|---|---|
+| music_raid.ogg | `Juhani Junkala - Epic Boss Battle [Seamlessly Looping].wav` |
+
+The raid track: a 2-minute orchestral loop that crossfades in when the defence
+starts and back out to the dungeon's own loop when it ends (see `setMusicMood`
+in `src/game/audio.ts`). Re-encoded from the 21 MB WAV to Vorbis quality 2
+(about 96 kbps, 44.1 kHz stereo) with `ffmpeg-static`: 1.5 MB.

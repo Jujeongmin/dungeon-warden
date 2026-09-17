@@ -517,10 +517,10 @@ export default function App() {
     void audio.startMusic();
   }, [screen, settings.musicVolume]);
 
-  // A raid has its own noise — hits, traps, the result. The loop steps back
-  // rather than everything else being pushed forward.
+  // A raid has its own track. It starts with the defence and holds through the
+  // build windows between waves, so a three-wave raid is one piece of music.
   useEffect(() => {
-    audio.duckMusic(raid.raiding);
+    audio.setMusicMood(raid.raiding || raid.raidOpen ? "raid" : "build");
   }, [raid.raiding, raid.raidOpen]);
 
   /**

@@ -61,6 +61,12 @@
       "bytes": 10872
     },
     {
+      "url": "/assets/audio/music_raid.ogg",
+      "name": "music_raid",
+      "group": "",
+      "bytes": 1563267
+    },
+    {
       "url": "/assets/audio/win_jingle.ogg",
       "name": "win_jingle",
       "group": "",
