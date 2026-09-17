@@ -19,8 +19,9 @@ interface Props {
  * The front door.
  *
  * Everything the player presses is down the left edge, cut into a slab of the
- * same stone the dungeon is made of; the rest of the screen is the room
- * itself, still turning, only lightly veiled.
+ * same stone the dungeon is made of; the name hangs over the room at the top
+ * centre, and the rest of the screen is the room itself, still turning, only
+ * lightly veiled.
  *
  * It used to be a centred stack of text on a flat wash - the layout every
  * menu has, which says nothing about what is behind it. The art here is not
@@ -44,21 +45,17 @@ export function TitleScreen({
   return (
     <div className="title">
       <Embers />
+      <div className="title-head">
+        <Sigil />
+        <p className="title-kicker">{t("title_kicker")}</p>
+        <h1 className="title-name">DUNGEON WARDEN</h1>
+        <p className="title-line">{t("title_line")}</p>
+      </div>
+
       <div
         className="title-slab"
         style={{ backgroundImage: `url(${publicUrl("assets/textures/rock051_color.webp")})` }}
       >
-        <div className="title-head">
-          <Sigil />
-          <p className="title-kicker">{t("title_kicker")}</p>
-          <h1 className="title-name">
-            DUNGEON
-            <br />
-            WARDEN
-          </h1>
-          <p className="title-line">{t("title_line")}</p>
-        </div>
-
         <div className="title-foot">
           {hasProgress && summary && (
             <dl className="title-save">

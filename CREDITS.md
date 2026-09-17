@@ -31,7 +31,7 @@ in `src/assets/fonts/licenses/`.
 | File | Font | Designer | Source |
 |---|---|---|---|
 | Warden-Latin.woff2 | Cinzel (wght 700) | Natanael Gama | <https://github.com/google/fonts/tree/main/ofl/cinzel> |
-| Warden-KR.woff2 | Song Myung | JIKJISOFT | <https://github.com/google/fonts/tree/main/ofl/songmyung> |
+| Warden-KR.woff2 | Hahmlet | Hypertype | <https://github.com/google/fonts/tree/main/ofl/hahmlet> |
 | Warden-JP.woff2 | Zen Antique | Yoshimichi Ohira | <https://github.com/google/fonts/tree/main/ofl/zenantique> |
 | Warden-SC.woff2 | Noto Serif SC (wght 700) | Google | <https://github.com/google/fonts/tree/main/ofl/notoserifsc> |
 | Warden-TC.woff2 | Noto Serif TC (wght 700) | Google | <https://github.com/google/fonts/tree/main/ofl/notoseriftc> |

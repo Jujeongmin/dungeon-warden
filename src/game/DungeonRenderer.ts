@@ -2666,17 +2666,24 @@ export class DungeonRenderer {
   /**
    * How far back the showcase camera stands.
    *
-   * Far enough that the room fits in the part of the canvas the menu does not
-   * cover, whichever way it has turned, and never so close that the far end
-   * of the room leaves the top of the screen.
+   * Far enough that the room fits in the part of the canvas the menu and the
+   * name do not cover, whichever way it has turned, and never so close that
+   * the far end of the room runs up under the name.
+   *
+   * The projection spans the canvas plus the hidden top strip (see
+   * applyViewOffset), so a unit of room is measured against that height.
    */
   private showcaseDistance(): number {
     const width = this.canvas.clientWidth || 1;
     const height = this.canvas.clientHeight || 1;
+    const top = Math.min(this.topInset, Math.max(0, height - 80));
+    const fullHeight = height + top;
+    const visibleHeight = height - top;
     const visible = Math.max(80, width - this.leftInset);
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
-    const across = (SHOWCASE_SPAN * height) / (2 * tanHalf * visible * 0.95);
-    const deep = (SHOWCASE_SPAN * Math.sin(SHOWCASE_PITCH) * 1.2) / (2 * tanHalf * 0.9);
+    const across = (SHOWCASE_SPAN * fullHeight) / (2 * tanHalf * visible * 0.95);
+    const deep =
+      (SHOWCASE_SPAN * Math.sin(SHOWCASE_PITCH) * 1.2 * fullHeight) / (2 * tanHalf * 0.9 * visibleHeight);
     return Math.max(across, deep);
   }
 

@@ -1253,9 +1253,12 @@ export default function App() {
         const slab = document.querySelector(".title-slab");
         const titleBox = document.querySelector(".title")?.getBoundingClientRect() ?? null;
         const left = slab && titleBox ? slab.getBoundingClientRect().right - titleBox.left : 0;
+        // The name hangs over the top of the room; the room is framed below it.
+        const head = document.querySelector(".title-head");
+        const top = head && titleBox ? head.getBoundingClientRect().bottom - titleBox.top : 0;
         renderer.setBottomInset(0);
         renderer.setRightInset(0);
-        renderer.setTopInset(0);
+        renderer.setTopInset(Math.max(0, top));
         renderer.setLeftInset(Math.max(0, left));
         return;
       }

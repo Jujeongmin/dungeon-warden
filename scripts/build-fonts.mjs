@@ -6,7 +6,7 @@
  * face for Latin and an old-press serif for each CJK script:
  *
  *   Warden-Latin  Cinzel (wght 700)          Latin, digits, punctuation
- *   Warden-KR     Song Myung                 Hangul the Korean table uses
+ *   Warden-KR     Hahmlet (wght 400-700)     Hangul the Korean table uses
  *   Warden-JP     Zen Antique                kana and kanji the Japanese table uses
  *   Warden-SC     Noto Serif SC (wght 700)   hanzi the Simplified table uses
  *   Warden-TC     Noto Serif TC (wght 700)   hanzi the Traditional table uses
@@ -46,7 +46,7 @@ const nonLatin = (text) => [...new Set(text)].filter((ch) => ch.codePointAt(0) >
 
 const faces = [
   { source: "Cinzel-wght.ttf", out: "Warden-Latin.woff2", text: ascii + marks, axes: { wght: 700 } },
-  { source: "SongMyung-Regular.ttf", out: "Warden-KR.woff2", text: nonLatin(localeChars("ko")) + cjkMarks },
+  { source: "Hahmlet-wght.ttf", out: "Warden-KR.woff2", text: nonLatin(localeChars("ko")) + cjkMarks, axes: { wght: { min: 400, max: 700 } } },
   { source: "ZenAntique-Regular.ttf", out: "Warden-JP.woff2", text: nonLatin(localeChars("ja")) + cjkMarks },
   { source: "NotoSerifSC-wght.ttf", out: "Warden-SC.woff2", text: nonLatin(localeChars("zh-Hans")) + cjkMarks, axes: { wght: 700 } },
   { source: "NotoSerifTC-wght.ttf", out: "Warden-TC.woff2", text: nonLatin(localeChars("zh-Hant")) + cjkMarks, axes: { wght: 700 } },

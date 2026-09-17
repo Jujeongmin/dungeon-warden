@@ -265,14 +265,12 @@ h3.section {
   position: relative;
   display: flex;
   flex-direction: column;
-  /* Held in the upper half rather than spread to the corners: a menu down
-     at the foot of a tall phone is a reach, and the empty stone between the
-     title and the buttons said nothing. */
-  justify-content: flex-start;
+  /* The name has gone to the top of the room, so the controls hold the
+     middle of the slab on their own. */
+  justify-content: center;
   gap: clamp(18px, 5vh, 34px);
-  width: 62%;
+  width: var(--slab-w);
   min-width: 210px;
-  max-width: 330px;
   padding: clamp(18px, 5vh, 34px) clamp(14px, 4.5%, 24px);
   /* Tiled at roughly its own size rather than blown up to cover: a 512px
      scan stretched down a tall column is a smear, and the grain is the
@@ -308,11 +306,49 @@ h3.section {
   );
 }
 
-/* Two blocks, not three: the readings belong with the buttons under them,
-   or the slab splits into a header, a hole, and a footer. */
-.title-head,
 .title-foot {
   position: relative;
+}
+
+/*
+   The name, over the room at the top centre.
+
+   Out of the slab so the slab is only the controls. Centred on the screen
+   where the screen is wide enough for that to clear the slab, and on the
+   room beside the slab where it is not (--slab-w). A soft pool of dark
+   behind it, not a box: it sits over a lit scene.
+*/
+.title {
+  --slab-w: min(62%, 330px);
+  --head-x: 50%;
+}
+
+.title-head {
+  position: absolute;
+  z-index: 2;
+  top: clamp(12px, 3.5vh, 30px);
+  left: var(--head-x);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(520px, calc(100% - var(--slab-w) - 24px));
+  padding: 6px 28px 14px;
+  text-align: center;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 6, 5, 0.62) 0%,
+    rgba(8, 6, 5, 0.38) 50%,
+    rgba(8, 6, 5, 0) 72%
+  );
+}
+
+.title-head .title-line,
+.title-head .title-kicker {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 1000px) {
+  .title { --head-x: calc((100% + var(--slab-w)) / 2); }
 }
 
 .title-foot {
@@ -324,7 +360,7 @@ h3.section {
 .title-sigil {
   width: 34px;
   height: 34px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   color: rgba(232, 164, 76, 0.75);
 }
 
@@ -338,8 +374,9 @@ h3.section {
 }
 
 .title-name {
-  margin: 0 0 12px;
-  font-size: var(--fs-lg);
+  margin: 0 0 8px;
+  font-size: clamp(26px, 4.4vw, 44px);
+  white-space: nowrap;
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide);
   line-height: 1.06;
@@ -403,6 +440,12 @@ h3.section {
   padding: 11px 14px;
   border-radius: 10px;
   font-size: var(--fs-sm);
+}
+
+/* One face across the whole title, not the name and the start button alone. */
+.title,
+.title button {
+  font-family: var(--font-display);
 }
 
 .title-note {
@@ -2675,10 +2718,11 @@ button.ad-gold {
  * narrows, everything in it tightens, and the three menu buttons share a row.
  */
 @media (max-height: 520px) {
+  .title { --slab-w: min(44%, 290px); --head-x: calc((100% + var(--slab-w)) / 2); }
+  .title-head { top: 8px; padding: 2px 20px 8px; }
+  .title-name { font-size: clamp(22px, 4vw, 30px); }
   .title-slab {
-    width: 44%;
     min-width: 0;
-    max-width: 290px;
     gap: 10px;
     padding: 12px 16px;
   }
