@@ -118,21 +118,24 @@ have to take the room's colour, but gold is a thing in the world rather than a
 control, so it is Kenney's coin with a viewBox added and the fill fixed to the
 game's amber. Geometry unchanged.
 
-## Music — "Loopable Dungeon Ambience", by JaggedStone
+## Music — "Cave Theme", by Brandon75689
 
-<https://opengameart.org/content/loopable-dungeon-ambience> · CC0
+<https://opengameart.org/content/cave-theme> · CC0 (dual-licensed CC0 / OGA-BY 3.0; used under CC0)
 
 | File | Source |
 |---|---|
-| dungeon_ambience.ogg | <https://opengameart.org/sites/default/files/dungeon_ambient_1_0.ogg> |
+| music_build.ogg | <https://opengameart.org/sites/default/files/cave%20themeb4.ogg> |
 
-The one music track: a 94-second seamless loop of low wind and water drips,
-renamed on the way in. Re-encoded from the original 160 kbps Vorbis to Vorbis
-quality 0 (about 58 kbps, 44.1 kHz stereo) with the `ffmpeg-static` binary -
-1.6 MB to 668 kB for a track that plays under everything at a third of full
-volume. It is not synthesised when missing, unlike the cues —
-a generated click is still a click, but two minutes of generated room tone is
-a fault rather than music, so the game simply runs silent without it.
+The dungeon's own track, playing while the player builds and walks: a
+4:40 mysterious cave piece with a soft start and a soft end, so it loops
+without a gap. Re-encoded from the original Vorbis (about 92 kbps) to Vorbis
+quality 1 (about 62 kbps, 44.1 kHz stereo) with `ffmpeg-static`: 3.1 MB to
+2.1 MB. It replaced "Loopable Dungeon Ambience" by JaggedStone (CC0), a
+room tone of wind and drips that stood in for music until there was some.
+
+Music is not synthesised when missing, unlike the cues — a generated click is
+still a click, but minutes of generated music is a fault rather than a
+soundtrack, so the game simply runs silent without it.
 
 ## Music — "Epic Boss Battle [Seamlessly Looping]", by Juhani Junkala (SubspaceAudio)
 

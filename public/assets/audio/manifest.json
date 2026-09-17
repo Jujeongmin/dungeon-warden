@@ -19,12 +19,6 @@
       "bytes": 35662
     },
     {
-      "url": "/assets/audio/dungeon_ambience.ogg",
-      "name": "dungeon_ambience",
-      "group": "",
-      "bytes": 683321
-    },
-    {
       "url": "/assets/audio/error_004.wav",
       "name": "error_004",
       "group": "",
@@ -59,6 +53,12 @@
       "name": "lose_jingle",
       "group": "",
       "bytes": 10872
+    },
+    {
+      "url": "/assets/audio/music_build.ogg",
+      "name": "music_build",
+      "group": "",
+      "bytes": 2172170
     },
     {
       "url": "/assets/audio/music_raid.ogg",
