@@ -2023,7 +2023,13 @@ export default function App() {
 
       {/* The way in, said once where the board is. Only while there is
           still a body to take, and never while the player is already in one. */}
-      {raid.raiding && !walking && !possessedId && !settings.possessSeen &&
+      {/* A skill waiting for its tile says so where the tile is - the line
+          about taking a body sat there instead, while a tap on a body would
+          have spent the skill. */}
+      {raid.raiding && !walking && !possessedId && raid.pendingSkill && (
+        <div className="possess-hint">{t("hint_skill_target")}</div>
+      )}
+      {raid.raiding && !walking && !possessedId && !raid.pendingSkill && !settings.possessSeen &&
         raid.raidState?.minions.some((m) => m.alive) && (
         <div className="possess-hint">{t("possess_pick")}</div>
       )}
@@ -2055,7 +2061,9 @@ export default function App() {
                 <i>
                   {cd > 0
                     ? `${cd.toFixed(0)}${t("seconds")}`
-                    : t(SKILL_NOTE[skill] as StringKey)}
+                    : raid.pendingSkill === skill
+                      ? t("skill_target")
+                      : t(SKILL_NOTE[skill] as StringKey)}
                 </i>
               </button>
             );
