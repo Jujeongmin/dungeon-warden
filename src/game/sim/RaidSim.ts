@@ -1409,9 +1409,21 @@ export class RaidSim {
   }
 
   private resolveStatus(): void {
-    const reachedCore = this.adventurers.some(
-      (a) => a.alive && a.spawned && a.downed <= 0 && a.pathIndex >= a.path.length - 1,
-    );
+    /*
+     * At the end of a route, and that route ends at the core.
+     *
+     * The end of a route used to be enough, because every route ended there.
+     * A hunt does not: it ends on the tile of whatever the adventurer turned
+     * aside for, and when the warden walks its body onto the adventurer's own
+     * tile the hunt is a single step long - so riding up to a knight to hit it
+     * ended the raid as a breach with the knight nowhere near the core.
+     */
+    const core = this.core;
+    const reachedCore = this.adventurers.some((a) => {
+      if (!a.alive || !a.spawned || a.downed > 0 || a.pathIndex < a.path.length - 1) return false;
+      const end = a.path[a.path.length - 1];
+      return end !== undefined && end.x === core.x && end.y === core.y;
+    });
     // One breach ends the raid whichever wave it happens on. There is nothing
     // left to defend.
     if (reachedCore) {

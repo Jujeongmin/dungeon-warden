@@ -277,3 +277,40 @@ describe("the warden's weight behind a body", () => {
     expect(firstWound(true)).toBeCloseTo(bare * WARDEN_GUARD, 5);
   });
 });
+
+describe("walking a body into the party", () => {
+  /*
+   * Found by playing: riding a warrior up to a knight ended the raid as a
+   * breach with the knight nowhere near the core. A hunt routes the knight to
+   * the body's tile, and once the two share a tile that route is a single
+   * step long - which resolveStatus read as having arrived at the core.
+   */
+  it("is a fight, not a breach", () => {
+    const sim = makeSim([minion("m1", entrance.x, entrance.y + 3)]);
+    expect(sim.possess("m1")).toBe(true);
+
+    const breaches: Array<{ t: number; knight: { x: number; y: number } | null }> = [];
+    for (let i = 0; i < Math.round(4 / SIM_DT); i++) {
+      if (sim.state.status !== "running") break;
+      sim.setControl({ x: 0, y: -1, facing: Math.PI });
+      sim.step();
+      const status: string = sim.state.status;
+      if (status === "breached") {
+        const knight = sim.state.adventurers.find((a) => a.id === "a1") ?? null;
+        breaches.push({ t: sim.state.elapsed, knight: knight && { x: knight.x, y: knight.y } });
+      }
+    }
+
+    // The knight walked in at the door; the core is the far end of the room.
+    expect(breaches).toEqual([]);
+  });
+
+  it("still ends in a breach when an adventurer does reach the core", () => {
+    // Nobody in the way: the knight walks the whole corridor.
+    const sim = new RaidSim({
+      minions: [], traps: [], party, arena, entrance, core, lures: [], seed: 1,
+    });
+    for (let i = 0; i < 20000 && sim.state.status === "running"; i++) sim.step();
+    expect(sim.state.status).toBe("breached");
+  });
+});

@@ -91,6 +91,20 @@ const WARDEN_HEIGHT = 1.15;
 const WARDEN_MAX_SPAN = 1.25;
 /** How strongly a glowing skin smoulders. */
 const SKIN_GLOW = 0.4;
+/*
+ * How the view keeps up with the simulation.
+ *
+ * The simulation moves everything twenty times a second. Drawn exactly
+ * there, a unit - and in the corridor the camera riding behind one - held
+ * still for two or three frames and then jumped, which on a 60 or 120 Hz
+ * screen is a stutter. Each position is a target the drawing eases toward
+ * instead: at this rate a step is mostly covered by the next one, so the
+ * motion reads as continuous and trails the truth by a few centimetres.
+ * Anything further off than FOLLOW_SNAP is a spawn, a hop between bodies or
+ * a shove, and is jumped to rather than slid across.
+ */
+const FOLLOW_RATE = 18;
+const FOLLOW_SNAP = 1.5;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -801,6 +815,7 @@ export class DungeonRenderer {
     for (const unit of units) {
       seen.add(unit.id);
       let object = this.unitMeshes.get(unit.id);
+      let created = false;
       const usesModel = this.loaded.get(unit.kind) != null;
 
       if (!object) {
@@ -813,6 +828,7 @@ export class DungeonRenderer {
           );
         this.unitMeshes.set(unit.id, object);
         this.unitGroup.add(object);
+        created = true;
 
         if (model) {
           // Characters ship without clips in KayKit 2.0, so they borrow the
@@ -834,11 +850,16 @@ export class DungeonRenderer {
       // A model already sits on the floor thanks to fitToTile; the capsule is
       // centred on its own middle and needs lifting. The knockback nudge is a
       // horizontal-only render offset — the sim's x/y stay authoritative.
-      object.position.set(
-        unit.x + (impact?.kx ?? 0) * knock,
-        usesModel ? object.position.y : UNIT_HEIGHT,
-        unit.y + (impact?.ky ?? 0) * knock,
-      );
+      // A target the loop eases toward rather than a place to be drawn - see
+      // FOLLOW_RATE. A new unit, or one that jumped, is put there outright.
+      const tx = unit.x + (impact?.kx ?? 0) * knock;
+      const tz = unit.y + (impact?.ky ?? 0) * knock;
+      if (!usesModel) object.position.y = UNIT_HEIGHT;
+      if (created || Math.hypot(object.position.x - tx, object.position.z - tz) > FOLLOW_SNAP) {
+        object.position.x = tx;
+        object.position.z = tz;
+      }
+      object.userData.target = { x: tx, z: tz };
       const baseScale = ((object.userData.baseScale as number | undefined) ?? 1) * (unit.scale ?? 1);
       object.scale.setScalar(baseScale * (1 + punch * PUNCH_SCALE));
       if (unit.facing !== undefined) object.rotation.y = unit.facing;
@@ -883,6 +904,17 @@ export class DungeonRenderer {
 
       this.disposeObject(this.unitGroup, object);
       this.impacts.delete(id);
+    }
+  }
+
+  /** Eases every unit toward where the simulation last put it. See FOLLOW_RATE. */
+  private updateUnitMotion(delta: number): void {
+    const k = 1 - Math.exp(-delta * FOLLOW_RATE);
+    for (const object of this.unitMeshes.values()) {
+      const target = object.userData.target as { x: number; z: number } | undefined;
+      if (!target) continue;
+      object.position.x += (target.x - object.position.x) * k;
+      object.position.z += (target.z - object.position.z) * k;
     }
   }
 
@@ -2155,6 +2187,8 @@ export class DungeonRenderer {
   private possessedType: string | null = null;
   /** Set by faceThreatOnArrival; the next position turns the view and clears it. */
   private faceOnArrival = false;
+  /** Where the simulation last put the ridden body. The view eases toward it. */
+  private rideTarget: { x: number; z: number } | null = null;
   /** Wall-clock time the current swing ends at. */
   private swingUntil = 0;
   /** Whether the body moved this frame, for idle against walk. */
@@ -2181,6 +2215,7 @@ export class DungeonRenderer {
   setWalking(on: boolean): void {
     if (!on) {
       this.walk = null;
+      this.rideTarget = null;
       this.disposeWarden();
       this.possessedType = null;
       this.keys.clear();
@@ -2345,6 +2380,7 @@ export class DungeonRenderer {
   setPossessed(key: string | null): void {
     if (this.possessedType === key) return;
     this.possessedType = key;
+    if (key === null) this.rideTarget = null;
     if (this.walk) this.spawnWarden();
   }
 
@@ -2357,8 +2393,14 @@ export class DungeonRenderer {
    */
   setPossessedAt(x: number, y: number): void {
     if (!this.walk) return;
-    this.walk.at.x = x;
-    this.walk.at.z = y;
+    // Eased toward in followRide rather than drawn here - see FOLLOW_RATE.
+    // A new ride or a hop is jumped to: easing would slide across the room.
+    const far = !this.rideTarget || Math.hypot(this.walk.at.x - x, this.walk.at.z - y) > FOLLOW_SNAP;
+    this.rideTarget = { x, z: y };
+    if (this.faceOnArrival || far) {
+      this.walk.at.x = x;
+      this.walk.at.z = y;
+    }
     if (!this.faceOnArrival) return;
     this.faceOnArrival = false;
 
@@ -2503,6 +2545,16 @@ export class DungeonRenderer {
     };
   }
 
+  /** Eases the ridden body, and the camera behind it, toward the simulation. */
+  private followRide(delta: number): void {
+    const walk = this.walk;
+    const target = this.rideTarget;
+    if (!walk || !target) return;
+    const k = 1 - Math.exp(-delta * FOLLOW_RATE);
+    walk.at.x += (target.x - walk.at.x) * k;
+    walk.at.z += (target.z - walk.at.z) * k;
+  }
+
   /** One frame of walking, from whichever input is live. */
   private updateWalk(delta: number): void {
     if (!this.walk) return;
@@ -2529,7 +2581,10 @@ export class DungeonRenderer {
      * have to see it move. So the input is read for the animation and handed
      * out through moveRequest; the position arrives back via setPossessedAt.
      */
-    if (this.possessedType !== null) return;
+    if (this.possessedType !== null) {
+      this.followRide(delta);
+      return;
+    }
     if (!this.wardenMoving) return;
     // Diagonals are not faster: the two axes share one speed.
     const length = Math.hypot(forward, strafe);
@@ -3096,6 +3151,7 @@ export class DungeonRenderer {
 
     for (const entry of this.mixers.values()) entry.mixer.update(delta);
     this.updateEffects(delta);
+    this.updateUnitMotion(delta);
     this.updateClutter(delta);
     this.updateFlames();
     this.updateEntranceMark();
