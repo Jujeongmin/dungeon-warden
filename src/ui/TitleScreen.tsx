@@ -1,6 +1,5 @@
 import type React from "react";
 import { useT } from "../i18n";
-import { publicUrl } from "../game/assets/publicUrl";
 
 interface Props {
   /** True when the dungeon has already been played. */
@@ -18,17 +17,15 @@ interface Props {
 /**
  * The front door.
  *
- * Everything the player presses is down the left edge, cut into a slab of the
- * same stone the dungeon is made of; the name hangs over the room at the top
- * centre, and the rest of the screen is the room itself, still turning, only
- * lightly veiled.
+ * Everything the player presses stands down the left edge, straight on the
+ * room with only a fade behind it; the name hangs over the room at the top
+ * centre, and the rest of the screen is the room itself, still turning.
  *
  * It used to be a centred stack of text on a flat wash - the layout every
  * menu has, which says nothing about what is behind it. The art here is not
  * drawn: it is the live scene, which is the one picture of this game that
- * cannot be faked and never repeats. The slab is a real photograph of stone
- * (the same ambientCG scan the walls use) rather than a CSS gradient
- * pretending to be one.
+ * cannot be faked and never repeats. The buttons used to sit on a slab of
+ * stone, which covered a third of that picture to hold four buttons.
  */
 export function TitleScreen({
   hasProgress,
@@ -52,10 +49,7 @@ export function TitleScreen({
         <p className="title-line">{t("title_line")}</p>
       </div>
 
-      <div
-        className="title-slab"
-        style={{ backgroundImage: `url(${publicUrl("assets/textures/rock051_color.webp")})` }}
-      >
+      <div className="title-slab">
         <div className="title-foot">
           {hasProgress && summary && (
             <dl className="title-save">
