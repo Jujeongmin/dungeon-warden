@@ -1,3 +1,4 @@
+import type React from "react";
 import { useT } from "../i18n";
 import { publicUrl } from "../game/assets/publicUrl";
 
@@ -42,6 +43,7 @@ export function TitleScreen({
 
   return (
     <div className="title">
+      <Embers />
       <div
         className="title-slab"
         style={{ backgroundImage: `url(${publicUrl("assets/textures/rock051_color.webp")})` }}
@@ -90,6 +92,45 @@ export function TitleScreen({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Sparks drifting up out of the dungeon.
+ *
+ * Placed from a fixed sequence rather than Math.random, so the screen is the
+ * same on every visit and nothing jumps on a re-render. Pure CSS: see
+ * .title-embers. Hidden for players who ask for reduced motion.
+ */
+const EMBERS = Array.from({ length: 22 }, (_, i) => {
+  const r = (n: number) => ((Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1 + 1) % 1;
+  return {
+    x: `${38 + r(1) * 60}%`,
+    size: `${2 + r(2) * 3.5}px`,
+    duration: `${7 + r(3) * 8}s`,
+    delay: `${-r(4) * 15}s`,
+    drift: `${(r(5) - 0.5) * 80}px`,
+  };
+});
+
+function Embers() {
+  return (
+    <div className="title-embers" aria-hidden="true">
+      {EMBERS.map((ember, i) => (
+        <span
+          key={i}
+          style={
+            {
+              "--x": ember.x,
+              "--s": ember.size,
+              "--d": ember.duration,
+              "--delay": ember.delay,
+              "--drift": ember.drift,
+            } as React.CSSProperties
+          }
+        />
+      ))}
     </div>
   );
 }

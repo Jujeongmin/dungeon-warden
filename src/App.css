@@ -246,11 +246,13 @@ h3.section {
   display: flex;
   align-items: stretch;
   justify-content: flex-start;
+  /* Only enough to seat the slab: the room beside it is the picture, and a
+     wash that reached across the screen turned it into a black rectangle. */
   background: linear-gradient(
-    100deg,
-    rgba(12, 10, 9, 0.92) 54%,
-    rgba(12, 10, 9, 0.62) 72%,
-    rgba(12, 10, 9, 0.24) 100%
+    90deg,
+    rgba(12, 10, 9, 0.55) 0%,
+    rgba(12, 10, 9, 0.2) 40%,
+    rgba(12, 10, 9, 0) 62%
   );
 }
 
@@ -2619,3 +2621,48 @@ button.ad-gold {
 /* The bought speed, before it is bought. */
 .speeds button.locked { opacity: 0.7; }
 .speeds button .lock { font-size: 0.8em; margin-right: 2px; }
+
+/* Title: sparks rising out of the dungeon, and a warm breath on the name. */
+.title-slab { z-index: 1; }
+
+.title-embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.title-embers span {
+  position: absolute;
+  bottom: -12px;
+  left: var(--x);
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe2a8 0%, #ff9a3c 45%, rgba(255, 120, 40, 0) 72%);
+  box-shadow: 0 0 6px rgba(255, 140, 60, 0.7);
+  opacity: 0;
+  animation: ember-rise var(--d) linear var(--delay) infinite;
+}
+
+@keyframes ember-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  12% { opacity: 0.95; }
+  75% { opacity: 0.55; }
+  100% { transform: translate(var(--drift), -110vh); opacity: 0; }
+}
+
+.title-name {
+  text-shadow: 0 0 18px rgba(232, 164, 76, 0.28);
+  animation: title-breathe 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes title-breathe {
+  from { text-shadow: 0 0 12px rgba(232, 164, 76, 0.18); }
+  to { text-shadow: 0 0 26px rgba(255, 170, 80, 0.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-embers { display: none; }
+  .title-name { animation: none; }
+}

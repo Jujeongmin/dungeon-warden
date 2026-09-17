@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { DungeonRenderer, MarkerView, UnitView } from "./game/DungeonRenderer";
 import { useDungeonSave } from "./game/useDungeonSave";
 import { useRaid, RAID_SPEEDS, FREE_RAID_SPEED, PAID_RAID_SPEED } from "./game/useRaid";
+import { useTitleDemo } from "./game/useTitleDemo";
 import { minionStatsFor } from "./game/sim/units";
 import { roomTiles, lureTiles, roomCovers } from "./game/rooms";
 import { buildRaidPath } from "./game/sim/pathfinding";
@@ -979,16 +980,20 @@ export default function App() {
     };
   }, []);
 
+  // Behind the title the board belongs to the demo fight (see useTitleDemo);
+  // these hand the player's dungeon back when the title goes.
   useEffect(() => {
+    if (screen === "title") return;
     rendererRef.current?.setArena(arena, entrance, core);
-  }, [arena, entrance, core, rendererReady]);
+  }, [arena, entrance, core, rendererReady, screen]);
 
   /** The shape of the room, which is the shape of what has been dug. */
   const open = useMemo(() => dugSet(arena, dug), [arena, dug]);
 
   useEffect(() => {
+    if (screen === "title") return;
     rendererRef.current?.setDug(open);
-  }, [open, rendererReady]);
+  }, [open, rendererReady, screen]);
 
   /*
    * Who is coming, ticked rather than read during render.
@@ -1267,18 +1272,28 @@ export default function App() {
     return () => window.removeEventListener("resize", measure);
   }, [screen, walking, hudOpen, tab, minions.length, traps.length, rooms.length, research.length, raid.raiding, rendererReady]);
 
+  // The title shows the dungeon off: lit up and slowly circling. See setShowcase.
   useEffect(() => {
-    rendererRef.current?.setUnits(units);
-  }, [units, rendererReady]);
+    rendererRef.current?.setShowcase(screen === "title");
+  }, [screen, rendererReady]);
+
+  // A built dungeon and a party fighting through it, behind the title.
+  useTitleDemo(screen === "title", rendererRef, rendererReady);
 
   useEffect(() => {
+    if (screen === "title") return;
+    rendererRef.current?.setUnits(units);
+  }, [units, rendererReady, screen]);
+
+  useEffect(() => {
+    if (screen === "title") return;
     rendererRef.current?.setMarkers(markers);
-  }, [markers, rendererReady]);
+  }, [markers, rendererReady, screen]);
 
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
   useEffect(() => {
-    if (!meta || raid.raiding || showAftermath) {
+    if (!meta || raid.raiding || showAftermath || screen === "title") {
       rendererRef.current?.setPathPreview(null);
       return;
     }
@@ -1295,7 +1310,7 @@ export default function App() {
         new Set(terrain),
       ),
     );
-  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, showAftermath, rendererReady]);
+  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, showAftermath, rendererReady, screen]);
 
   /*
    * What the route becomes if the tile under the cursor changes.

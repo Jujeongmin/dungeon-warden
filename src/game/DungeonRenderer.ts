@@ -111,6 +111,23 @@ const FOLLOW_SNAP = 1.5;
  * drawn it fills the screen with the inside of a model.
  */
 const CAMERA_CLEARANCE = 1.1;
+
+/** The standing light, restated by setShowcase. */
+const AMBIENT_INTENSITY = 0.62;
+const KEY_INTENSITY = 0.72;
+
+/*
+ * The title screen's view of the dungeon.
+ *
+ * The overview is lit and framed for building: straight down, dim, the room
+ * filling the screen. Behind a menu that read as a black rectangle. The title
+ * shows the dungeon off instead - brighter, lower, and slowly circling, so the
+ * walls have depth and the torches have something to light.
+ */
+const SHOWCASE_SPIN = 0.06; // radians a second: one turn in under two minutes
+const SHOWCASE_PITCH = THREE.MathUtils.degToRad(40);
+const SHOWCASE_ZOOM = 0.8;
+const SHOWCASE_LIGHT = 1.8;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
 const FOV = 45;
@@ -507,6 +524,10 @@ export class DungeonRenderer {
   private flames: Array<{ light: THREE.PointLight; base: number; phase: number }> = [];
   /** Seconds since the renderer started, for anything that wobbles. */
   private elapsed = 0;
+  private ambientLight!: THREE.AmbientLight;
+  private keyLight!: THREE.DirectionalLight;
+  /** True while the title screen is up. See SHOWCASE_SPIN. */
+  private showcase = false;
 
   /** Pixels of canvas hidden behind the HUD, so the board can frame above it. */
   private bottomInset = 0;
@@ -581,12 +602,14 @@ export class DungeonRenderer {
      * bounce, the ambient carries the warmth, and the actual light comes from
      * the torch props on the walls (see buildDecor).
      */
-    const ambient = new THREE.AmbientLight(0xbcc6d8, 0.62);
-    const key = new THREE.DirectionalLight(0xdfe3ee, 0.72);
+    const ambient = new THREE.AmbientLight(0xbcc6d8, AMBIENT_INTENSITY);
+    const key = new THREE.DirectionalLight(0xdfe3ee, KEY_INTENSITY);
     key.position.set(6, 14, 4);
     const rim = new THREE.DirectionalLight(0x8fa6cc, 0.22);
     rim.position.set(-8, 6, -6);
     this.scene.add(ambient, key, rim);
+    this.ambientLight = ambient;
+    this.keyLight = key;
 
     const highlightGeo = new THREE.BoxGeometry(
       TILE_SIZE * 0.98,
@@ -2639,6 +2662,15 @@ export class DungeonRenderer {
     return true;
   }
 
+  /** Lights the dungeon up and sets it circling behind the title, or stops. */
+  setShowcase(on: boolean): void {
+    if (this.showcase === on) return;
+    this.showcase = on;
+    const boost = on ? SHOWCASE_LIGHT : 1;
+    this.ambientLight.intensity = AMBIENT_INTENSITY * boost;
+    this.keyLight.intensity = KEY_INTENSITY * boost;
+  }
+
   private updateCamera(): void {
     if (this.walk) {
       /*
@@ -2680,6 +2712,23 @@ export class DungeonRenderer {
   }
 
   private updateOrbitCamera(): void {
+    if (this.showcase) {
+      const orbit = this.elapsed * SHOWCASE_SPIN;
+      const distance = this.distance * SHOWCASE_ZOOM;
+      const flat = Math.cos(SHOWCASE_PITCH) * distance;
+      this.camera.position.set(
+        this.target.x + Math.sin(orbit) * flat,
+        this.target.y + Math.sin(SHOWCASE_PITCH) * distance,
+        this.target.z + Math.cos(orbit) * flat,
+      );
+      this.camera.lookAt(this.target);
+      const showFog = this.scene.fog as THREE.Fog | null;
+      if (showFog) {
+        showFog.near = distance * 1.1;
+        showFog.far = distance * 3;
+      }
+      return;
+    }
     const y = this.yaw;
     const horizontal = Math.cos(PITCH) * this.distance;
     this.camera.position.set(
