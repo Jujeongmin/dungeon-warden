@@ -1995,6 +1995,14 @@ button.ad-gold {
 /* Room for the last row to clear the foot instead of being sliced by it. */
 .hud-body { padding-bottom: 6px; }
 
+/* The scrollbar sits in the panel's own margin, not over the row's last
+   button: drawn on top of the content it hid half of "Remove". The content
+   keeps its width; only the scroll box reaches into the padding. */
+.hud-body {
+  margin-right: -9px;
+  padding-right: 9px;
+}
+
 /* ── Modals and the title, in the panel's language ────────────────────────
  *
  * The build panel got three weights — quiet nav, solid controls, one loud
