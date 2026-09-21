@@ -5,12 +5,14 @@ interface Props {
   /** True when the dungeon has already been played. */
   hasProgress: boolean;
   /** Progress shown above the buttons once there is any. */
-  summary: { stars: number; starsMax: number; cleared: number; stages: number } | null;
+  summary: { stage: number; wave: number; souls: number } | null;
   loading: boolean;
   offline: boolean;
   onStart: () => void;
   onSettings: () => void;
   onShop: () => void;
+  onLeaderboard: () => void;
+  onResearch: () => void;
   onGuide: () => void;
 }
 
@@ -35,6 +37,8 @@ export function TitleScreen({
   onStart,
   onSettings,
   onShop,
+  onLeaderboard,
+  onResearch,
   onGuide,
 }: Props) {
   const t = useT();
@@ -54,12 +58,12 @@ export function TitleScreen({
           {hasProgress && summary && (
             <dl className="title-save">
               <div>
-                <dt>{t("stat_stars")}</dt>
-                <dd>★ {summary.stars}/{summary.starsMax}</dd>
+                <dt>{t("stat_best")}</dt>
+                <dd>{t("rank_reach", { stage: summary.stage, wave: summary.wave })}</dd>
               </div>
               <div>
-                <dt>{t("stat_cleared")}</dt>
-                <dd>{summary.cleared}/{summary.stages}</dd>
+                <dt>{t("stat_souls")}</dt>
+                <dd>{summary.souls}</dd>
               </div>
             </dl>
           )}
@@ -70,6 +74,8 @@ export function TitleScreen({
             </button>
 
             <div className="title-menu">
+              <button onClick={onLeaderboard}>{t("menu_leaderboard")}</button>
+              <button onClick={onResearch}>{t("tab_research")}</button>
               <button onClick={onShop}>{t("menu_shop")}</button>
               <button onClick={onGuide}>{t("menu_guide")}</button>
               <button onClick={onSettings}>{t("menu_settings")}</button>

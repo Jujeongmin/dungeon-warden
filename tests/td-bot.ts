@@ -50,7 +50,7 @@ export function playStage(
     }
   };
 
-  const maxSteps = ((options.maxSeconds ?? 2000) / 0.05) | 0;
+  const maxSteps = ((options.maxSeconds ?? 4000) / 0.05) | 0;
   let steps = 0;
   spend();
   while (run.status !== "won" && run.status !== "lost" && steps < maxSteps) {
@@ -68,6 +68,8 @@ export function playStage(
     lives0: run.lives0,
     towers: run.towers.length,
     route: run.route()?.length ?? 0,
+    wavesCleared: run.wavesCleared,
+    stage: Math.floor(run.wavesCleared / 5) + 1,
   };
 }
 
@@ -145,6 +147,6 @@ function nextInOrder(run: StageRun, order: Point[]): Point | null {
 export function bestPlay(stage: Stage, options: Parameters<typeof playStage>[1] = {}) {
   const a = playStage(stage, { ...options, plan: "serpentine" });
   const b = playStage(stage, { ...options, plan: "greedy" });
-  const score = (r: typeof a) => (r.status === "won" ? r.lives : -1);
+  const score = (r: typeof a) => (r.status === "won" ? 1000 + r.lives : r.wavesCleared);
   return score(a) >= score(b) ? a : b;
 }

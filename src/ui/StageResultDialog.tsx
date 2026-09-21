@@ -1,46 +1,44 @@
 import { useT } from "../i18n";
-import { Stars } from "./StageSelectDialog";
 
 interface Props {
-  won: boolean;
-  stars: number;
+  stage: number;
+  wave: number;
+  wavesCleared: number;
+  /** Souls earned; null while the server is still deciding. */
+  souls: number | null;
   improved: boolean;
-  livesLeft: number;
-  lives: number;
-  /** Null while the server is still deciding. */
   saved: boolean | null;
-  hasNext: boolean;
   onRetry: () => void;
-  onNext: () => void;
-  onStages: () => void;
+  onResearch: () => void;
+  onTitle: () => void;
 }
 
-/** The end of a stage: how it went, and where to go from here. */
+/** The end of a run: how far it got, what it earned, and the way back in. */
 export function StageResultDialog({
-  won, stars, improved, livesLeft, lives, saved, hasNext, onRetry, onNext, onStages,
+  stage, wave, wavesCleared, souls, improved, saved, onRetry, onResearch, onTitle,
 }: Props) {
   const t = useT();
 
   return (
     <div className="modal-backdrop">
-      <div className={won ? "modal narrow stage-result won" : "modal narrow stage-result"}>
+      <div className="modal narrow stage-result">
         <header className="modal-head">
-          <h2>{won ? t("stage_won") : t("stage_lost")}</h2>
+          <h2>{t("run_over")}</h2>
         </header>
 
-        {won && <div className="result-stars"><Stars n={stars} /></div>}
-        <p className="modal-note">
-          {won ? t("stage_lives_left", { n: livesLeft, m: lives }) : t("stage_lost_note")}
-        </p>
-        {won && improved && <p className="modal-note owned">{t("stage_new_best")}</p>}
+        <div className="result-reach">
+          <b>{t("stage_n", { n: stage })}</b>
+          <span>{t("run_wave", { n: wave })}</span>
+        </div>
+        <p className="modal-note">{t("run_cleared", { n: wavesCleared })}</p>
+        {souls !== null && <p className="modal-note owned">{t("run_souls", { n: souls })}</p>}
+        {improved && <p className="modal-note owned">{t("stage_new_best")}</p>}
         {saved === false && <p className="modal-note error">{t("stage_not_saved")}</p>}
 
         <div className="actions">
-          <button onClick={onStages}>{t("stage_select")}</button>
-          <button onClick={onRetry}>{t("stage_retry")}</button>
-          {won && hasNext && (
-            <button className="primary" onClick={onNext}>{t("stage_next")}</button>
-          )}
+          <button onClick={onTitle}>{t("menu_home")}</button>
+          <button onClick={onResearch}>{t("tab_research")}</button>
+          <button className="primary" onClick={onRetry}>{t("stage_retry")}</button>
         </div>
       </div>
     </div>

@@ -3,12 +3,12 @@ import type { TrapType } from "../types";
 import type { TowerType } from "./towers";
 
 /**
- * What stars buy, for good.
+ * What souls buy, for good.
  *
- * Stages are won with gold that starts again every run; research is the one
- * thing that carries between them. Every node is paid in stars, and there
- * are more nodes than a first pass through the stages earns - so it is a
- * choice, and a replayed stage for a third star is worth something.
+ * A run is played with gold that starts again every time; research is the
+ * one thing that carries between runs. Every node is paid in souls, earned
+ * one for each stage a run gets past, so a better run buys more - and there
+ * are more nodes than a few runs pay for, so it is a choice.
  *
  * Mirrored in server.js (RESEARCH), which is what decides a purchase;
  * tests/td-server.test.ts checks the two agree.
@@ -90,9 +90,8 @@ export function canResearch(node: ResearchNode, owned: string[]): boolean {
   return (node.requires ?? []).every((id) => owned.includes(id));
 }
 
-/** Stars left to spend: everything earned, less what research has taken. */
-export function starsToSpend(best: Record<string, number>, owned: string[]): number {
-  const earned = Object.values(best).reduce((sum, n) => sum + n, 0);
+/** Souls left to spend: everything earned, less what research has taken. */
+export function soulsToSpend(earned: number, owned: string[]): number {
   const spent = owned.reduce((sum, id) => sum + (RESEARCH_BY_ID.get(id)?.cost ?? 0), 0);
   return earned - spent;
 }

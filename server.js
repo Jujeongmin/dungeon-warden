@@ -4,17 +4,17 @@
 // Do NOT export this class.
 
 /*
- * A stage tower defence keeps almost nothing on the server.
+ * An endless tower defence keeps almost nothing on the server.
  *
- * A stage is played start to finish in the browser - gold, towers and waves
- * all live and die inside one run - so what is worth keeping is what carries
- * between runs: the best stars earned on each stage, and the research those
- * stars have bought. That is all this file stores, and it decides the two
- * things a client must not decide for itself: how many stars a finished run
- * is worth, and whether a research purchase can be afforded.
+ * A run is played start to finish in the browser - gold, towers and waves
+ * all live and die inside it - so what is worth keeping is what carries
+ * between runs: the furthest a run has got, the souls runs have earned, and
+ * the research those souls have bought. This file decides the things a
+ * client must not decide for itself: whether a result could have been
+ * played in the time it took, what it earns, and what can be afforded.
  */
 
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 /**
  * Reads a key a client chose out of a plain-object table.
@@ -30,36 +30,40 @@ function ownEntry(table, key) {
 }
 
 // ---------------------------------------------------------------------------
-// Stages
+// The run
 // ---------------------------------------------------------------------------
-/*
- * Mirrored from src/game/td/stages.ts; tests/td-server.test.ts checks that
- * the two agree.
- *
- * minSeconds is the least play a win can take: every adventurer of every
- * wave has to have come in, and they enter SPAWN_INTERVAL apart. A result
- * that arrives sooner than that, at the fastest speed the player owns, was
- * not played.
- */
-const STAGES = {
-  1: { waves: 6, lives: 20, minSeconds: 24 },
-  2: { waves: 7, lives: 20, minSeconds: 37 },
-  3: { waves: 8, lives: 20, minSeconds: 47 },
-  4: { waves: 8, lives: 20, minSeconds: 54 },
-  5: { waves: 9, lives: 20, minSeconds: 65 },
-  6: { waves: 10, lives: 20, minSeconds: 86 },
-  7: { waves: 10, lives: 20, minSeconds: 86 },
-  8: { waves: 11, lives: 20, minSeconds: 109 },
-  9: { waves: 12, lives: 20, minSeconds: 125 },
-  10: { waves: 12, lives: 20, minSeconds: 195 },
-};
+// Mirrored from src/game/td/stages.ts; tests/td-server.test.ts checks them.
 
-/** Mirrors starsFor in src/game/td/stages.ts. */
-function starsFor(livesLeft, lives) {
-  if (livesLeft <= 0) return 0;
-  if (livesLeft >= lives * 0.9) return 3;
-  if (livesLeft >= lives * 0.5) return 2;
-  return 1;
+const WAVES_PER_STAGE = 5;
+const SPAWN_INTERVAL = 0.9;
+/** A result claiming more than this many waves is not believed. */
+const MAX_WAVES = 400;
+
+/** Adventurers in wave `index`, champion aside. */
+function waveCount(index) {
+  return 4 + Math.floor(index * 0.8);
+}
+
+/** The last wave of every stage from the second is led by a champion. */
+function hasChampion(index) {
+  return Math.floor(index / WAVES_PER_STAGE) + 1 >= 2 && index % WAVES_PER_STAGE === WAVES_PER_STAGE - 1;
+}
+
+/**
+ * The least play `waves` cleared waves can take: every adventurer of every
+ * one has to have come in, SPAWN_INTERVAL apart.
+ */
+function leastSeconds(waves) {
+  let total = 0;
+  for (let i = 0; i < waves; i++) {
+    const size = waveCount(i) + (hasChampion(i) ? 1 : 0);
+    total += (size - 1) * SPAWN_INTERVAL;
+  }
+  return total;
+}
+
+function stageOfWaves(waves) {
+  return Math.floor(waves / WAVES_PER_STAGE) + 1;
 }
 
 /** Play speed the account may use: 3x is bought, 2x is free. */
@@ -75,11 +79,7 @@ function speedFor(state) {
 // ---------------------------------------------------------------------------
 // Research
 // ---------------------------------------------------------------------------
-/*
- * Mirrored from src/game/td/research.ts. Costs are in stars; `lives` is the
- * one bonus this file needs, because it changes how many lives a run starts
- * with and so what a result's lives are worth.
- */
+/* Mirrored from src/game/td/research.ts. Costs are in souls. */
 const RESEARCH = {
   grunt: { cost: 1 },
   guard: { cost: 2 },
@@ -96,22 +96,7 @@ const RESEARCH = {
   walls: { cost: 3, lives: 5 },
 };
 
-function extraLives(research) {
-  let lives = 0;
-  for (const id of research) {
-    const node = ownEntry(RESEARCH, id);
-    if (node && node.lives) lives = Math.max(lives, node.lives);
-  }
-  return lives;
-}
-
-function starsEarned(best) {
-  let total = 0;
-  for (const key of Object.keys(best || {})) total += best[key] || 0;
-  return total;
-}
-
-function starsSpent(research) {
+function soulsSpent(research) {
   let total = 0;
   for (const id of research) {
     const node = ownEntry(RESEARCH, id);
@@ -125,24 +110,46 @@ function starsSpent(research) {
 // ---------------------------------------------------------------------------
 
 function emptyProgress() {
-  return { version: SAVE_VERSION, best: {}, research: [] };
+  return { version: SAVE_VERSION, bestWaves: 0, souls: 0, research: [] };
 }
 
-/** The saved progress, or a fresh one when there is none or it is from the old game. */
+/** The saved progress, or a fresh one when there is none or it is from an older game. */
 function progressOf(state) {
   const saved = state && state.progress;
   if (!saved || saved.version !== SAVE_VERSION) return emptyProgress();
   return {
     version: SAVE_VERSION,
-    best: saved.best && typeof saved.best === "object" ? saved.best : {},
+    bestWaves: Math.max(0, Math.floor(saved.bestWaves || 0)),
+    souls: Math.max(0, Math.floor(saved.souls || 0)),
     research: Array.isArray(saved.research) ? saved.research : [],
   };
 }
 
-/** A stage is open once the one before it has been won. */
-function isUnlocked(progress, stageId) {
-  if (stageId === 1) return true;
-  return (progress.best[String(stageId - 1)] || 0) > 0;
+// ---------------------------------------------------------------------------
+// Ranking
+// ---------------------------------------------------------------------------
+// One row per account: how far its best run got. Ordered by waves cleared,
+// which orders stages too.
+const LEADERBOARD = "dungeon_endless";
+
+function cleanName(nickname, account) {
+  const name = typeof nickname === "string" ? nickname.trim().slice(0, 20) : "";
+  return name || String(account).slice(0, 8);
+}
+
+async function writeRanking(account, nickname, bestWaves) {
+  const entry = {
+    __id: account,
+    account,
+    nickname: cleanName(nickname, account),
+    waves: bestWaves,
+    stage: stageOfWaves(bestWaves),
+    updatedAt: Date.now(),
+  };
+  const existing = await $global.getCollectionItem(LEADERBOARD, account);
+  if (existing && existing.account) await $global.updateCollectionItem(LEADERBOARD, entry);
+  else await $global.addCollectionItem(LEADERBOARD, entry);
+  return entry;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +159,7 @@ function isUnlocked(progress, stageId) {
 // (game management page -> VX Shop tab). Registering a product does not put
 // it on sale by itself; the game has to grant it, which $onItemPurchased does.
 const PRODUCTS = {
-  // Convenience: stages at 3x. Changes how long a wave takes to watch, not
+  // Convenience: runs at 3x. Changes how long a wave takes to watch, not
   // how it goes - the simulation steps the same either way.
   raid_speed_3x: { grants: "fastForward", repeatable: false },
 };
@@ -213,9 +220,14 @@ class Server {
     const progress = progressOf(state);
     const entitlements = (state && state.entitlements) || emptyEntitlements();
     if (!state || !state.progress || state.progress.version !== SAVE_VERSION) {
-      await $global.updateMyState({ progress, pendingStage: null });
+      await $global.updateMyState({ progress, pendingRun: null });
     }
-    return { progress, entitlements, account: $sender.account };
+    return {
+      progress,
+      entitlements,
+      nickname: (state && state.nickname) || "",
+      account: $sender.account,
+    };
   }
 
   async getEntitlements() {
@@ -223,56 +235,45 @@ class Server {
     return { entitlements: (state && state.entitlements) || emptyEntitlements() };
   }
 
-  /** Opens a run: remembers which stage and when, for finishStage to check. */
-  async startStage({ stageId } = {}) {
-    const stage = ownEntry(STAGES, String(stageId));
-    if (!stage) throw new Error("UNKNOWN_STAGE");
+  /** Opens a run: remembers when, for finishRun to check. */
+  async startRun() {
     return await $lock(`progress:${$sender.account}`, async () => {
-      const state = await $global.getMyState();
-      const progress = progressOf(state);
-      if (!isUnlocked(progress, stageId)) throw new Error("STAGE_LOCKED");
       const startedAt = Date.now();
-      await $global.updateMyState({ pendingStage: { stageId, startedAt } });
-      return { stageId, startedAt };
+      await $global.updateMyState({ pendingRun: { startedAt } });
+      return { startedAt };
     });
   }
 
   /**
-   * Closes a run and records its stars.
+   * Closes a run: how many waves it cleared.
    *
-   * The client says whether it won and with how many lives; the server
-   * decides what that is worth, and refuses a win that came in faster than
-   * the stage's waves could have been played.
+   * Refused if the waves could not have been played in the time since the
+   * run opened. Pays a soul for each stage it got past, keeps the best, and
+   * puts the best on the ranking.
    */
-  async finishStage({ stageId, won, livesLeft } = {}) {
-    const stage = ownEntry(STAGES, String(stageId));
-    if (!stage) throw new Error("UNKNOWN_STAGE");
+  async finishRun({ wavesCleared } = {}) {
+    const waves = Math.floor(Number(wavesCleared));
+    if (!Number.isFinite(waves) || waves < 0 || waves > MAX_WAVES) throw new Error("BAD_WAVES");
     return await $lock(`progress:${$sender.account}`, async () => {
       const state = await $global.getMyState();
       const progress = progressOf(state);
-      const pending = state && state.pendingStage;
-      if (!pending || pending.stageId !== stageId) throw new Error("NO_STAGE_OPEN");
+      const pending = state && state.pendingRun;
+      if (!pending) throw new Error("NO_RUN_OPEN");
+      const elapsed = Date.now() - pending.startedAt;
+      const least = (leastSeconds(waves) * 1000) / speedFor(state) - CLOCK_SLACK_MS;
+      if (elapsed < least) throw new Error("RUN_TOO_FAST");
 
-      let stars = 0;
-      if (won === true) {
-        const lives = stage.lives + extraLives(progress.research);
-        const left = Math.floor(Number(livesLeft));
-        if (!Number.isFinite(left) || left < 1 || left > lives) throw new Error("BAD_LIVES");
-        const elapsed = Date.now() - pending.startedAt;
-        const least = (stage.minSeconds * 1000) / speedFor(state) - CLOCK_SLACK_MS;
-        if (elapsed < least) throw new Error("STAGE_TOO_FAST");
-        stars = starsFor(left, lives);
-      }
-
-      const key = String(stageId);
-      const before = progress.best[key] || 0;
-      if (stars > before) progress.best[key] = stars;
-      await $global.updateMyState({ progress, pendingStage: null });
-      return { stars, best: progress.best[key] || 0, improved: stars > before, progress };
+      const souls = Math.floor(waves / WAVES_PER_STAGE);
+      const improved = waves > progress.bestWaves;
+      progress.souls += souls;
+      if (improved) progress.bestWaves = waves;
+      await $global.updateMyState({ progress, pendingRun: null });
+      if (improved) await writeRanking($sender.account, state && state.nickname, progress.bestWaves);
+      return { souls, improved, progress };
     });
   }
 
-  /** Buys a research node with stars. */
+  /** Buys a research node with souls. */
   async researchNode({ id } = {}) {
     const node = ownEntry(RESEARCH, id);
     if (!node) throw new Error("UNKNOWN_RESEARCH");
@@ -283,18 +284,42 @@ class Server {
       for (const need of node.requires || []) {
         if (progress.research.indexOf(need) === -1) throw new Error("RESEARCH_LOCKED");
       }
-      const left = starsEarned(progress.best) - starsSpent(progress.research);
-      if (left < node.cost) throw new Error("NOT_ENOUGH_STARS");
+      if (progress.souls - soulsSpent(progress.research) < node.cost) throw new Error("NOT_ENOUGH_SOULS");
       progress.research = progress.research.concat([id]);
       await $global.updateMyState({ progress });
       return { progress };
     });
   }
 
-  /** Starts over: stars and research go, purchases stay. */
+  /** The name shown on the ranking. Renames the row there too, if there is one. */
+  async setNickname({ nickname } = {}) {
+    const account = $sender.account;
+    const name = cleanName(nickname, account);
+    await $global.updateMyState({ nickname: name });
+    const state = await $global.getMyState();
+    const progress = progressOf(state);
+    if (progress.bestWaves > 0) await writeRanking(account, name, progress.bestWaves);
+    return { nickname: name };
+  }
+
+  /** The top runs, and the caller's own so a player always sees themselves. */
+  async getRankings({ limit } = {}) {
+    const account = $sender.account;
+    const size = Math.max(1, Math.min(50, Math.floor(limit || 30)));
+    // Filters and orderBy cannot be combined, so the caller's row is fetched
+    // by id instead of queried.
+    const top = await $global.getCollectionItems(LEADERBOARD, {
+      orderBy: [{ field: "waves", direction: "desc" }],
+      limit: size,
+    });
+    const mine = await $global.getCollectionItem(LEADERBOARD, account);
+    return { top: top || [], mine: mine && mine.account ? mine : null };
+  }
+
+  /** Starts over: progress goes, purchases and the ranking row stay. */
   async resetGame() {
     const progress = emptyProgress();
-    await $global.updateMyState({ progress, pendingStage: null });
+    await $global.updateMyState({ progress, pendingRun: null });
     const state = await $global.getMyState();
     return { progress, entitlements: (state && state.entitlements) || emptyEntitlements() };
   }

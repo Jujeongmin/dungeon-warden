@@ -2110,8 +2110,31 @@ button.primary {
 @media (max-height: 520px) {
   .stage-grid { gap: 6px; }
   .stage-card { padding: 6px 2px; }
-  .title-menu { grid-template-columns: repeat(3, 1fr); }
 }
 
 .modal.stage-result { width: min(420px, 100%); }
 .stage-result .actions button { flex: 1 1 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
+
+/* ── Endless run ──────────────────────────────────────────────────────── */
+
+.result-reach { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 6px 0 4px; }
+.result-reach b { font-family: var(--font-display); font-size: 30px; color: var(--accent); line-height: 1.1; }
+.result-reach span { color: var(--muted); font-size: var(--fs-sm); }
+
+.floater.stage { color: var(--accent); font-family: var(--font-display); font-size: var(--fs-lg); animation-duration: 1.6s; }
+
+.modal.ranking { width: min(460px, 100%); }
+.rank-name { display: flex; gap: 6px; margin: 6px 0 8px; }
+.rank-name input { flex: 1; min-width: 0; }
+.rank-list { list-style: none; margin: 0; padding: 0; }
+.rank-list li { display: flex; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
+.rank-list li:last-child { border-bottom: none; }
+.rank-list li.me { color: var(--accent); }
+.rank-pos { width: 22px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-name-cell { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-list li b { white-space: nowrap; }
+.rank-empty { justify-content: center; color: var(--muted); }
+
+@media (max-height: 520px) {
+  .title-menu { grid-template-columns: repeat(2, 1fr); }
+}

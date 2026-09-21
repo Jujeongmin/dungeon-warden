@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { StageRun } from "../src/game/td/StageRun";
 import { researchEffects } from "../src/game/td/research";
-import { STAGES, starsFor, type Stage } from "../src/game/td/stages";
+import { ENDLESS, WAVES_PER_STAGE, endlessWave, waveSize, type Stage } from "../src/game/td/stages";
 import { sellValue, TOWERS } from "../src/game/td/towers";
-import { bestPlay, playStage, ALL_RESEARCH } from "./td-bot";
+import { playStage, ALL_RESEARCH } from "./td-bot";
 
 const open = (): Stage => ({
-  id: 99,
   arena: { w: 5, h: 6 },
   bedrock: [],
   startGold: 500,
@@ -22,7 +21,7 @@ function runUntilSettled(run: StageRun, seconds = 120) {
 
 describe("building in the open room", () => {
   it("starts open: every tile but the bedrock can be walked", () => {
-    const stage = STAGES[2];
+    const stage = ENDLESS;
     const run = new StageRun(stage, base);
     const rock = stage.bedrock[0];
     expect(run.isDug(rock.x, rock.y)).toBe(false);
@@ -114,39 +113,40 @@ describe("waves", () => {
     }
   });
 
-  it("rate a win in stars by the lives left", () => {
-    expect(starsFor(20, 20)).toBe(3);
-    expect(starsFor(12, 20)).toBe(2);
-    expect(starsFor(3, 20)).toBe(1);
-    expect(starsFor(0, 20)).toBe(0);
+  it("count the waves cleared, which is what a run is scored by", () => {
+    const run = new StageRun(open(), base);
+    for (let x = 0; x < 4; x++) run.placeTower("warrior", x, 2);
+    for (const t of run.towers) { run.upgradeTower(t.id); run.upgradeTower(t.id); }
+    run.startWave();
+    runUntilSettled(run);
+    expect(run.wavesCleared).toBe(1);
   });
 });
 
 /*
- * The difficulty curve, measured by bots in tests/td-bot.ts.
+ * The endless run, measured by the bots in tests/td-bot.ts.
  *
- * A maze is the point of the game, so it has to pay: a switchback beats a
- * row of towers along a straight road, the opening stages are easy for
- * anyone who walls at all, and the late ones want research.
+ * A maze is the point of the game, so it has to pay: a switchback gets
+ * further than a row of towers along a straight road, research gets further
+ * again, and nothing lasts for ever.
  */
-describe("the stages", () => {
-  it("open with a stage a maze wins without losing a life", () => {
-    const result = playStage(STAGES[0]);
-    expect(result.status).toBe("won");
-    expect(result.lives).toBe(result.lives0);
-  }, 60000);
+describe("the endless run", () => {
+  it("never runs out of waves, and they grow", () => {
+    expect(waveSize(endlessWave(40))).toBeGreaterThan(waveSize(endlessWave(0)));
+    expect(new StageRun(ENDLESS, base).wavesTotal).toBe(Infinity);
+  });
 
-  it("reward a maze over towers lined along a straight road", () => {
-    const stage = STAGES[7];
-    expect(playStage(stage).status).toBe("won");
-    expect(playStage(stage, { plan: "flat" }).status).toBe("lost");
-  }, 120000);
+  it("has a champion at the end of every stage from the second", () => {
+    expect(endlessWave(WAVES_PER_STAGE - 1).some((g) => g.champion)).toBe(false);
+    expect(endlessWave(2 * WAVES_PER_STAGE - 1).some((g) => g.champion)).toBe(true);
+  });
 
-  it("end with a stage researched towers can win", () => {
-    const full = bestPlay(STAGES[9], {
-      research: ALL_RESEARCH,
-      towers: ["warrior", "warrior", "warrior", "mage", "guard"],
-    });
-    expect(full.status).toBe("won");
-  }, 120000);
+  it("goes further with a maze than without, further still with research, and ends", () => {
+    const flat = playStage(ENDLESS, { plan: "flat" });
+    const maze = playStage(ENDLESS);
+    const full = playStage(ENDLESS, { research: ALL_RESEARCH, towers: ["warrior", "warrior", "warrior", "mage", "guard"] });
+    expect(maze.stage).toBeGreaterThan(flat.stage);
+    expect(full.stage).toBeGreaterThan(maze.stage);
+    expect(full.status).toBe("lost");
+  }, 300000);
 });

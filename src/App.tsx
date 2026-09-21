@@ -7,7 +7,7 @@ import { loadSettings, pixelRatioFor, saveSettings, type Settings } from "./game
 import { TRAP_STATS } from "./game/sim/traps";
 import { researchEffects } from "./game/td/research";
 import type { Refusal, RunEvent, StageRun } from "./game/td/StageRun";
-import { STAGES, stageById } from "./game/td/stages";
+import { ENDLESS, WAVES_PER_STAGE, stageOfWave } from "./game/td/stages";
 import { MAX_TOWER_LEVEL, sellValue, TOWER_TYPES, TOWERS, towerStats, upgradeCost, type TowerType } from "./game/td/towers";
 import { tutorialFor } from "./game/td/tutorial";
 import { useProgress } from "./game/td/useProgress";
@@ -23,7 +23,7 @@ import { IntroDialog } from "./ui/IntroDialog";
 import { ResearchDialog } from "./ui/ResearchDialog";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { StageResultDialog } from "./ui/StageResultDialog";
-import { StageSelectDialog } from "./ui/StageSelectDialog";
+import { RankingDialog } from "./ui/RankingDialog";
 import { TitleScreen } from "./ui/TitleScreen";
 import { useCountUp } from "./ui/useCountUp";
 import { useSpotlight } from "./ui/useSpotlight";
@@ -70,11 +70,10 @@ const REFUSAL_TEXT: Record<Refusal, StringKey> = {
 type Selection = { kind: "tower" | "trap"; id: string } | null;
 
 interface Result {
-  won: boolean;
-  stars: number;
+  wavesCleared: number;
+  /** Null until the server has said what the run earned. */
+  souls: number | null;
   improved: boolean;
-  livesLeft: number;
-  lives: number;
   saved: boolean | null;
 }
 
@@ -87,7 +86,6 @@ export default function App() {
 
   const [settings, setSettings] = useState(loadSettings);
   const [screen, setScreen] = useState<"title" | "play">("title");
-  const [stageId, setStageId] = useState(1);
   const [toolId, setToolId] = useState<string>("warrior");
   const [selection, setSelection] = useState<Selection>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
@@ -96,7 +94,7 @@ export default function App() {
   const [hudOpen, setHudOpen] = useState(true);
   const [homeArmed, setHomeArmed] = useState(false);
 
-  const [selectOpen, setSelectOpen] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -163,6 +161,9 @@ export default function App() {
           float(`-${event.lives}♥`, event.x, event.y, "leak");
         } else if (event.kind === "waveCleared") {
           float(t("wave_bonus", { n: event.bonus }), run.core.x, run.core.y - 1, "bonus");
+        } else if (event.kind === "stageCleared") {
+          audio.play("victory");
+          float(t("stage_cleared", { n: event.stage }), run.core.x, run.core.y - 3, "stage");
         } else if (event.kind === "won" || event.kind === "lost") {
           finishRef.current(run);
         }
@@ -290,60 +291,46 @@ export default function App() {
     audio.setMusicMood(fighting ? "raid" : "build");
   }, [fighting]);
 
-  // --------------------------------------------------------- stage flow
+  // ----------------------------------------------------------- run flow
 
-  const beginStage = useCallback(
-    async (id: number) => {
-      const stage = stageById(id);
-      if (!stage) return;
-      const ok = await progress.startStage(id);
-      if (!ok) {
-        audio.play("error");
-        return;
-      }
-      audio.play("click");
-      setStageId(id);
-      setResult(null);
-      setSelection(null);
-      setSelectOpen(false);
-      setToolId("warrior");
-      runner.begin(stage, effects);
-      setScreen("play");
-      if (!settings.introSeen) {
-        setIntroOpen(true);
-        patchSettings({ introSeen: true });
-      }
-    },
-    [progress, runner, effects, settings.introSeen, patchSettings],
-  );
+  const beginRun = useCallback(async () => {
+    const ok = await progress.startRun();
+    if (!ok) {
+      audio.play("error");
+      return;
+    }
+    audio.play("click");
+    setResult(null);
+    setSelection(null);
+    setResearchOpen(false);
+    setToolId("warrior");
+    runner.begin(ENDLESS, effects);
+    setScreen("play");
+    if (!settings.introSeen) {
+      setIntroOpen(true);
+      patchSettings({ introSeen: true });
+    }
+  }, [progress, runner, effects, settings.introSeen, patchSettings]);
 
+  /** The run is over: lives gone, or left from the home button. */
   finishRef.current = (finished: StageRun) => {
-    const won = finished.status === "won";
-    audio.play(won ? "victory" : "defeat");
-    const pending: Result = {
-      won,
-      stars: 0,
-      improved: false,
-      livesLeft: finished.lives,
-      lives: finished.lives0,
-      saved: null,
-    };
+    audio.play("defeat");
+    const pending: Result = { wavesCleared: finished.wavesCleared, souls: null, improved: false, saved: null };
     setResult(pending);
-    void progress.finishStage(finished.stage.id, won, finished.lives, finished.lives0).then((saved) => {
+    void progress.finishRun(finished.wavesCleared).then((saved) => {
       setResult((current) =>
         current === pending
-          ? { ...current, stars: saved?.stars ?? 0, improved: saved?.improved ?? false, saved: saved !== null }
+          ? { ...current, souls: saved?.souls ?? 0, improved: saved?.improved ?? false, saved: saved !== null }
           : current,
       );
     });
   };
 
-  const leaveStage = useCallback(() => {
+  const toTitle = useCallback(() => {
     runner.end();
     setResult(null);
     setSelection(null);
     setScreen("title");
-    setSelectOpen(true);
     const renderer = rendererRef.current;
     renderer?.setGhost(null, true);
     renderer?.setRangeRing(null);
@@ -450,7 +437,7 @@ export default function App() {
   // ------------------------------------------------------------- tutorial
 
   const teaching =
-    run && run.stage.id === 1 && !settings.tutorialDone && !result
+    run && !settings.tutorialDone && !result
       ? tutorialFor({
           toolId,
           towers: run.towers.length,
@@ -467,7 +454,7 @@ export default function App() {
     installDevTools({
       run: () => runner.run,
       stepBy: (n: number) => runner.stepBy(n),
-      beginStage: (id: number) => void beginStage(id),
+      beginRun: () => void beginRun(),
       progress: () => progress.progress,
       renderer: () => rendererRef.current,
     });
@@ -476,7 +463,9 @@ export default function App() {
   // --------------------------------------------------------------- render
 
   const purse = useCountUp(run?.gold ?? 0);
-  const nextWave = run && run.wavesStarted < run.wavesTotal ? run.stage.waves[run.wavesStarted] : null;
+  const nextWave = run ? run.waveAt(run.wavesStarted) : null;
+  const stageNow = run ? stageOfWave(Math.max(0, run.wavesStarted - 1)) : 1;
+  const waveInStage = run && run.wavesStarted > 0 ? ((run.wavesStarted - 1) % WAVES_PER_STAGE) + 1 : 0;
   const nextSummary = nextWave
     ? nextWave.map((g) => `${g.champion ? "♛ " : ""}${t(ADVENTURER_LABEL[g.cls])} ${g.count}`).join(" · ")
     : null;
@@ -490,8 +479,7 @@ export default function App() {
         : t("hint_trap_td")
       : "";
 
-  const starsMax = STAGES.length * 3;
-  const cleared = STAGES.filter((s) => (progress.progress.best[String(s.id)] ?? 0) > 0).length;
+  const best = progress.progress.bestWaves;
 
   return (
     <LocaleProvider locale={settings.locale}>
@@ -500,14 +488,13 @@ export default function App() {
 
         {screen === "title" && (
           <TitleScreen
-            hasProgress={progress.starsTotal > 0}
-            summary={progress.starsTotal > 0 ? { stars: progress.starsTotal, starsMax, cleared, stages: STAGES.length } : null}
+            hasProgress={best > 0}
+            summary={best > 0 ? { stage: stageOfWave(best), wave: (best % WAVES_PER_STAGE) + 1, souls: progress.soulsLeft } : null}
             loading={progress.status === "connecting" || progress.status === "loading"}
             offline={progress.isOffline}
-            onStart={() => {
-              audio.play("click");
-              setSelectOpen(true);
-            }}
+            onStart={() => void beginRun()}
+            onLeaderboard={() => { audio.play("click"); setRankingOpen(true); }}
+            onResearch={() => { audio.play("click"); setResearchOpen(true); }}
             onSettings={() => setSettingsOpen(true)}
             onShop={() => setShopOpen(true)}
             onGuide={() => setGuideOpen(true)}
@@ -544,9 +531,17 @@ export default function App() {
                     className={homeArmed ? "icon-toggle armed" : "icon-toggle"}
                     onClick={() => {
                       audio.play("click");
-                      if (run.status === "won" || run.status === "lost" || run.wavesStarted === 0 || homeArmed) {
+                      if (run.wavesStarted === 0) {
+                        toTitle();
+                        return;
+                      }
+                      if (homeArmed) {
+                        // Leaving ends the run where it stands, and it counts.
                         setHomeArmed(false);
-                        leaveStage();
+                        if (run.status !== "lost") {
+                          run.status = "lost";
+                          finishRef.current(run);
+                        }
                         return;
                       }
                       setHomeArmed(true);
@@ -585,8 +580,8 @@ export default function App() {
                       );
                     })}
                   </span>
-                  <b>{t("stage_n", { n: run.stage.id })}</b>
-                  <span>{t("wave_of", { n: run.wavesStarted, m: run.wavesTotal })}</span>
+                  <b>{t("stage_n", { n: stageNow })}</b>
+                  <span>{t("wave_of", { n: waveInStage, m: WAVES_PER_STAGE })}</span>
                   {enemiesIn > 0 && <span>{t("enemies_in", { n: enemiesIn })}</span>}
                 </div>
                 {homeArmed && <div className="banner">{t("leave_confirm")}</div>}
@@ -721,36 +716,35 @@ export default function App() {
           </>
         )}
 
-        {result && run && (
+        {result && (
           <StageResultDialog
-            won={result.won}
-            stars={result.stars}
+            stage={stageOfWave(result.wavesCleared)}
+            wave={(result.wavesCleared % WAVES_PER_STAGE) + 1}
+            wavesCleared={result.wavesCleared}
+            souls={result.souls}
             improved={result.improved}
-            livesLeft={result.livesLeft}
-            lives={result.lives}
             saved={result.saved}
-            hasNext={stageById(stageId + 1) !== null}
-            onRetry={() => void beginStage(stageId)}
-            onNext={() => void beginStage(stageId + 1)}
-            onStages={leaveStage}
+            onRetry={() => void beginRun()}
+            onResearch={() => setResearchOpen(true)}
+            onTitle={toTitle}
           />
         )}
 
-        {selectOpen && (
-          <StageSelectDialog
-            best={progress.progress.best}
-            isUnlocked={progress.isUnlocked}
-            starsLeft={progress.starsLeft}
-            onPick={(id) => void beginStage(id)}
-            onResearch={() => setResearchOpen(true)}
-            onClose={() => setSelectOpen(false)}
+        {rankingOpen && (
+          <RankingDialog
+            offline={progress.isOffline}
+            nickname={progress.nickname}
+            bestWaves={best}
+            load={progress.rankings}
+            onRename={progress.setNickname}
+            onClose={() => setRankingOpen(false)}
           />
         )}
 
         {researchOpen && (
           <ResearchDialog
             owned={progress.progress.research}
-            starsLeft={progress.starsLeft}
+            soulsLeft={progress.soulsLeft}
             onBuy={(id) => {
               void progress.research(id).then((ok) => audio.play(ok ? "place" : "error"));
             }}

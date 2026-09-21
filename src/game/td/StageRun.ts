@@ -9,7 +9,9 @@ import {
   stageCore,
   stageEntrance,
   waveBonus,
+  WAVES_PER_STAGE,
   type Stage,
+  type Wave,
 } from "./stages";
 import {
   MAX_TOWER_LEVEL,
@@ -22,7 +24,7 @@ import {
 } from "./towers";
 
 /**
- * One stage, played.
+ * One run, played.
  *
  * The room is open from the start: every tile but the stage's bedrock can be
  * walked, and the towers are the walls. Each one is placed on the floor and
@@ -105,6 +107,8 @@ export type RunEvent =
   | { kind: "killed"; targetId: string; x: number; y: number; bounty: number }
   | { kind: "leaked"; targetId: string; x: number; y: number; lives: number }
   | { kind: "waveCleared"; wave: number; bonus: number }
+  /** The last wave of a stage is through: `stage` is the one just finished. */
+  | { kind: "stageCleared"; stage: number }
   | { kind: "won" }
   | { kind: "lost" };
 
@@ -173,7 +177,6 @@ export class StageRun {
     this.gold = stage.startGold + effects.startGold;
     this.lives0 = stage.lives + effects.lives;
     this.lives = this.lives0;
-    this.remaining = stage.waves.map(() => 0);
   }
 
   // ------------------------------------------------------------------ reading
@@ -224,8 +227,22 @@ export class StageRun {
     return findPath(this.stage.arena, this.entrance, this.core, this.blocked());
   }
 
+  /** How many waves the stage has: without end for the endless run. */
   get wavesTotal(): number {
-    return this.stage.waves.length;
+    return this.stage.waveAt ? Infinity : (this.stage.waves?.length ?? 0);
+  }
+
+  /** Wave `index`, 0-based, or null past the end of a fixed list. */
+  waveAt(index: number): Wave | null {
+    if (this.stage.waveAt) return this.stage.waveAt(index);
+    return this.stage.waves?.[index] ?? null;
+  }
+
+  /** Waves every adventurer of which has been stopped or got through. */
+  get wavesCleared(): number {
+    let n = 0;
+    while (n < this.wavesStarted && (this.remaining[n] ?? 0) === 0) n++;
+    return n;
   }
 
   /** Whether "next wave" may be pressed: everyone of the last one has come in. */
@@ -377,7 +394,8 @@ export class StageRun {
   startWave(): boolean {
     if (!this.canStartWave()) return false;
     const index = this.wavesStarted;
-    const wave = this.stage.waves[index];
+    const wave = this.waveAt(index);
+    if (!wave) return false;
     let at = this.time;
     let count = 0;
     for (const group of wave) {
@@ -601,6 +619,9 @@ export class StageRun {
       const bonus = waveBonus(enemy.wave);
       this.gold += bonus;
       this.events.push({ kind: "waveCleared", wave: enemy.wave, bonus });
+      if (enemy.wave % WAVES_PER_STAGE === WAVES_PER_STAGE - 1) {
+        this.events.push({ kind: "stageCleared", stage: Math.floor(enemy.wave / WAVES_PER_STAGE) + 1 });
+      }
     }
   }
 

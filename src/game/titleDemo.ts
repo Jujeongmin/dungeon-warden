@@ -41,7 +41,7 @@ function demoStage(round: number): Stage {
     { cls: pick(1), count: 3, level: 3 },
     { cls: pick(2), count: 1, level: 4, champion: round % 2 === 1 },
   ];
-  return { id: 0, arena: { w: W, h: H }, bedrock: [], startGold: 100000, lives: 20, waves: [wave] };
+  return { arena: { w: W, h: H }, bedrock: [], startGold: 100000, lives: 20, waves: [wave] };
 }
 
 export function createTitleDemo(round: number): StageRun {

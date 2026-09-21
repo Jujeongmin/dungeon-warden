@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameServer } from "@agent8/gameserver";
 import { installServerProbe } from "../devtools";
 import { EMPTY_ENTITLEMENTS, type Entitlements } from "../types";
-import { RESEARCH_BY_ID, canResearch, starsToSpend } from "./research";
-import { starsFor, stageById } from "./stages";
+import { RESEARCH_BY_ID, canResearch, soulsToSpend } from "./research";
+import { WAVES_PER_STAGE } from "./stages";
 
 /** True once the project has been deployed at least once. */
 const HAS_VERSE = Boolean(import.meta.env.VITE_AGENT8_VERSE);
@@ -11,21 +11,29 @@ const HAS_VERSE = Boolean(import.meta.env.VITE_AGENT8_VERSE);
 export type ProgressStatus = "connecting" | "loading" | "ready" | "offline" | "error";
 
 export interface Progress {
-  /** Best stars per stage id. */
-  best: Record<string, number>;
+  /** Waves the best run cleared. */
+  bestWaves: number;
+  /** Every soul earned, spent or not. */
+  souls: number;
   research: string[];
 }
 
-export interface FinishResult {
-  stars: number;
-  best: number;
+export interface RunResult {
+  souls: number;
   improved: boolean;
 }
 
-const EMPTY: Progress = { best: {}, research: [] };
+export interface RankRow {
+  account: string;
+  nickname: string;
+  waves: number;
+  stage: number;
+}
 
-/** Where the offline preview keeps its progress, so a dev can play past stage 1. */
-const LOCAL_KEY = "dungeon-warden:td-progress";
+const EMPTY: Progress = { bestWaves: 0, souls: 0, research: [] };
+
+/** Where the offline preview keeps its progress, so a dev can play past one run. */
+const LOCAL_KEY = "dungeon-warden:endless-progress";
 
 function readLocal(): Progress {
   try {
@@ -33,7 +41,8 @@ function readLocal(): Progress {
     if (!raw) return EMPTY;
     const parsed = JSON.parse(raw) as Partial<Progress>;
     return {
-      best: parsed.best && typeof parsed.best === "object" ? parsed.best : {},
+      bestWaves: Number(parsed.bestWaves) || 0,
+      souls: Number(parsed.souls) || 0,
       research: Array.isArray(parsed.research) ? parsed.research : [],
     };
   } catch {
@@ -49,18 +58,23 @@ function writeLocal(progress: Progress): void {
   }
 }
 
+function fromServer(p: Partial<Progress> | undefined): Progress {
+  return { bestWaves: p?.bestWaves ?? 0, souls: p?.souls ?? 0, research: p?.research ?? [] };
+}
+
 /**
- * Stars and research: the part of the game that outlives a stage.
+ * What outlives a run: the best one, the souls earned, the research bought.
  *
- * On Verse8 the server holds it and decides what a finished run is worth;
- * the offline preview keeps it in localStorage and decides for itself, so
- * `npm run dev` plays the whole game before the first deploy.
+ * On Verse8 the server holds it, decides what a finished run earns and keeps
+ * the ranking; the offline preview keeps it in localStorage and decides for
+ * itself, so `npm run dev` plays the whole game before the first deploy.
  */
 export function useProgress() {
   const { server, connected, connecting, account } = useGameServer();
   const [status, setStatus] = useState<ProgressStatus>(HAS_VERSE ? "connecting" : "offline");
   const [progress, setProgress] = useState<Progress>(() => (HAS_VERSE ? EMPTY : readLocal()));
   const [entitlements, setEntitlements] = useState<Entitlements>(EMPTY_ENTITLEMENTS);
+  const [nickname, setNicknameState] = useState("");
   const [error, setError] = useState<string | null>(null);
   const loadedRef = useRef(false);
   const progressRef = useRef(progress);
@@ -81,10 +95,11 @@ export function useProgress() {
     setStatus("loading");
     server
       .remoteFunction("loadGame", [])
-      .then((result: { progress: Progress; entitlements: Entitlements }) => {
+      .then((result: { progress: Progress; entitlements: Entitlements; nickname?: string }) => {
         if (cancelled) return;
-        setProgress({ best: result.progress.best ?? {}, research: result.progress.research ?? [] });
+        setProgress(fromServer(result.progress));
         setEntitlements(result.entitlements ?? EMPTY_ENTITLEMENTS);
+        setNicknameState(result.nickname ?? "");
         setStatus("ready");
       })
       .catch((e: unknown) => {
@@ -104,35 +119,35 @@ export function useProgress() {
   }, []);
 
   /** Opens a run on the server. Resolves false if it was refused. */
-  const startStage = useCallback(
-    async (stageId: number): Promise<boolean> => {
-      if (!HAS_VERSE) return true;
-      try {
-        await server.remoteFunction("startStage", [{ stageId }]);
-        return true;
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-        return false;
-      }
-    },
-    [server],
-  );
+  const startRun = useCallback(async (): Promise<boolean> => {
+    if (!HAS_VERSE) return true;
+    try {
+      await server.remoteFunction("startRun", []);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return false;
+    }
+  }, [server]);
 
-  const finishStage = useCallback(
-    async (stageId: number, won: boolean, livesLeft: number, lives: number): Promise<FinishResult | null> => {
+  /** Closes a run. Null when the server would not record it. */
+  const finishRun = useCallback(
+    async (wavesCleared: number): Promise<RunResult | null> => {
       if (!HAS_VERSE) {
-        const stars = won ? starsFor(livesLeft, lives) : 0;
-        const key = String(stageId);
-        const before = progressRef.current.best[key] ?? 0;
-        if (stars > before) update({ ...progressRef.current, best: { ...progressRef.current.best, [key]: stars } });
-        return { stars, best: Math.max(stars, before), improved: stars > before };
+        const current = progressRef.current;
+        const souls = Math.floor(wavesCleared / WAVES_PER_STAGE);
+        const improved = wavesCleared > current.bestWaves;
+        update({
+          ...current,
+          souls: current.souls + souls,
+          bestWaves: Math.max(current.bestWaves, wavesCleared),
+        });
+        return { souls, improved };
       }
       try {
-        const result: FinishResult & { progress: Progress } = await server.remoteFunction("finishStage", [
-          { stageId, won, livesLeft },
-        ]);
-        update({ best: result.progress.best ?? {}, research: result.progress.research ?? [] });
-        return { stars: result.stars, best: result.best, improved: result.improved };
+        const result: RunResult & { progress: Progress } = await server.remoteFunction("finishRun", [{ wavesCleared }]);
+        update(fromServer(result.progress));
+        return { souls: result.souls, improved: result.improved };
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         return null;
@@ -146,14 +161,14 @@ export function useProgress() {
       const node = RESEARCH_BY_ID.get(id);
       const current = progressRef.current;
       if (!node || !canResearch(node, current.research)) return false;
-      if (starsToSpend(current.best, current.research) < node.cost) return false;
+      if (soulsToSpend(current.souls, current.research) < node.cost) return false;
       if (!HAS_VERSE) {
         update({ ...current, research: [...current.research, id] });
         return true;
       }
       try {
         const result: { progress: Progress } = await server.remoteFunction("researchNode", [{ id }]);
-        update({ best: result.progress.best ?? {}, research: result.progress.research ?? [] });
+        update(fromServer(result.progress));
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -163,6 +178,34 @@ export function useProgress() {
     [server, update],
   );
 
+  const setNickname = useCallback(
+    async (name: string): Promise<boolean> => {
+      if (!HAS_VERSE) {
+        setNicknameState(name.trim().slice(0, 20));
+        return true;
+      }
+      try {
+        const result: { nickname: string } = await server.remoteFunction("setNickname", [{ nickname: name }]);
+        setNicknameState(result.nickname);
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        return false;
+      }
+    },
+    [server],
+  );
+
+  const rankings = useCallback(async (): Promise<{ top: RankRow[]; mine: RankRow | null } | null> => {
+    if (!HAS_VERSE) return null;
+    try {
+      return await server.remoteFunction("getRankings", [{ limit: 30 }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return null;
+    }
+  }, [server]);
+
   const reset = useCallback(async () => {
     if (!HAS_VERSE) {
       update(EMPTY);
@@ -170,7 +213,7 @@ export function useProgress() {
     }
     try {
       const result: { progress: Progress } = await server.remoteFunction("resetGame", []);
-      update({ best: result.progress.best ?? {}, research: result.progress.research ?? [] });
+      update(fromServer(result.progress));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -186,11 +229,6 @@ export function useProgress() {
     }
   }, [server]);
 
-  const isUnlocked = useCallback(
-    (stageId: number) => stageId === 1 || (progress.best[String(stageId - 1)] ?? 0) > 0,
-    [progress],
-  );
-
   return {
     status,
     error,
@@ -198,14 +236,14 @@ export function useProgress() {
     isOffline: !HAS_VERSE,
     progress,
     entitlements,
-    starsLeft: starsToSpend(progress.best, progress.research),
-    starsTotal: Object.values(progress.best).reduce((sum, n) => sum + n, 0),
-    isUnlocked,
-    startStage,
-    finishStage,
+    nickname,
+    soulsLeft: soulsToSpend(progress.souls, progress.research),
+    startRun,
+    finishRun,
     research,
+    setNickname,
+    rankings,
     reset,
     refreshEntitlements,
-    stageExists: (id: number) => stageById(id) !== null,
   };
 }

@@ -4,13 +4,13 @@ import { RESEARCH, RESEARCH_BY_ID, canResearch } from "../game/td/research";
 
 interface Props {
   owned: string[];
-  starsLeft: number;
+  soulsLeft: number;
   onBuy: (id: string) => void;
   onClose: () => void;
 }
 
-/** Everything stars can buy, and what each needs first. */
-export function ResearchDialog({ owned, starsLeft, onBuy, onClose }: Props) {
+/** Everything souls can buy, and what each needs first. */
+export function ResearchDialog({ owned, soulsLeft, onBuy, onClose }: Props) {
   useEscape(onClose);
   const t = useT();
 
@@ -19,7 +19,7 @@ export function ResearchDialog({ owned, starsLeft, onBuy, onClose }: Props) {
       <div className="modal research-dialog" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <h2>{t("tab_research")}</h2>
-          <span className="research-stars">★ {starsLeft}</span>
+          <span className="research-stars">{t("souls_n", { n: soulsLeft })}</span>
           <button className="icon-btn" onClick={onClose} aria-label="close">×</button>
         </header>
         <p className="modal-note">{t("research_note")}</p>
@@ -38,10 +38,10 @@ export function ResearchDialog({ owned, starsLeft, onBuy, onClose }: Props) {
                   <i>{needs.length > 0 ? t("research_needs", { list: needs.join(", ") }) : t(node.note)}</i>
                 </div>
                 <button
-                  disabled={has || !open || starsLeft < node.cost}
+                  disabled={has || !open || soulsLeft < node.cost}
                   onClick={() => onBuy(node.id)}
                 >
-                  {has ? t("research_owned") : `★ ${node.cost}`}
+                  {has ? t("research_owned") : t("souls_n", { n: node.cost })}
                 </button>
               </li>
             );
