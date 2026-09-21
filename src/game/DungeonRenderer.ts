@@ -1293,9 +1293,18 @@ export class DungeonRenderer {
         this.markerGroup.add(object);
       }
 
-      // Sits just above the floor so it reads as part of the tile.
-      const lift = usesModel ? object.position.y : MARKER_HEIGHT / 2;
-      object.position.set(marker.x, FLOOR_HEIGHT + lift, marker.y);
+      /*
+       * Sits just above the floor so it reads as part of the tile.
+       *
+       * The lift is read once, when the object is made, and kept: it used to
+       * be read back off the object's own height every call, so each call
+       * added the floor height again - and now that markers are handed over
+       * every frame, a trap rose into the air the moment it was placed.
+       */
+      if (object.userData.lift === undefined) {
+        object.userData.lift = usesModel ? object.position.y : MARKER_HEIGHT / 2;
+      }
+      object.position.set(marker.x, FLOOR_HEIGHT + (object.userData.lift as number), marker.y);
     }
 
     for (const [id, object] of this.markerMeshes) {
