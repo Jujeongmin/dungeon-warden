@@ -2813,3 +2813,27 @@ button.ad-gold {
   .icon-toggle { width: 32px; height: 32px; }
   .raid-bar { padding: 4px 12px; gap: 10px; }
 }
+
+/*
+ * The ridden body's health, small, in the top-left corner.
+ *
+ * It sat in the middle of the view just above the controls, 300px across -
+ * right where the corridor ahead is, which is the one thing the player is
+ * looking at. Under the raid bar it is out of the way and still one glance
+ * from the fight.
+ */
+.walk-life {
+  left: 12px;
+  right: auto;
+  top: calc(var(--dock-bottom, 92px) + 6px);
+  bottom: auto;
+  transform: none;
+  width: min(28%, 190px);
+  align-items: flex-start;
+  gap: 3px;
+}
+.walk-life-bar { height: 14px; }
+.walk-life span { font-size: var(--fs-2xs); }
+@media (max-height: 520px) {
+  .walk-life { top: calc(var(--dock-bottom, 92px) + 4px); bottom: auto; }
+}

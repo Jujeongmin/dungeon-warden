@@ -1311,7 +1311,14 @@ export default function App() {
       // walking: down there the camera is an eye, not a frame, and every
       // offset would only skew what it sees.
       const dock = document.querySelector(".topdock");
-      const dockBottom = dock && frame && !walking ? dock.getBoundingClientRect().bottom - frame.top : 0;
+      const dockEdge = dock && frame ? dock.getBoundingClientRect().bottom - frame.top : 0;
+      // Where the top chrome ends, for the ridden body's health bar to hang
+      // under. The --topdock-h the panel uses is a fixed 92px, and a bar placed
+      // off that sat on the raid bar.
+      if (stage instanceof HTMLElement && dockEdge > 0) {
+        stage.style.setProperty("--dock-bottom", `${Math.round(dockEdge)}px`);
+      }
+      const dockBottom = !walking ? dockEdge : 0;
       renderer.setTopInset(Math.max(0, dockBottom));
 
       // The fight: the panel is away and the skill cards stand in a column
@@ -2591,8 +2598,11 @@ export default function App() {
       {possessed && (
         <div className="walk-life">
           {/* The level on a line of its own, above the bar rather than inside it:
-              squeezed into a 15px pill beside the hit points, both were clipped. */}
-          <b className="walk-life-level">{t("warden_level", { n: wardenLevelOf(meta?.wardenDowns ?? 0) })}</b>
+              squeezed into a 15px pill beside the hit points, both were clipped.
+              The body's name, not the warden's level: the bar is the body's
+              health, and "Warden Lv1" over it read as the archer having turned
+              into the warden. The level is in the top bar already. */}
+          <b className="walk-life-level">{t(MINION_LABEL[possessed.type] as StringKey)}</b>
           <div className="walk-life-bar">
             <div
               className="walk-life-fill"
