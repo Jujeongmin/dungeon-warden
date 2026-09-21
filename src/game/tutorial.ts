@@ -56,6 +56,16 @@ export interface TutorialStep {
    * never sent somewhere they cannot go.
    */
   placeAt?: (context: TutorialContext) => { x: number; y: number } | null;
+  /**
+   * Every tile the step accepts, when that is more than the one pointed at.
+   *
+   * Digging is a drag, and a drag crosses many tiles within one gesture -
+   * faster than the pointer can move on to the next. Checked against the one
+   * ringed tile, a drag either dug anywhere (it was not checked at all) or
+   * would stop after the first. So the dig steps name the whole run they
+   * want: the corridor's column, or the two nooks.
+   */
+  allows?: (context: TutorialContext, x: number, y: number) => boolean;
   /** True once the player has done the thing. */
   done: (context: TutorialContext) => boolean;
   /**
@@ -121,6 +131,8 @@ export const TUTORIAL: TutorialStep[] = [
       }
       return null;
     },
+    allows: ({ entrance, core }, x, y) =>
+      !!entrance && !!core && x === entrance.x && y > Math.min(entrance.y, core.y) && y < Math.max(entrance.y, core.y),
     done: ({ connected }) => connected,
   },
   {
@@ -155,6 +167,7 @@ export const TUTORIAL: TutorialStep[] = [
       if (!isDug(core.x - 1, y)) return { x: core.x - 1, y };
       return null;
     },
+    allows: ({ core }, x, y) => !!core && y === core.y - 3 && Math.abs(x - core.x) === 1,
     progress: ({ dug }) => ({ done: Math.min(2, Math.max(0, dug - CORRIDOR_TILES)), of: 2 }),
     done: ({ dug, connected }) => connected && dug >= CORRIDOR_TILES + 2,
   },

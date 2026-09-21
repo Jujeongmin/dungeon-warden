@@ -1321,28 +1321,26 @@ button.primary {
 }
 
 /*
-   The skills go along the foot of the board, not down the right.
+   The skills stand down the right, where the build panel was.
 
-   The panel is a full-height column on the right, and a second column of
-   cards beside it had nowhere to be: they overlapped it. The board keeps the
-   left of a sideways stage, so its bottom edge is the one piece of screen
-   nothing else claims - and a row there is where a thumb already is.
+   The panel steps aside for the fight (see the hud's hidden flag), and the
+   board is tall rather than wide: a row of cards along its foot took the
+   height it is short of, while the right of a sideways screen is width it
+   has to spare - and it is where the right thumb already rests.
 */
 .skillbar {
   position: absolute;
-  left: 12px;
-  right: calc(min(42%, 360px) + 20px);
-  bottom: 12px;
+  right: 8px;
+  top: calc(var(--topdock-h, 92px) + 4px);
   z-index: 2;
-  flex-direction: row;
+  flex-direction: column;
   align-self: auto;
-  width: auto;
+  width: min(24%, 190px);
   margin-right: 0;
   gap: 8px;
 }
 
 .skillbar .skill {
-  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -2621,7 +2619,7 @@ button.ad-gold {
   /* The skill cards ran past the foot of a 390px screen once one of them
      wrapped its effect line to three: two lines at most, and a little less
      of everything around them. */
-  .skillbar { bottom: 8px; gap: 6px; }
+  .skillbar { gap: 6px; }
   .skillbar .skill { padding: 5px 8px; }
   .skill b { font-size: var(--fs-xs); }
   .skill i {
@@ -2785,3 +2783,33 @@ button.ad-gold {
    so neither label breaks over two lines in a narrow dialog. */
 .intro-actions button { white-space: nowrap; }
 .intro-actions .primary { flex: 1 1 auto; }
+
+/*
+ * A phone held sideways.
+ *
+ * The stage used to stop at 16:9, which on a 19.5:9 phone left a dark strip
+ * down each side; it takes the whole width now. And the type no longer grows
+ * with that width: it was sized off the stage, so a wide phone got desktop
+ * type in a panel a third of a 400px-tall screen, and the board was left a
+ * sliver. The panel narrows with it.
+ */
+@media (max-height: 520px) and (orientation: landscape) {
+  /* html:root: index.css sets these on :root and loads after this file. */
+  html:root {
+    --stage-w: 100vw;
+    --fs-2xs: 10px;
+    --fs-xs: 11px;
+    --fs-sm: 12px;
+    --fs-base: 13px;
+    --fs-md: 15px;
+    --fs-lg: 17px;
+  }
+  .hud { width: min(34%, 300px); }
+  .skillbar { width: min(22%, 170px); gap: 6px; }
+  .skill b { font-size: var(--fs-xs); }
+  /* Its padding was a share of the stage, and the stage is now the whole
+     width: 30px above and below the bar, taken from the board. */
+  .topbar { padding: 8px 14px; gap: 12px; }
+  .icon-toggle { width: 32px; height: 32px; }
+  .raid-bar { padding: 4px 12px; gap: 10px; }
+}

@@ -879,13 +879,9 @@ export default function App() {
       return;
     }
 
-    const guided = guidedTapRef.current;
-    if (guided && tool.kind !== "remove") {
-      const wrongTile = guided === "none" || x !== guided.x || y !== guided.y;
-      if (wrongTile) {
-        audio.play("error");
-        return;
-      }
+    if (tool.kind !== "remove" && !guideAllowsRef.current(x, y)) {
+      audio.play("error");
+      return;
     }
 
     let ok = false;
@@ -926,6 +922,8 @@ export default function App() {
   const dragRef = useRef<(x: number, y: number) => void>(() => {});
   dragRef.current = (x, y) => {
     if (raid.raiding) return;
+    // Filling is undoing, and stays free of the guide like removing does.
+    if (tool.kind === "dig" && !guideAllowsRef.current(x, y)) return;
     const ok =
       tool.kind === "dig" ? save.dig(x, y) : tool.kind === "fill" ? save.fill(x, y) : false;
     if (ok) audio.play("dig");
@@ -1302,8 +1300,10 @@ export default function App() {
       const panel = hudRef.current;
       if (!panel) return;
       // Measured against the stage, not the window: on a wide screen the game
-      // is a letterboxed column and the window is mostly backdrop.
-      const stage = panel.offsetParent as HTMLElement | null;
+      // is a letterboxed column and the window is mostly backdrop. Not the
+      // panel's offset parent: the panel is hidden during a raid, and hidden
+      // it has none.
+      const stage = document.querySelector(".app");
       const frame = stage?.getBoundingClientRect() ?? null;
 
       renderer.setLeftInset(0);
@@ -1313,18 +1313,25 @@ export default function App() {
       const dock = document.querySelector(".topdock");
       const dockBottom = dock && frame && !walking ? dock.getBoundingClientRect().bottom - frame.top : 0;
       renderer.setTopInset(Math.max(0, dockBottom));
+
+      // The fight: the panel is away and the skill cards stand in a column
+      // where it was, so the board is framed beside them.
+      if (raid.raiding && !walking) {
+        const skills = document.querySelector(".skillbar");
+        renderer.setBottomInset(0);
+        renderer.setRightInset(
+          skills && frame ? Math.max(0, frame.right - skills.getBoundingClientRect().left) : 0,
+        );
+        return;
+      }
+
       const box = panel.getBoundingClientRect();
       // A column down the side starts near the top of the stage; a sheet
       // across the foot starts well below it. Either way, only the covered
       // strip is handed over, never both.
       const column = frame ? box.top - frame.top < frame.height * 0.5 && box.width < frame.width * 0.6 : false;
       if (column && frame && !walking) {
-        // During a raid the skill cards run along the foot of the board, and
-        // the core is the bottom row of it: framed without them, they hid it.
-        const skills = raid.raiding ? document.querySelector(".skillbar") : null;
-        renderer.setBottomInset(
-          skills ? Math.max(0, frame.bottom - skills.getBoundingClientRect().top) : 0,
-        );
+        renderer.setBottomInset(0);
         renderer.setRightInset(Math.max(0, frame.right - box.left));
       } else {
         renderer.setRightInset(0);
@@ -1661,7 +1668,7 @@ export default function App() {
     room: { count: rooms.length, cap: MAX_ROOMS },
   };
 
-  const guide = guideFor({
+  const tutorialContext = {
     entrance,
     core,
     minions,
@@ -1672,9 +1679,10 @@ export default function App() {
     toolId,
     group,
     dug: dug.length,
-    isDug: (x, y) => terrain.has(blockedKey(x, y, arena.w)) === false && inArena(arena, x, y),
+    isDug: (x: number, y: number) => terrain.has(blockedKey(x, y, arena.w)) === false && inArena(arena, x, y),
     connected,
-  });
+  };
+  const guide = guideFor(tutorialContext);
   // The tutorial is dismissed for good, finished, or out of the way while a
   // raid plays — there is nothing to do during one but watch.
   const teaching = settings.tutorialDone || raid.raiding || walking ? null : guide;
@@ -1739,6 +1747,23 @@ export default function App() {
       : teaching.target?.kind === "tile" || !teaching.step.tool
         ? null
         : "none";
+
+  /*
+   * Whether the opening lets this tile be built on, for a tap or a drag.
+   *
+   * The dig tool is a paint stroke from the first press, so its taps never
+   * reached the check above and the corridor step could be dug anywhere. A
+   * step that names a run of tiles (see TutorialStep.allows) takes any of
+   * them; otherwise only the ringed tile will do.
+   */
+  const guideAllowsRef = useRef<(x: number, y: number) => boolean>(() => true);
+  guideAllowsRef.current = (x, y) => {
+    const guided = guidedTapRef.current;
+    if (!teaching || guided === null) return true;
+    if (guided === "none") return false;
+    if (teaching.step.allows) return teaching.step.allows(tutorialContext, x, y);
+    return x === guided.x && y === guided.y;
+  };
 
   /*
    * The tiles the party will walk, for telling road from roadside under the
@@ -2172,8 +2197,11 @@ export default function App() {
         ref={hudRef}
         className={hudOpen ? "hud" : "hud collapsed"}
         // Hidden rather than unmounted: it keeps its scroll position and its
-        // open tab for when the player climbs back out.
-        hidden={walking || screen === "title"}
+        // open tab for when the player climbs back out. Out of the way while
+        // the fight runs too: nothing in it can be used then, and on a phone
+        // it took a third of the screen from the board. It is back for the
+        // build break between waves.
+        hidden={walking || screen === "title" || raid.raiding}
       >
         <div className="hud-tabs">
           <button className={tab === "build" ? "active" : ""} onClick={() => { audio.play("click"); setTab("build"); }}>{t("tab_build")}</button>

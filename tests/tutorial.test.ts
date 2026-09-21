@@ -173,3 +173,28 @@ describe("steps that ask for two", () => {
     expect(guideFor(ctx({ dug: 13, toolId: "none" }))?.progress ?? null).toBeNull();
   });
 });
+
+describe("the tiles a dig step accepts", () => {
+  const context = {
+    minions: [], traps: [], entrance, core,
+    wavesRepelled: 0, coreBreaches: 0, loot: 0, toolId: "dig", group: "dig",
+    dug: 2, isDug: () => false, connected: false,
+  } satisfies TutorialContext;
+  const corridor = TUTORIAL.find((step) => step.id === "dig")!;
+  const nook = TUTORIAL.find((step) => step.id === "nook")!;
+
+  it("takes the whole corridor between door and core, and nothing beside it", () => {
+    for (let y = entrance.y + 1; y < core.y; y++) {
+      expect(corridor.allows?.(context, entrance.x, y)).toBe(true);
+    }
+    expect(corridor.allows?.(context, entrance.x + 1, entrance.y + 3)).toBe(false);
+    expect(corridor.allows?.(context, 0, 0)).toBe(false);
+  });
+
+  it("takes only the two nooks beside the corridor", () => {
+    expect(nook.allows?.(context, core.x + 1, core.y - 3)).toBe(true);
+    expect(nook.allows?.(context, core.x - 1, core.y - 3)).toBe(true);
+    expect(nook.allows?.(context, core.x + 1, core.y - 4)).toBe(false);
+    expect(nook.allows?.(context, core.x + 2, core.y - 3)).toBe(false);
+  });
+});
