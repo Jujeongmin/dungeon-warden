@@ -3,7 +3,7 @@ import type { TrapType } from "../types";
 export interface TrapStats {
   /** Instant damage on trigger. */
   damage: number;
-  /** Seconds before the trap can fire again. */
+  /** Seconds between shots, for the one trap that shoots. Floor traps catch everyone that passes. */
   cooldown: number;
   /** How close an adventurer must get for a pressure trap to fire. 0 = ranged. */
   triggerRadius: number;

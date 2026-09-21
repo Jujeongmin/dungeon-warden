@@ -69,7 +69,10 @@ export interface RunTrap {
   type: TrapType;
   x: number;
   y: number;
+  /** The arrow trap's time to its next shot. Floor traps have none. */
   cooldown: number;
+  /** Adventurers a floor trap has already caught: each is caught once. */
+  hit: Set<string>;
 }
 
 export interface RunEnemy {
@@ -363,7 +366,7 @@ export class StageRun {
     if (this.gold < cost) return { ok: false, reason: "gold" };
     this.gold -= cost;
     this.seq += 1;
-    this.traps.push({ id: `p${this.seq}`, type, x, y, cooldown: 0 });
+    this.traps.push({ id: `p${this.seq}`, type, x, y, cooldown: 0, hit: new Set() });
     return { ok: true };
   }
 
@@ -579,15 +582,20 @@ export class StageRun {
         this.hurt(target, stats.damage * scale * ENEMIES[target.cls].trapResistance, "trap", { x: trap.x, y: trap.y });
         continue;
       }
-      // Stepped on.
-      const on = this.enemies.filter((e) => Math.hypot(e.x - trap.x, e.y - trap.y) <= stats.triggerRadius);
-      if (on.length === 0) continue;
-      trap.cooldown = stats.cooldown;
+      /*
+       * On the floor: no recharge. Every adventurer that comes within reach
+       * is caught once as it passes - the plate under its feet, or for a
+       * rockfall or a flame, the tiles round it too, which in a maze is the
+       * next lane over as well.
+       */
+      const reach = Math.max(stats.triggerRadius, stats.aoe);
+      const hit = this.enemies.filter(
+        (e) => !trap.hit.has(e.id) && Math.hypot(e.x - trap.x, e.y - trap.y) <= reach,
+      );
+      if (hit.length === 0) continue;
       this.events.push({ kind: "trap", trapId: trap.id, x: trap.x, y: trap.y });
-      const hit = stats.aoe > 0
-        ? this.enemies.filter((e) => Math.hypot(e.x - trap.x, e.y - trap.y) <= stats.aoe)
-        : [on[0]];
       for (const enemy of hit) {
+        trap.hit.add(enemy.id);
         const resist = ENEMIES[enemy.cls].trapResistance;
         if (stats.burn) enemy.burn = { dps: stats.burn.dps * scale * resist, until: this.time + stats.burn.duration };
         this.hurt(enemy, stats.damage * scale * resist, "trap");

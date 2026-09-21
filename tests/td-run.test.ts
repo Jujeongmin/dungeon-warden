@@ -113,6 +113,18 @@ describe("waves", () => {
     }
   });
 
+  it("catch every adventurer that walks over a floor trap, with no recharge", () => {
+    const stage = { ...open(), waves: [[{ cls: "knight" as const, count: 5, level: 1 }]] };
+    const run = new StageRun(stage, base);
+    run.placeTrap("spike", run.entrance.x, 2);
+    run.startWave();
+    const hurt = new Set<string>();
+    for (let i = 0; i < 2400 && run.status === "wave"; i++) {
+      for (const e of run.step()) if (e.kind === "damage" && e.source === "trap") hurt.add(e.targetId);
+    }
+    expect(hurt.size).toBe(5);
+  });
+
   it("count the waves cleared, which is what a run is scored by", () => {
     const run = new StageRun(open(), base);
     for (let x = 0; x < 4; x++) run.placeTower("warrior", x, 2);
