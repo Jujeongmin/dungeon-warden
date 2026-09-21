@@ -143,7 +143,6 @@ body {
 .hud,
 .tutorial,
 .raid-bar,
-.skillbar,
 .banner,
 .floater,
 .title,
@@ -181,20 +180,6 @@ h3.section {
   pointer-events: none;
 }
 
-.brand {
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide);
-  font-size: var(--fs-md);
-  white-space: nowrap;
-}
-
-.brand span {
-  color: var(--muted);
-  font-weight: var(--fw-bold);
-  font-size: var(--fs-2xs);
-  margin-left: 6px;
-}
-
 .stats {
   display: flex;
   align-items: center;
@@ -227,10 +212,6 @@ h3.section {
   background: var(--panel);
   font-size: var(--fs-xs);
 }
-
-.status-ready { color: var(--ok); }
-.status-error { color: var(--danger); }
-.status-offline { color: var(--accent); }
 
 /*
    The room keeps turning behind the menu, and it is the picture.
@@ -329,7 +310,6 @@ h3.section {
 .title-head .title-kicker {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
-
 
 .title-foot {
   display: flex;
@@ -495,45 +475,6 @@ h3.section {
 .floater.trap { color: #ff9a5c; font-size: var(--fs-lg); }
 .floater.killed { color: #ff8f7a; }
 .floater.captured { color: #8fe6a0; font-size: var(--fs-lg); }
-/* The party has seen the warden: bigger than a number, and the colour of trouble. */
-.floater.noticed { color: #ff6a52; font-size: var(--fs-lg); }
-
-/* The warden's skins in settings: locked ones stay in the row and say what
-   opens them, so the reward is known before it is earned. */
-.setting-row.skin-row { flex-wrap: wrap; gap: 8px; }
-.skin-picks {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.skin-picks button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  padding: 5px 10px;
-  font-size: var(--fs-xs);
-}
-.skin-picks button small { font-size: var(--fs-2xs); color: var(--muted); }
-.skin-picks button.active { border-color: var(--accent); color: var(--accent); }
-
-/* The leaderboard's two boards, and today's party on the second. */
-.board-tabs { margin-bottom: 8px; }
-.daily-waves {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 4px 0 10px;
-}
-.daily-wave {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-xs);
-}
-.daily-wave b { margin-right: 4px; color: var(--muted); font-weight: var(--fw-bold); }
 
 /* Starts fully visible: a damage number that fades in is a damage number the
    player misses. */
@@ -565,60 +506,10 @@ h3.section {
   line-height: 1.6;
 }
 
-/* Stuck: a line and the two ways out, side by side. */
-.banner-broke {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding-right: 16px;
-  border-color: rgba(232, 164, 76, 0.55);
-}
-
-.banner-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  pointer-events: auto;
-}
-
-.banner-actions button {
-  padding: 6px 12px;
-  font-size: var(--fs-2xs);
-  border-radius: 99px;
-}
-
-/* Relief is not earnings, so it does not wear the gold of the reward. */
-.payout .relief {
-  display: block;
-  font-size: var(--fs-2xs);
-  color: #b9d7a8;
-}
-
-.banner-error {
-  border-color: rgba(215, 106, 90, 0.6);
-  color: #ffbdb2;
-}
-
 .banner code {
   background: rgba(255, 255, 255, 0.08);
   padding: 1px 5px;
   border-radius: 4px;
-}
-
-.banner-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  flex: none;
-  padding: 0;
-  line-height: 1;
-  font-size: var(--fs-md);
-  border: none;
-  background: none;
-  color: var(--muted);
 }
 
 .hud {
@@ -670,8 +561,7 @@ h3.section {
  * will use. The selected tool, the armed skill and the open tab are the same
  * state, so they get the same treatment rather than three near-misses. */
 .hud-tabs button.active,
-.tool.active,
-.skill.armed {
+.tool.active {
   border-color: var(--torch-edge);
   color: var(--torch);
   background: linear-gradient(180deg, #3b2f20, #2a2118);
@@ -780,42 +670,6 @@ h3.section:first-child { margin-top: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .spotlight { animation: none; }
 }
-
-.rank-submit {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0;
-}
-
-.rank-submit input {
-  flex: 1;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ink);
-  font: inherit;
-  font-size: var(--fs-sm);
-}
-
-.rank-submit button { flex: none; width: auto; min-width: 64px; }
-
-.rank-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-xs);
-  margin-top: 8px;
-}
-
-.rank-table th,
-.rank-table td {
-  padding: 6px 4px;
-  text-align: left;
-  border-bottom: 1px solid var(--line);
-}
-
-.rank-table th { color: var(--muted); font-weight: var(--fw-bold); font-size: var(--fs-2xs); }
-.rank-table tr.me td { color: var(--accent); font-weight: var(--fw-bold); }
 
 .hud h2 {
   margin: 0 0 6px;
@@ -951,47 +805,6 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
   overflow-y: auto;
 }
 
-/* Below the stack rather than beside it, which is where it already ended up
-   on screen - so the width the bar above had to reserve for it was reserved
-   against nothing. */
-.skillbar {
-  align-self: flex-end;
-  margin-right: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 150px;
-  pointer-events: auto;
-}
-
-.skill {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 8px 10px;
-}
-
-.skill b { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
-/* The effect line wraps rather than being clipped: it is a short sentence in
-   five languages and the column is 116px on a phone, so one of them is going
-   to need two lines and the button can afford to be that tall. */
-.skill i {
-  font-style: normal;
-  font-size: var(--fs-2xs);
-  line-height: 1.35;
-  color: var(--muted);
-  text-align: left;
-  white-space: normal;
-}
-
-/* The one ad in the raid, marked apart from the free warden skills. */
-.skill.ad {
-  border-color: rgba(127, 201, 138, 0.5);
-}
-
-.skill.ad b { color: var(--ok); }
-
 .tool {
   display: flex;
   flex-direction: column;
@@ -1044,23 +857,6 @@ button.primary {
 
 .modal.narrow { width: min(360px, 100%); }
 
-.result-list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  font-size: var(--fs-sm);
-}
-
-.result-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 7px 0;
-  border-top: 1px solid var(--line);
-}
-
-.result-list span { color: var(--muted); }
-.result-list b.bad { color: #ffb4a8; }
-
 .panel {
   margin: 8px 0;
   padding: 8px 10px;
@@ -1088,62 +884,6 @@ button.primary {
 
 .research:first-of-type { border-top: none; }
 .research.owned { opacity: 0.55; }
-
-.research-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.research-head b { font-size: var(--fs-xs); font-weight: var(--fw-bold); }
-.research-head .ok { color: var(--ok); font-size: var(--fs-2xs); }
-
-.research-head button {
-  flex: none;
-  width: auto;
-  min-width: 54px;
-  padding: 3px 8px;
-  font-size: var(--fs-2xs);
-}
-
-.equip-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 6px 0;
-  font-size: var(--fs-2xs);
-  color: var(--muted);
-}
-
-.equip-row span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.equip-row select {
-  flex: none;
-  width: 96px;
-  padding: 3px 4px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--ink);
-  font: inherit;
-  font-size: var(--fs-2xs);
-}
-
-.shop-btn {
-  flex: none;
-  pointer-events: auto;
-  padding: 4px 12px;
-  font-size: var(--fs-xs);
-  border-radius: 99px;
-  border-color: rgba(232, 164, 76, 0.5);
-  color: var(--accent);
-}
 
 .modal-backdrop {
   position: absolute;
@@ -1302,46 +1042,10 @@ button.primary {
   width: auto;
 }
 
-/* Down in the corridor the panel is gone, so the raid bar has no reason to
-   stop short of it - it wrapped onto two lines for a column that was empty. */
-.app:has(.walkbar) .topstack { padding-right: 8px; }
-
 /* Only gold and the buttons survive on a phone; the rest is in the HUD. */
 .stats .status,
 .stats .pending {
   display: none;
-}
-
-.brand { font-size: var(--fs-xs); letter-spacing: var(--ls-normal); }
-.brand span { display: none; }
-
-.skillbar {
-  margin-right: 8px;
-  width: 116px;
-}
-
-/*
-   The skills stand down the right, where the build panel was.
-
-   The panel steps aside for the fight (see the hud's hidden flag), and the
-   board is tall rather than wide: a row of cards along its foot took the
-   height it is short of, while the right of a sideways screen is width it
-   has to spare - and it is where the right thumb already rests.
-*/
-.skillbar {
-  position: absolute;
-  right: 8px;
-  top: calc(var(--topdock-h, 92px) + 4px);
-  z-index: 2;
-  flex-direction: column;
-  align-self: auto;
-  width: min(24%, 190px);
-  margin-right: 0;
-  gap: 8px;
-}
-
-.skillbar .skill {
-  min-width: 0;
 }
 
 .raid-bar {
@@ -1365,11 +1069,6 @@ button.primary {
 .stats { gap: 0.45em; font-size: var(--fs-xs); }
 .banner { font-size: var(--fs-xs); }
 .modal { max-height: 80%; }
-
-/* Below this the brand no longer fits alongside the functional buttons —
-   decoration yields to function, so it drops rather than push controls
-   off the right edge. */
-.brand { display: none; }
 
 /* The toolbar is a well cut into the panel, not more panel: the tools sit
    inside it, which is why the shadow runs inwards here and outwards on the
@@ -1469,8 +1168,7 @@ button.primary {
   animation: slab-rise 220ms cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
-.hud,
-.skillbar {
+.hud {
   animation: slab-rise 240ms cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
@@ -1519,16 +1217,15 @@ button.primary {
    monster, so removing it would remove information rather than decoration. */
 @media (prefers-reduced-motion: reduce) {
   .title,
-  .modal,
-  .modal-backdrop,
-  .hud,
-  .skillbar,
-  .banner,
-  .tutorial,
-  .raid-bar,
-  .hud-body,
-  .gold.up,
-  .gold.down {
+.modal,
+.modal-backdrop,
+.hud,
+.banner,
+.tutorial,
+.raid-bar,
+.hud-body,
+.gold.up,
+.gold.down {
     animation: none;
   }
 }
@@ -1553,128 +1250,10 @@ button.primary {
   overflow-y: auto;
 }
 
-/* The verdict is the whole top of the panel, coloured by which way it went —
-   read before a word of it has been. */
-.verdict {
-  margin: 0 -20px 14px;
-  padding: 18px 20px 14px;
-  text-align: center;
-  border-bottom: 1px solid var(--edge-dark);
-}
-
-.result.won .verdict {
-  background: linear-gradient(180deg, rgba(232, 164, 76, 0.22), transparent);
-  box-shadow: inset 0 2px 0 var(--torch);
-}
-
-.result.lost .verdict {
-  background: linear-gradient(180deg, rgba(215, 106, 90, 0.22), transparent);
-  box-shadow: inset 0 2px 0 var(--danger);
-}
-
-.verdict b {
-  display: block;
-  font-size: var(--fs-lg);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide);
-}
-
-.result.won .verdict b { color: var(--accent); }
-.result.lost .verdict b { color: #ffb4a8; }
-
-.verdict p {
-  margin: 6px 0 0;
-  font-size: var(--fs-xs);
-  line-height: 1.6;
-  color: var(--muted);
-}
-
-.payout {
-  text-align: center;
-  margin: 4px 0 14px;
-}
-
-.payout b {
-  display: block;
-  font-size: clamp(34px, 12vw, 52px);
-  font-weight: var(--fw-bold);
-  line-height: 1.1;
-  color: var(--accent);
-  /* Numbers that change every frame must not shuffle their own width. */
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 24px var(--torch-glow);
-  animation: payout-land 520ms cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-
-/* The sign and the coin are along for the ride, not part of the count. */
-.payout b i,
-.payout b em {
-  font-style: normal;
-  font-size: 0.45em;
-  vertical-align: 0.5em;
-  color: var(--muted);
-}
-
-.payout b em { margin-left: 0.15em; color: var(--accent); }
-
-.payout .taken {
-  display: inline-block;
-  margin-top: 2px;
-  font-size: var(--fs-xs);
-  color: #ffb4a8;
-}
-
 @keyframes payout-land {
   0% { opacity: 0; transform: scale(0.72); }
   55% { opacity: 1; transform: scale(1.06); }
   100% { opacity: 1; transform: scale(1); }
-}
-
-/* Captured adventurers and looted weapons were sentences. They are things you
-   gained, so they are objects on the screen rather than prose about them. */
-.spoils {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.chip {
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  background: var(--stone-deep);
-  font-size: var(--fs-2xs);
-  color: var(--ink);
-}
-
-.chip.captured {
-  border-color: rgba(127, 201, 138, 0.45);
-  color: var(--ok);
-}
-
-/* The leader is the one spoil worth lighting up. */
-.chip.champion {
-  border-color: rgba(232, 164, 76, 0.6);
-  background: linear-gradient(180deg, #4a3a22, #2f2519);
-  color: var(--accent);
-  font-weight: var(--fw-bold);
-}
-
-/* The warden's own hands: set apart from loot and prisoners, which are the
-   dungeon's, in the cold of a spell rather than the gold of a reward. */
-.chip.warden {
-  border-color: rgba(201, 182, 255, 0.5);
-  color: #d9ceff;
-}
-
-/* Running totals arrive after the payout has landed, one beat apart, so the
-   block reads downwards instead of all at once. Delays are set inline from
-   the row index. */
-.modal.result .result-list li {
-  opacity: 0;
-  animation: row-in 220ms ease-out forwards;
 }
 
 @keyframes row-in {
@@ -1692,13 +1271,6 @@ button.primary {
   border-top: 1px solid var(--edge-dark);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .payout b,
-  .modal.result .result-list li {
-    animation: none;
-    opacity: 1;
-  }
-}
 /* ── Stacking ─────────────────────────────────────────────────────────────
  *
  * Everything inside .app is absolutely positioned and none of it declared a
@@ -1737,11 +1309,6 @@ button.primary {
    screen. */
 .title { z-index: 30; }
 
-/* 3.5 — the right-click prompt. Over the board and the chrome it was
-   opened on top of, under anything modal: a dialog opening while it is up
-   should cover it, and its own backdrop closes it before that can matter. */
-.prompt-catch { z-index: 35; }
-
 /* 4 — anything modal, over everything including the title. */
 .modal-backdrop { z-index: 40; }
 
@@ -1749,27 +1316,10 @@ button.primary {
    while it shows. */
 .rotate-guard { z-index: 50; }
 
-
-/* Watching an ad for gold is an offer, not a control the game needs — marked
-   in the gold it pays out rather than in the torch colour that means "this is
-   what you have selected". */
-button.ad-gold {
-  border-color: rgba(232, 164, 76, 0.45);
-  color: var(--accent);
-  font-size: var(--fs-xs);
-}
-
 /* The name the dungeon has earned, beside the number it earned it with. */
 .tier {
   color: var(--accent);
   font-weight: var(--fw-bold);
-}
-
-/* A tier is reached once. Marked apart from the error banners it shares a
-   stack with — this one is good news. */
-.banner-tier {
-  border-color: rgba(232, 164, 76, 0.5);
-  color: var(--accent);
 }
 
 /* ── The build panel, rebuilt ─────────────────────────────────────────────
@@ -1863,10 +1413,6 @@ button.ad-gold {
   border-color: rgba(232, 164, 76, 0.55);
   color: var(--accent);
 }
-
-/* Nobody is standing to defend yet: the one line on the button that has to
-   be read before pressing it. */
-.hud-foot .go .go-warn { color: #ffb4a8; }
 
 .hud-foot .go {
   display: flex;
@@ -2134,8 +1680,6 @@ button.ad-gold {
   background: linear-gradient(180deg, var(--torch), #b97c2f);
 }
 
-
-
 /* ---------------------------------------------------------------------------
    Landscape.
 
@@ -2195,59 +1739,9 @@ button.ad-gold {
   .rotate-guard .phone { animation: none; }
 }
 
-
-
-
-/* ---------------------------------------------------------------------------
-   The right-click prompt.
-
-   Fixed, not absolute: the position it is given is a pointer position, which
-   is viewport coordinates, and the stage is a centred column - an absolute
-   offset inside it would land the prompt short by the width of the letterbox.
-   (The tutorial ring got this wrong once already.)
-   --------------------------------------------------------------------------- */
-.prompt-catch {
-  position: fixed;
-  inset: 0;
-}
-
-.tile-prompt {
-  position: fixed;
-  transform: translate(-50%, 10px);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 7px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, #2b241c, #1b1610);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--edge-lit);
-  white-space: nowrap;
-  /* Its own keyframes, not the shared panel-fade.
-
-     panel-fade ends at `transform: none`, and an animation owns the whole
-     property for its duration - so for 120ms the centring translate was
-     simply gone and the prompt was drawn half its own width to the right of
-     the cursor, then jumped left when the animation finished. It has to fade
-     in without ever letting go of the offset that positions it. */
-  animation: prompt-in 120ms ease-out;
-}
-
 @keyframes prompt-in {
   from { opacity: 0; transform: translate(-50%, 6px); }
   to { opacity: 1; transform: translate(-50%, 10px); }
-}
-
-.tile-prompt b {
-  font-size: var(--fs-2xs);
-  color: var(--ink);
-}
-
-.tile-prompt button {
-  padding: 4px 10px;
-  font-size: var(--fs-2xs);
-  border-color: rgba(216, 106, 76, 0.5);
-  color: var(--danger);
 }
 
 /* ---------------------------------------------------------------------------
@@ -2273,16 +1767,6 @@ button.ad-gold {
   font-variant-numeric: tabular-nums;
 }
 
-.raid-bar .go-wave {
-  flex: none;
-  margin-left: auto;
-  padding: 4px 12px;
-  font-size: var(--fs-2xs);
-  font-weight: var(--fw-bold);
-  border-color: rgba(232, 164, 76, 0.6);
-  color: var(--accent);
-}
-
 /* ---------------------------------------------------------------------------
    Walking the dungeon.
 
@@ -2293,20 +1777,6 @@ button.ad-gold {
    [hidden] - so hiding either has to be said out loud. */
 .hud[hidden],
 .topdock[hidden] { display: none; }
-
-.walkbar {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
-  pointer-events: none;
-}
-
-.walkbar > * { pointer-events: auto; }
 
 /* The stick: a ring the left thumb rests in, a knob it drags. Deliberately
    large - it is held, not tapped, by a thumb that is not being looked at. */
@@ -2324,81 +1794,8 @@ button.ad-gold {
   user-select: none;
 }
 
-.stick .knob {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 1px solid rgba(232, 164, 76, 0.5);
-  background: linear-gradient(180deg, rgba(58, 46, 28, 0.92), rgba(36, 28, 18, 0.92));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-}
-
-/* The raid button from the floor: top right, out of the way of both thumbs. */
-.walk-raid {
-  position: absolute;
-  right: 12px;
-  top: calc(var(--topdock-h, 92px) + 8px);
-  z-index: 2;
-  flex: none;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
-}
-
 @media (max-height: 480px) {
   .stick { width: 92px; height: 92px; }
-  .stick .knob { width: 44px; height: 44px; }
-  .walkbar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); }
-}
-
-/* How to get down there, said on the board while a raid runs. Low contrast
-   and out of the way: it is an offer, not an instruction, and the player who
-   has taken it up once never needs to read it again. */
-.possess-hint {
-  position: absolute;
-  /* Clear above the skill cards, centred on the board column rather than the
-     stage: lower down it sat on the cards' titles, and centred on the whole
-     stage it straddled the panel. */
-  left: calc((100% - min(42%, 360px) - 20px) / 2);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 124px);
-  transform: translateX(-50%);
-  white-space: nowrap;
-  z-index: 3;
-  padding: 6px 14px;
-  border-radius: 99px;
-  font-size: var(--fs-2xs);
-  color: rgba(239, 231, 216, 0.72);
-  border: 1px solid rgba(232, 164, 76, 0.22);
-  background: rgba(20, 15, 11, 0.55);
-  pointer-events: none;
-}
-
-/* The frame the warden sees when the body under it dies.
-
-   Held rather than flashed: a single frame of red is a rendering glitch, and
-   what this has to say is that something was lost. It takes no clicks and
-   clears itself - the board is already back underneath it. */
-.body-lost {
-  /* The stage, not the browser window: on a screen wider than 16:9 the
-     game is a centred column and this belongs over that, not over the bars
-     either side of it. */
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(120, 18, 14, 0) 35%, rgba(120, 18, 14, 0.62) 100%);
-  animation: body-lost 1.8s ease-out forwards;
-}
-
-.body-lost span {
-  font-size: var(--fs-lg);
-  letter-spacing: 0.06em;
-  color: #f3d9d2;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
 }
 
 @keyframes body-lost {
@@ -2406,93 +1803,6 @@ button.ad-gold {
   12% { opacity: 1; }
   70% { opacity: 1; }
   100% { opacity: 0; }
-}
-
-/* Said down in the corridor instead, where the skills are not drawn and the
-   bar along the foot is the stick and the swing. */
-.strike-hint {
-  /* The panel is gone down there, so this one centres on the whole stage. */
-  left: 50%;
-  top: auto;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 158px);
-}
-
-/* The swing, opposite the stick: one thumb walks the body, the other hits
-   with it. Round and large for the same reason the stick is - it is found by
-   feel, by a thumb that is not being looked at. */
-.walk-strike {
-  flex: none;
-  margin-left: auto;
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
-  font-size: var(--fs-xs);
-  letter-spacing: 0.08em;
-  color: var(--ink);
-  border: 1px solid rgba(232, 164, 76, 0.45);
-  background: radial-gradient(circle at 50% 34%, rgba(232, 164, 76, 0.34), rgba(20, 15, 11, 0.74));
-  box-shadow: inset 0 1px 0 rgba(255, 226, 178, 0.18);
-}
-
-.walk-strike:active { transform: scale(0.94); }
-
-/* The hop sits beside the swing: the same thumb, one reach further in. */
-.walk-hop {
-  flex: none;
-  margin-left: auto;
-  align-self: flex-end;
-  padding: 8px 14px;
-  font-size: var(--fs-2xs);
-  border-radius: 99px;
-  color: var(--ink);
-  border: 1px solid rgba(232, 164, 76, 0.35);
-  background: rgba(20, 15, 11, 0.62);
-}
-
-.walk-hop + .walk-strike { margin-left: 10px; }
-
-/* The skill leads the group on the right; the hop tucks in after it. The
-   wait is written on the button itself, so it greys out while it counts. */
-.walk-skill {
-  flex: none;
-  margin-left: auto;
-  align-self: flex-end;
-  padding: 8px 14px;
-  font-size: var(--fs-2xs);
-  border-radius: 99px;
-  color: var(--ink);
-  border: 1px solid rgba(201, 182, 255, 0.45);
-  background: rgba(20, 15, 11, 0.62);
-}
-
-.walk-skill:disabled { opacity: 0.55; }
-
-/* The key each control answers to, on the control itself. Only on a machine
-   with a mouse, which is the one that has a keyboard to press them on - a
-   thumb on a phone has no use for "E". The one-time hint above the bar said
-   it once and then never again, which is how nobody learned Q. */
-.walkbar kbd {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 5px;
-  min-width: 1.4em;
-  border: 1px solid rgba(232, 164, 76, 0.45);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: var(--fs-2xs);
-  font-weight: var(--fw-bold);
-  line-height: 1.25;
-  text-align: center;
-  color: var(--accent);
-  background: rgba(0, 0, 0, 0.35);
-}
-
-/* Under the word on the round swing button, not beside it. */
-.walk-strike kbd {
-  display: block;
-  width: fit-content;
-  margin: 4px auto 0;
 }
 
 /* The stick's keys sit under the ring, out of the thumb's way. */
@@ -2506,80 +1816,6 @@ button.ad-gold {
   margin: 0;
   pointer-events: none;
   white-space: nowrap;
-}
-
-.walk-skill + .walk-hop { margin-left: 10px; }
-
-.walk-strike + .walk-exit { margin-left: 12px; }
-
-/* What is left of the body being ridden.
-
-   Above the bar rather than in it: this is the number the player is watching
-   while both thumbs are busy, and it has to be readable without looking down
-   at either of them. */
-.walk-life {
-  position: absolute;
-  left: 50%;
-  /* Above the row of buttons between the stick and the swing: level with
-     them it ran under the skill and hop buttons. */
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 132px);
-  transform: translateX(-50%);
-  z-index: 3;
-  /* Wider and taller than it was: at 15px high and 240px across, a line of
-     Korean with the level and the hit points on it was cut off top, bottom
-     and end. The level now has a line of its own above the bar. */
-  width: min(46%, 300px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  pointer-events: none;
-}
-
-.walk-life-level {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-bold);
-  line-height: 1.2;
-  color: var(--accent);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
-  white-space: nowrap;
-}
-
-.walk-life-bar {
-  position: relative;
-  width: 100%;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 99px;
-  border: 1px solid rgba(232, 164, 76, 0.32);
-  background: rgba(20, 15, 11, 0.62);
-}
-
-.walk-life-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: linear-gradient(90deg, #8d2f2a, #d0564a);
-  transition: width 0.12s linear;
-}
-
-.walk-life span {
-  position: relative;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-bold);
-  line-height: 1;
-  color: var(--ink);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  white-space: nowrap;
-}
-
-@media (max-height: 520px) {
-  .walk-strike { width: 74px; height: 74px; }
-  /* Clear of the button row: with the level on a line of its own the block is
-     twice the height it was, and at 44px it sat on the skill and hop buttons. */
-  .walk-life { bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); }
-  .strike-hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 162px); }
 }
 
 /*
@@ -2596,7 +1832,6 @@ button.ad-gold {
    does not fit ends in an ellipsis instead of being sliced.
 */
 @media (max-height: 520px) {
-  .topdock:has(.tutorial) .banner:not(.banner-broke):not(.banner-error) { display: none; }
   .banner,
   .tutorial {
     padding-top: 6px;
@@ -2616,18 +1851,6 @@ button.ad-gold {
     padding: 8px 10px;
   }
   .hud-foot { padding-top: 6px; }
-  /* The skill cards ran past the foot of a 390px screen once one of them
-     wrapped its effect line to three: two lines at most, and a little less
-     of everything around them. */
-  .skillbar { gap: 6px; }
-  .skillbar .skill { padding: 5px 8px; }
-  .skill b { font-size: var(--fs-xs); }
-  .skill i {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
   .group i {
     max-width: 100%;
     overflow: hidden;
@@ -2637,15 +1860,6 @@ button.ad-gold {
 
 /* A tool's name breaks between words, never inside one: "스켈레톤 궁 / 수". */
 .tool b { word-break: keep-all; }
-
-.walk-exit {
-  flex: none;
-  margin-left: auto;
-  align-self: flex-end;
-  padding: 8px 14px;
-  font-size: var(--fs-2xs);
-  border-radius: 99px;
-}
 
 /* The bought speed, before it is bought. */
 .speeds button.locked { opacity: 0.7; }
@@ -2805,8 +2019,6 @@ button.ad-gold {
     --fs-lg: 17px;
   }
   .hud { width: min(34%, 300px); }
-  .skillbar { width: min(22%, 170px); gap: 6px; }
-  .skill b { font-size: var(--fs-xs); }
   /* Its padding was a share of the stage, and the stage is now the whole
      width: 30px above and below the bar, taken from the board. */
   .topbar { padding: 8px 14px; gap: 12px; }
@@ -2814,26 +2026,92 @@ button.ad-gold {
   .raid-bar { padding: 4px 12px; gap: 10px; }
 }
 
-/*
- * The ridden body's health, small, in the top-left corner.
- *
- * It sat in the middle of the view just above the controls, 300px across -
- * right where the corridor ahead is, which is the one thing the player is
- * looking at. Under the raid bar it is out of the way and still one glance
- * from the fight.
- */
-.walk-life {
-  left: 12px;
-  right: auto;
-  top: calc(var(--dock-bottom, 92px) + 6px);
-  bottom: auto;
-  transform: none;
-  width: min(28%, 190px);
-  align-items: flex-start;
-  gap: 3px;
+/* ── Stage tower defence ──────────────────────────────────────────────── */
+
+.stars { letter-spacing: 1px; white-space: nowrap; }
+.star { color: rgba(255, 255, 255, 0.18); }
+.star.on { color: var(--accent); text-shadow: 0 0 6px rgba(232, 164, 76, 0.5); }
+
+.modal.stage-select { width: min(560px, 100%); }
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 8px 0 4px;
 }
-.walk-life-bar { height: 14px; }
-.walk-life span { font-size: var(--fs-2xs); }
+
+.stage-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  border-radius: 6px;
+}
+
+.stage-card b { font-family: var(--font-display); font-size: var(--fs-lg); line-height: 1.1; }
+.stage-card i { font-style: normal; font-size: var(--fs-2xs); color: var(--muted); text-align: center; word-break: keep-all; }
+.stage-card.locked { opacity: 0.45; }
+
+.modal.research-dialog { width: min(520px, 100%); }
+.research-stars { margin-left: auto; margin-right: 10px; color: var(--accent); font-weight: var(--fw-bold); }
+
+.research-list { list-style: none; margin: 0; padding: 0; }
+.research-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.research-list li:last-child { border-bottom: none; }
+.research-list li div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.research-list li b { font-size: var(--fs-sm); }
+.research-list li i { font-style: normal; font-size: var(--fs-xs); color: var(--muted); }
+.research-list li.owned b { color: var(--accent); }
+.research-list li.locked { opacity: 0.55; }
+.research-list li button { flex: none; min-width: 64px; }
+
+.result-stars { text-align: center; font-size: 34px; margin: 4px 0 2px; }
+
+.lives { color: #ff9a8a; font-weight: var(--fw-bold); margin-left: 12px; }
+
+.icon-toggle.armed { border-color: rgba(222, 104, 84, 0.75); color: #ffb4a8; }
+
+/* The upgrade and sell menu, hung over the tower it belongs to. */
+.tower-menu {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, calc(-100% - 18px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 132px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--edge-dark);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--stone-raised) 0, var(--stone-face) 20%, var(--stone-face) 100%);
+  box-shadow: inset 0 1px 0 var(--edge-lit), 0 10px 24px rgba(0, 0, 0, 0.55);
+  font-size: var(--fs-xs);
+}
+.tower-menu b { padding-right: 22px; white-space: nowrap; }
+.tower-menu button { padding: 6px 8px; font-size: var(--fs-xs); white-space: nowrap; }
+.tower-menu .icon-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; font-size: var(--fs-md); padding: 0; }
+
+.floater.gold { color: var(--accent); }
+.floater.leak { color: #ff8a7a; font-size: var(--fs-md); }
+.floater.bonus { color: #9be29b; }
+
+.hud-foot .go { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+
 @media (max-height: 520px) {
-  .walk-life { top: calc(var(--dock-bottom, 92px) + 4px); bottom: auto; }
+  .stage-grid { gap: 6px; }
+  .stage-card { padding: 6px 2px; }
+  .title-menu { grid-template-columns: repeat(3, 1fr); }
 }
+
+.modal.stage-result { width: min(420px, 100%); }
+.stage-result .actions button { flex: 1 1 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; }

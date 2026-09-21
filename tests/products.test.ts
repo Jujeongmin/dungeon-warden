@@ -12,9 +12,9 @@ describe("the shop's products", () => {
   });
 
   it("count as owned by what they grant, not by their id", () => {
-    expect(ownsProduct({ skinEmber: true }, "warden_skin_ember")).toBe(true);
-    expect(ownsProduct({ warden_skin_ember: true }, "warden_skin_ember")).toBe(false);
-    expect(ownsProduct({}, "larger_garrison")).toBe(false);
+    expect(ownsProduct({ fastForward: true }, "raid_speed_3x")).toBe(true);
+    expect(ownsProduct({ raid_speed_3x: true }, "raid_speed_3x")).toBe(false);
+    expect(ownsProduct({ skinEmber: true }, "warden_skin_ember")).toBe(false);
     expect(ownsProduct({ toString: true } as never, "toString")).toBe(false);
   });
 });

@@ -1,16 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { arenaFor, blockedSet, coreOf, entranceOf } from "../src/game/arena";
-import { buildRaidPath, findPath } from "../src/game/sim/pathfinding";
+import { blockedSet, coreOf, entranceOf, type Arena } from "../src/game/arena";
+import { findPath } from "../src/game/sim/pathfinding";
 
-const arena = arenaFor([]);
+const arena: Arena = { w: 12, h: 12 };
 
 describe("arena", () => {
-  it("is 12x12 with no research and grows with it", () => {
-    expect(arenaFor([])).toEqual({ w: 12, h: 12 });
-    expect(arenaFor(["expand1"])).toEqual({ w: 12, h: 16 });
-    expect(arenaFor(["expand1", "expand2"])).toEqual({ w: 12, h: 20 });
-  });
-
   it("puts the entrance and core on opposite edges", () => {
     expect(entranceOf(arena)).toEqual({ x: 6, y: 0 });
     expect(coreOf(arena)).toEqual({ x: 6, y: 11 });
@@ -46,21 +40,5 @@ describe("findPath", () => {
     const blocked = blockedSet(arena, [{ x: 6, y: 3 }]);
     const path = findPath(arena, entranceOf(arena), coreOf(arena), blocked);
     expect(path!.some((p) => p.x === 6 && p.y === 3)).toBe(false);
-  });
-});
-
-describe("buildRaidPath", () => {
-  it("detours through the nearest lure", () => {
-    const path = buildRaidPath(arena, entranceOf(arena), coreOf(arena), [{ x: 2, y: 4 }], new Set());
-    expect(path!.some((p) => p.x === 2 && p.y === 4)).toBe(true);
-  });
-
-  it("falls back to the direct route when no lure is reachable", () => {
-    const box = [
-      { x: 2, y: 3 }, { x: 2, y: 5 }, { x: 1, y: 4 }, { x: 3, y: 4 },
-    ];
-    const path = buildRaidPath(arena, entranceOf(arena), coreOf(arena), [{ x: 2, y: 4 }], blockedSet(arena, box));
-    expect(path).not.toBeNull();
-    expect(path!.some((p) => p.x === 2 && p.y === 4)).toBe(false);
   });
 });

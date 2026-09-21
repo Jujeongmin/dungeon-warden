@@ -2,32 +2,24 @@
 
 ## Short description (KO, <= 100)
 
-모험가가 아니라 던전이 되어라. 길을 접고 궁수를 세워 쳐들어오는 용사를 막는 3D 타워 디펜스. 막을수록 더 강한 파티가 온다.
+모험가가 아니라 던전이 되어라. 부하를 벽처럼 세워 꼬불꼬불한 미로를 만들고 쳐들어오는 용사를 막는 3D 타워 디펜스.
 
 ## Description (KO + EN, <= 1000)
 
 당신은 던전입니다.
 
-빈 방 하나를 받습니다. 바리케이드와 석벽으로 길을 접어 용사가 걷는 거리를 늘리고, 그 길 옆에 스켈레톤 궁수와 메이지를 세우세요.
+텅 빈 방에 스켈레톤 부하를 세우세요. 부하가 선 칸은 막혀서 용사는 돌아가야 합니다. 길을 길고 꼬불꼬불하게 만들수록 용사는 화살 앞을 오래 걷습니다. 단, 코어로 가는 길을 완전히 막을 수는 없습니다.
 
-용사는 코어만 봅니다. 길이 있으면 아무리 멀어도 돌아가고, 옆에서 화살이 날아와도 멈추지 않습니다. 길을 완전히 막아야 벽을 부수고, 길 위에 세운 부하와 싸웁니다.
+웨이브는 당신이 부를 때 옵니다. 처치해서 번 골드로 웨이브 도중에도 부하를 더 세우고 Lv3까지 강화하세요. 궁수, 범위 공격 메이지, 적을 느리게 하는 방패병, 싸고 빠른 졸개, 그리고 함정까지.
 
-방에는 이미 잔해가 있습니다. 그 위에는 지을 수 없고, 아무도 지나가지 못합니다.
-
-함정을 깔고, 방을 지어 부하를 키우고, 쓰러진 용사를 생포해 내 편으로 돌리세요. 막아낼수록 위협도가 올라 더 크고 강한 파티가 옵니다. 마지막 웨이브는 없습니다.
-
-전투는 자동입니다. 지켜보다 워든 스킬로 개입하세요.
+스테이지를 깨고 별을 모아 새 타워와 영구 강화를 연구하세요. 10개의 스테이지가 기다립니다.
 
 ---
 
 You are the dungeon.
 
-You get one empty room. Fold the walk with barricades and walls, then stand skeleton archers and mages beside it.
+Stand skeleton minions in an empty room. Every tile one stands on is blocked, so the heroes have to go round. The longer and more winding the way, the longer they walk under your arrows. Only one rule: the way to the core can never be sealed.
 
-Adventurers only want the core. If a path exists they take it, however long, and they will not stop for arrows from the side. Seal it, and only then do they break through — and fight whatever stands in the road.
+Waves come when you call them. Spend the gold from every kill on more minions mid-wave, and upgrade them to level 3: archers, splash mages, slowing guards, cheap fast grunts, and traps.
 
-The room comes with rubble: you cannot build on it and nobody walks through it.
-
-Lay traps, build rooms, take the fallen alive and turn them. Every raid you repel raises the threat; the next party is larger. There is no last wave.
-
-Combat runs itself. Step in with warden skills.
+Clear stages, collect stars, and research new towers and lasting upgrades. Ten stages to hold.

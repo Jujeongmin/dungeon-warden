@@ -13,25 +13,14 @@ import { publicUrl } from "./assets/publicUrl";
 export type Cue =
   | "click"
   | "place"
-  | "dig"
-  | "minionDown"
-  | "captured"
+  | "sell"
+  | "leak"
   | "error"
   | "raidStart"
   | "hit"
   | "trap"
-  | "skill"
   | "victory"
-  | "defeat"
-  // Down in a ridden body. First person is half sound: a swing nobody hears
-  // is a swing that did not happen, and a corridor walked in silence is a
-  // camera being moved.
-  | "swing"
-  | "possess"
-  | "bodyLost"
-  | "step"
-  // An adventurer has seen the warden in a body and is coming for it.
-  | "noticed";
+  | "defeat";
 
 interface ToneSpec {
   /** Start frequency in Hz. */
@@ -50,18 +39,13 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 180, to: 260, seconds: 0.09, type: "triangle", gain: 0.09 },
     { from: 90, seconds: 0.14, type: "sine", gain: 0.07 },
   ],
-  // Rock coming out: the lowest, longest thing in the mix.
-  dig: [
+  // A tower taken down: the lowest, longest thing in the mix.
+  sell: [
     { from: 150, to: 45, seconds: 0.34, type: "sawtooth", gain: 0.1 },
     { from: 70, to: 40, seconds: 0.5, type: "sine", gain: 0.08 },
   ],
-  // Bone giving out — short, dry, and clearly not an adventurer dying.
-  minionDown: [{ from: 260, to: 110, seconds: 0.2, type: "triangle", gain: 0.07 }],
-  // Taking one alive is the good outcome, so it rises where a kill falls.
-  captured: [
-    { from: 300, seconds: 0.1, type: "triangle", gain: 0.07 },
-    { from: 480, seconds: 0.18, type: "triangle", gain: 0.07 },
-  ],
+  // One through to the core: a hollow drop, clearly not a kill.
+  leak: [{ from: 260, to: 110, seconds: 0.2, type: "triangle", gain: 0.07 }],
   error: [{ from: 200, to: 120, seconds: 0.18, type: "square", gain: 0.06 }],
   raidStart: [
     { from: 110, to: 220, seconds: 0.35, type: "sawtooth", gain: 0.08 },
@@ -69,7 +53,6 @@ const TONES: Record<Cue, ToneSpec[]> = {
   ],
   hit: [{ from: 240, to: 90, seconds: 0.07, type: "square", gain: 0.05 }],
   trap: [{ from: 320, to: 60, seconds: 0.16, type: "sawtooth", gain: 0.07 }],
-  skill: [{ from: 300, to: 600, seconds: 0.22, type: "triangle", gain: 0.07 }],
   victory: [
     { from: 330, seconds: 0.12, type: "triangle", gain: 0.08 },
     { from: 440, seconds: 0.12, type: "triangle", gain: 0.08 },
@@ -79,27 +62,6 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 220, seconds: 0.16, type: "sawtooth", gain: 0.07 },
     { from: 150, seconds: 0.32, type: "sawtooth", gain: 0.07 },
   ],
-  // Air moving, not a hit: the blow lands or it does not, and the hit cue is
-  // what says it landed.
-  swing: [{ from: 520, to: 140, seconds: 0.12, type: "sawtooth", gain: 0.035 }],
-  // Dropping into a body: a low fall, then the room closing round you.
-  possess: [
-    { from: 480, to: 90, seconds: 0.28, type: "triangle", gain: 0.07 },
-    { from: 60, seconds: 0.4, type: "sine", gain: 0.08 },
-  ],
-  // Thrown out of one: the same fall, cut short and dropping further.
-  // Two short rising notes, higher than anything else down there: a warning,
-  // not an impact, and heard over a fight without being mistaken for one.
-  noticed: [
-    { from: 520, to: 700, seconds: 0.07, type: "square", gain: 0.05 },
-    { from: 700, to: 940, seconds: 0.09, type: "square", gain: 0.045 },
-  ],
-  bodyLost: [
-    { from: 300, to: 40, seconds: 0.45, type: "sawtooth", gain: 0.08 },
-    { from: 45, seconds: 0.6, type: "sine", gain: 0.09 },
-  ],
-  // Bone on stone. Quiet, because it repeats.
-  step: [{ from: 110, to: 70, seconds: 0.05, type: "triangle", gain: 0.03 }],
 };
 
 /**
@@ -109,30 +71,22 @@ const TONES: Record<Cue, ToneSpec[]> = {
 const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   click: [/click_00[12]/, /^click/, /select/, /^tick/],
   place: [/^drop_00/, /^switch/, /^bong/, /place/],
-  dig: [/rubble/, /^rock/, /impact.*heavy/, /^footstep/],
-  // No file matches these on purpose: the packs have nothing that reads as
-  // bone breaking or a body being dragged away, and a wrong sound is worse
-  // than the synthesised one the engine falls back to.
-  minionDown: [],
-  captured: [],
+  sell: [/rubble/, /^rock/, /impact.*heavy/, /^footstep/],
+  // Nothing in the packs reads as this, and a wrong sound is worse than the
+  // synthesised one the engine falls back to.
+  leak: [],
   error: [/error/, /^back_00/, /^close/, /wrong/],
   raidStart: [/^jingles_steel/, /^jingles_pizzi/, /horn/, /alarm/],
   hit: [/impact.*generic/, /^impact/, /^hit/, /punch/],
   trap: [/impact.*plate/, /explosion/, /^spike/, /metal/],
-  skill: [/^powerup/, /^magic/, /^spell/, /confirm/],
   victory: [/jingles.*win/, /win/, /^success/, /^complete/],
   defeat: [/jingles.*lose/, /lose/, /^fail/, /^gameover/],
-  swing: [/swoosh/, /^swing/, /whoosh/],
-  possess: [],
-  noticed: [],
-  bodyLost: [],
-  step: [/^footstep_concrete/, /^footstep/],
 };
 
 /**
  * The background music, one loop per mood.
  *
- * Building and walking the dungeon has its own track; a raid has another, and
+ * Building has its own track; a wave has another, and
  * the two crossfade when the defence starts and when it is over. Matched out of
  * the same manifest as the cues. The build mood falls back to the room tone
  * that shipped before there was music, and a raid with no track of its own

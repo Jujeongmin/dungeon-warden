@@ -4,13 +4,12 @@ import { useT } from "../i18n";
 interface Props {
   /** True when the dungeon has already been played. */
   hasProgress: boolean;
-  /** Dungeon summary shown on the continue card. */
-  summary: { threat: number; wavesRepelled: number; coreBreaches: number } | null;
+  /** Progress shown above the buttons once there is any. */
+  summary: { stars: number; starsMax: number; cleared: number; stages: number } | null;
   loading: boolean;
   offline: boolean;
   onStart: () => void;
   onSettings: () => void;
-  onLeaderboard: () => void;
   onShop: () => void;
   onGuide: () => void;
 }
@@ -35,7 +34,6 @@ export function TitleScreen({
   offline,
   onStart,
   onSettings,
-  onLeaderboard,
   onShop,
   onGuide,
 }: Props) {
@@ -56,16 +54,12 @@ export function TitleScreen({
           {hasProgress && summary && (
             <dl className="title-save">
               <div>
-                <dt>{t("stat_threat")}</dt>
-                <dd>{summary.threat}</dd>
+                <dt>{t("stat_stars")}</dt>
+                <dd>★ {summary.stars}/{summary.starsMax}</dd>
               </div>
               <div>
-                <dt>{t("board_repelled")}</dt>
-                <dd>{summary.wavesRepelled}</dd>
-              </div>
-              <div>
-                <dt>{t("board_breaches")}</dt>
-                <dd>{summary.coreBreaches}</dd>
+                <dt>{t("stat_cleared")}</dt>
+                <dd>{summary.cleared}/{summary.stages}</dd>
               </div>
             </dl>
           )}
@@ -76,7 +70,6 @@ export function TitleScreen({
             </button>
 
             <div className="title-menu">
-              <button onClick={onLeaderboard}>{t("menu_leaderboard")}</button>
               <button onClick={onShop}>{t("menu_shop")}</button>
               <button onClick={onGuide}>{t("menu_guide")}</button>
               <button onClick={onSettings}>{t("menu_settings")}</button>

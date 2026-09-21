@@ -265,6 +265,35 @@ export class StageRun {
 
   // ----------------------------------------------------------------- building
 
+  /**
+   * What placing here would be refused for, or null if it would be allowed.
+   *
+   * The same checks placeTower and placeTrap make, without spending anything,
+   * so the board can colour the ghost under the cursor before the tap.
+   */
+  refusalFor(kind: "tower" | "trap", type: TowerType | TrapType, x: number, y: number): Refusal | null {
+    if (this.status === "won" || this.status === "lost") return "over";
+    const unlocked = kind === "tower"
+      ? this.effects.towers.includes(type as TowerType)
+      : this.effects.traps.includes(type as TrapType);
+    if (!unlocked) return "locked";
+    if (!this.isDug(x, y)) return "not_dug";
+    if (this.isFixed(x, y)) return "fixed";
+    if (this.towerAt(x, y) || this.trapAt(x, y)) return "taken";
+    const cost = kind === "tower" ? TOWERS[type as TowerType].cost[0] : TRAP_COST[type as TrapType];
+    if (this.gold < cost) return "gold";
+    if (kind === "tower") {
+      if (this.occupied(x, y)) return "occupied";
+      if (!this.keepsWay(x, y)) return "blocks";
+    }
+    return null;
+  }
+
+  /** The way in if a tower stood here too, for drawing the maze it would make. */
+  routeWithTower(x: number, y: number): Point[] | null {
+    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(this.key(x, y)));
+  }
+
   placeTower(type: TowerType, x: number, y: number): BuildResult {
     if (this.status === "won" || this.status === "lost") return { ok: false, reason: "over" };
     if (!this.effects.towers.includes(type)) return { ok: false, reason: "locked" };

@@ -84,7 +84,7 @@ full packs are the archives in `art-src/`.
 | Impact Sounds | <https://kenney.nl/assets/impact-sounds> |
 | Music Jingles | <https://kenney.nl/assets/music-jingles> |
 
-Ten files in `public/assets/audio/`, one per cue. The audio engine matches them
+Nine files in `public/assets/audio/`, one per cue. The audio engine matches them
 by name, so the two jingles that carry no win/lose wording in the pack were
 renamed on the way in — the originals are named below.
 
@@ -93,8 +93,7 @@ renamed on the way in — the originals are named below.
 | click | `click_001.wav` | Interface Sounds | — |
 | place | `drop_002.wav` | Interface Sounds | — |
 | error | `error_004.wav` | Interface Sounds | — |
-| skill | `confirmation_002.wav` | Interface Sounds | — |
-| dig | `footstep_concrete_000.ogg` | Impact Sounds | — |
+| sell | `footstep_concrete_000.ogg` | Impact Sounds | — |
 | hit | `impactGeneric_light_000.ogg` | Impact Sounds | — |
 | trap | `impactPlate_medium_000.ogg` | Impact Sounds | — |
 | raidStart | `jingles_STEEL00.ogg` | Music Jingles | — |

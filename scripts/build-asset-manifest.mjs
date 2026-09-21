@@ -14,9 +14,8 @@ import { join, relative, posix, sep, dirname } from "node:path";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PUBLIC_DIR = join(ROOT, "public");
-// Every pack: the KayKit folders, and anything baked by another script
-// (scripts/bake-warden.mjs). The manifest itself stays where it has always
-// been, so the URL the runtime fetches does not move.
+// Every pack under public/assets. The manifest itself stays where it has
+// always been, so the URL the runtime fetches does not move.
 const MODEL_DIR = join(PUBLIC_DIR, "assets");
 const MANIFEST = join(PUBLIC_DIR, "assets", "kaykit", "manifest.json");
 const AUDIO_DIR = join(PUBLIC_DIR, "assets", "audio");

@@ -30,78 +30,16 @@ const FLOOR_HEIGHT = 0.12;
  */
 const PITCH = THREE.MathUtils.degToRad(68);
 
-/**
- * Half the width of whatever is walking the corridor, in tiles.
- *
- * Wide on purpose: it is how far from the rock the body is kept, and a body
- * let within a fifth of a tile of the wall is drawn with a shoulder in it.
- */
-const BODY = 0.36;
-/** How close the warden walking alone may come to one of its own minions, in tiles. */
-const MINION_CLEARANCE = 0.6;
-
-/** Radians of turn per pixel dragged. */
-const LOOK_SPEED = 0.0045;
-/** Tiles a second on foot. A tile is about two metres. */
-const WALK_SPEED = 2.2;
-
-/** How long one swing owns the body's clip, in milliseconds. */
-const SWING_MS = 450;
-
-/**
- * The camera behind the body, not inside its head.
- *
- * A pair of arms cut out of a model and hung off the lens never stopped
- * looking cut, and it hid the one thing worth seeing: the body itself,
- * swinging, among the rest of the fight. So the whole body is drawn and the
- * camera follows it from behind and above - high enough to clear the rock of
- * a one-tile corridor, which is what ruled a shoulder camera out before.
- *
- * `CHASE_DISTANCE` is tiles from the point it looks at; the elevation is the
- * angle above the horizon, turned by the vertical look within the clamp so
- * the view can neither sink into the rock behind nor flip over the top.
- */
-const CHASE_DISTANCE = 3.5;
-const CHASE_ELEVATION = 0.66;
-// Not lower: looking across a one-tile corridor from below this, the line from
-// the camera to the body passes under the top of the near wall and the rock
-// hides the body's legs behind a slab that fills half the screen.
-const CHASE_ELEVATION_MIN = 0.6;
-const CHASE_ELEVATION_MAX = 1.25;
-/** How far above its feet the camera aims: about the ridden body's chest. */
-const CHASE_AIM = 0.55;
-/** How far past the body it looks, in tiles along the ground. */
-const CHASE_LEAD = 0.5;
-/** The ring under the ridden body, so it can be told from its twins. */
-const MARK_COLOR = 0xc9b6ff;
-/** Health bars over units, as a share of their board size, while walking. */
-const WALK_BAR_SCALE = 0.4;
-/** How wide across the shoulders the warden is, in tiles. */
-const WARDEN_WIDTH = 0.62;
-/** And how tall it stands, which is what the eye height follows from. */
-const WARDEN_HEIGHT = 1.15;
-/**
- * And how wide it may come out at that height, in tiles.
- *
- * The imp is about as wide as it is tall and lands at 1.2. A body built squat
- * - the puglin, arms and stick out - scaled to the same height came out nearly
- * two tiles across and filled the corridor wall to wall, so the width caps the
- * scale as well.
- */
-const WARDEN_MAX_SPAN = 1.25;
-/** How strongly a glowing skin smoulders. */
-const SKIN_GLOW = 0.4;
 /*
  * How the view keeps up with the simulation.
  *
  * The simulation moves everything twenty times a second. Drawn exactly
- * there, a unit - and in the corridor the camera riding behind one - held
- * still for two or three frames and then jumped, which on a 60 or 120 Hz
- * screen is a stutter. Each position is a target the drawing eases toward
- * instead: at this rate a step is mostly covered by the next one, so the
- * motion reads as continuous and trails the truth by a few centimetres.
- * Anything further off than FOLLOW_SNAP is a spawn, a hop between bodies or
- * a shove, and is jumped to rather than slid across.
+ * there, a unit held still for two or three frames and then jumped, which
+ * on a 60 or 120 Hz screen is a stutter. Each position is a target the
+ * drawing eases toward instead: at this rate a step is mostly covered by the
+ * next one, so the motion reads as continuous and trails the truth by a few
+ * centimetres. Anything further off than FOLLOW_SNAP is a spawn or a shove,
+ * and is jumped to rather than slid across.
  */
 const FOLLOW_RATE = 18;
 /** How solid a minion on its revive timer is drawn. See UnitView.resting. */
@@ -110,12 +48,6 @@ const RESTING_OPACITY = 0.35;
 const LABEL_W = 128;
 const LABEL_H = 52;
 const FOLLOW_SNAP = 1.5;
-/**
- * How near the chase camera a unit can be before it is hidden. Anything
- * closer is between the camera and the body, or around the lens, and
- * drawn it fills the screen with the inside of a model.
- */
-const CAMERA_CLEARANCE = 1.1;
 
 /** The standing light, restated by setShowcase. */
 const AMBIENT_INTENSITY = 0.62;
@@ -176,38 +108,6 @@ const COLORS: Record<TileId, number> = {
 
 export interface RendererCallbacks {
   onTileTap: (x: number, y: number) => void;
-  /** A tap that was not a drag, while walking: down there it means hit. */
-  onWalkTap?: () => void;
-  /** A footfall, while walking - the warden's own or a ridden body's. */
-  onStep?: () => void;
-  /**
-   * A secondary click on a tile - right mouse button only, so it exists on a
-   * desktop and simply never fires on a phone, where the toolbar's remove
-   * tool is the way to do this.
-   *
-   * Carries the pointer position as well as the tile, because whatever this
-   * opens has to open where the player clicked rather than somewhere the
-   * board knows nothing about.
-   */
-  onTileAlt?: (x: number, y: number, clientX: number, clientY: number) => void;
-  /**
-   * A tile crossed while dragging with a tool held.
-   *
-   * Cutting the first corridor is ten tiles in a line, and ten taps for one
-   * intention is the kind of thing that makes a verb feel like paperwork.
-   * Only fired for tiles the drag actually enters, once each.
-   */
-  onTileDrag?: (x: number, y: number) => void;
-  /**
-   * Whether the tool in hand is one a drag should run along.
-   *
-   * Asked at the moment the gesture starts rather than pushed in by a setter.
-   * A setter has to be called from an effect, and the effect that would do it
-   * runs before the one that builds this renderer - so on the pass that
-   * matters it was setting a field on nothing, and every drag panned the
-   * camera instead of digging.
-   */
-  isPaintable?: () => boolean;
   onHoverChange: (tile: { x: number; y: number } | null) => void;
 }
 
@@ -281,13 +181,13 @@ interface Clutter {
   wanted: number;
 }
 
-/** A flat tile decoration: a trap plate or a room floor. */
+/** A trap on the floor. */
 export interface MarkerView {
   id: string;
   x: number;
   y: number;
   kind: string;
-  shape: "trap" | "room";
+  shape: "trap";
 }
 
 /** Placeholder colors, keyed the same way as MODEL_PATTERNS. */
@@ -308,37 +208,12 @@ const MARKER_COLORS: Record<string, number> = {
   arrow: 0x8fae7e,
   rockfall: 0x8a7a63,
   flame: 0xd98443,
-  treasury: 0xd4a94a,
-  vault: 0x7f8fa6,
-  barracks: 0xa86f5c,
-  altar: 0x8f6fb0,
-  workshop: 0x6f9a9a,
 };
 
 const UNIT_HEIGHT = 0.7;
-/** How wide a unit is drawn, in tiles. A ridden body is drawn the same. */
+/** How wide a unit is drawn, in tiles. */
 const UNIT_TILES = 0.8;
 const MARKER_HEIGHT = 0.16;
-
-/**
- * What each room type puts on its tiles.
- *
- * A room is 2x2, and drawing its one model on all four tiles read as a
- * warehouse of identical chests. Each tile picks from this list instead, so a
- * treasury is a chest with coin piles around it and a barracks is beds and
- * footlockers. The room's own key stays first: it is the one that has to be
- * recognisable, and it is what a one-tile fallback shows.
- */
-const ROOM_PROPS: Record<string, string[]> = {
-  treasury: ["treasury", "prop_coin_large", "prop_coin_small", "treasury"],
-  vault: ["vault", "prop_box", "prop_barrel", "prop_box"],
-  barracks: ["barracks", "prop_bed", "prop_box", "prop_banner"],
-  altar: ["altar", "prop_candle", "prop_pillar", "prop_candle"],
-  workshop: ["workshop", "prop_table", "prop_shelf", "prop_barrel"],
-  jail: ["jail", "prop_box", "prop_barrel", "jail"],
-};
-
-/** Props scattered on empty room floor, and how often a tile gets one. */
 
 /**
  * How the clutter behaves once the room is in use.
@@ -374,9 +249,6 @@ const STONE = {
  * it never hides the corridor from this camera angle.
  */
 const ROCK_HEIGHT = 0.85;
-
-/** Seconds between footfalls. A trudge, not a run. */
-const STEP_SECONDS = 0.42;
 
 /** How high off the floor a shot is drawn, and how thick. Chest height. */
 const BOLT_HEIGHT = 0.42;
@@ -464,7 +336,6 @@ export class DungeonRenderer {
   private trapGeometry = new THREE.BoxGeometry(0.72, MARKER_HEIGHT, 0.72);
   /** The floor ring under every trap. Shared; each trap tints its own material. */
   private trapRing = new THREE.RingGeometry(0.4, 0.5, 28);
-  private roomGeometry = new THREE.BoxGeometry(0.94, MARKER_HEIGHT * 0.6, 0.94);
 
 
   private arena: Arena | null = null;
@@ -569,12 +440,6 @@ export class DungeonRenderer {
   private activePointers = new Map<number, THREE.Vector2>();
   private dragStart: THREE.Vector2 | null = null;
   private dragMoved = false;
-  /** The last tile a drag painted, so crossing one tile twice does nothing. */
-  private paintedTile: string | null = null;
-  /** Where the last painted tile was, so a fast drag can be joined up. */
-  private paintedAt: { x: number; y: number } | null = null;
-  /** Whether the current drag paints tiles rather than moving the camera. */
-  private painting = false;
   private pinchStartDistance = 0;
   private pinchStartCameraDistance = 0;
 
@@ -632,7 +497,6 @@ export class DungeonRenderer {
 
     this.attachPointerEvents();
     window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
 
     // Models arrive asynchronously; anything already on screen is swapped in
     // place once they land, so the game is playable while they load.
@@ -938,26 +802,6 @@ export class DungeonRenderer {
     }
   }
 
-  /** Hides units standing on the chase camera, and shows them again once clear. */
-  private hideUnitsAtCamera(): void {
-    const camera = this.camera.position;
-    const live = new Set(this.unitMeshes.values());
-    for (const object of this.hiddenByCamera) {
-      if (!live.has(object)) this.hiddenByCamera.delete(object);
-    }
-    for (const object of live) {
-      const near =
-        this.walk !== null &&
-        Math.hypot(object.position.x - camera.x, object.position.z - camera.z) < CAMERA_CLEARANCE;
-      if (near) {
-        object.visible = false;
-        this.hiddenByCamera.add(object);
-      } else if (this.hiddenByCamera.delete(object)) {
-        object.visible = true;
-      }
-    }
-  }
-
   /** Eases every unit toward where the simulation last put it. See FOLLOW_RATE. */
   private updateUnitMotion(delta: number): void {
     const k = 1 - Math.exp(-delta * FOLLOW_RATE);
@@ -1019,9 +863,6 @@ export class DungeonRenderer {
     this.clearMarkers();
     this.setUnits(this.lastUnits);
     this.setMarkers(this.lastMarkers);
-    // The body was spawned before its model existed, if it exists at all.
-    if (this.walk) this.spawnWarden();
-
     // The floor/walls/landmarks/decor were built at mount, before models
     // existed, so every tileProto/spawnModel lookup came back null and they
     // never rebuild on their own. Rebuild them now that models are loaded.
@@ -1140,9 +981,6 @@ export class DungeonRenderer {
      */
     const scale = host.scale.x || 1;
     bar.position.set(0, 1.45 / scale, 0);
-    // Remembered, because the frame loop resizes the bar while walking and
-    // has to keep undoing the host scale when it does.
-    bar.userData.baseScale = 1 / scale;
     bar.scale.setScalar(1 / scale);
 
     const fill = bar.getObjectByName("fill") as THREE.Mesh | undefined;
@@ -1219,16 +1057,7 @@ export class DungeonRenderer {
   /** Turns every bar to face the camera. Cheap: a handful of quaternion copies. */
   private updateHealthBars(): void {
     this.camera.getWorldQuaternion(FACING);
-    /*
-     * Smaller from the corridor.
-     *
-     * Sized to read from above the board, a bar a tile or two from the lens
-     * was a slab across the middle of the screen - and drawn over depth, so
-     * over the ridden body too.
-     */
-    const size = this.walk ? WALK_BAR_SCALE : 1;
     for (const bar of this.healthBars.values()) {
-      bar.scale.setScalar(((bar.userData.baseScale as number | undefined) ?? 1) * size);
       /*
        * The parent turn has to come out first, or the bar wears it.
        *
@@ -1412,7 +1241,7 @@ export class DungeonRenderer {
     };
   }
 
-  /** Flat decorations for traps and room floors, synced the same way as units. */
+  /** The traps, synced the same way as units. */
   setMarkers(markers: MarkerView[]): void {
     this.lastMarkers = markers;
     const seen = new Set<string>();
@@ -1420,17 +1249,14 @@ export class DungeonRenderer {
     for (const marker of markers) {
       seen.add(marker.id);
       let object = this.markerMeshes.get(marker.id);
-      // A room tile may show one of its type's props rather than the room
-      // model itself; a trap is always its own model.
-      const modelKey =
-        marker.shape === "room" ? this.roomPropFor(marker) : marker.kind;
+      const modelKey = marker.kind;
       const usesModel = this.loaded.get(modelKey) != null;
 
       if (!object) {
         object =
-          this.spawnModel(modelKey, marker.shape === "trap" ? 0.78 : 0.85) ??
+          this.spawnModel(modelKey, 0.78) ??
           new THREE.Mesh(
-            marker.shape === "trap" ? this.trapGeometry : this.roomGeometry,
+            this.trapGeometry,
             new THREE.MeshLambertMaterial({
               color: MARKER_COLORS[marker.kind] ?? 0xffffff,
             }),
@@ -1441,10 +1267,10 @@ export class DungeonRenderer {
          * The pack's props are dungeon dressing first - a crossbow is a
          * crossbow, and on a torch-lit floor it is a small dark shape among
          * other small dark shapes. The ring is what says "this tile does
-         * something", from above and from the corridor alike, and its
+         * something" at a glance, and its
          * colour is the one the same trap flashes when it fires.
          */
-        if (marker.shape === "trap") {
+        {
           const ring = new THREE.Mesh(
             this.trapRing,
             new THREE.MeshBasicMaterial({
@@ -1467,7 +1293,7 @@ export class DungeonRenderer {
         this.markerGroup.add(object);
       }
 
-      // Sits just above the room floor so it reads as part of the tile.
+      // Sits just above the floor so it reads as part of the tile.
       const lift = usesModel ? object.position.y : MARKER_HEIGHT / 2;
       object.position.set(marker.x, FLOOR_HEIGHT + lift, marker.y);
     }
@@ -1479,19 +1305,6 @@ export class DungeonRenderer {
     }
 
     this.syncClutter();
-  }
-
-  /**
-   * Which prop this tile of a room shows.
-   *
-   * Falls back to the room's own model when the prop did not load, so a
-   * missing file costs one prop rather than an invisible room.
-   */
-  private roomPropFor(marker: MarkerView): string {
-    const props = ROOM_PROPS[marker.kind];
-    if (!props) return marker.kind;
-    const pick = props[Math.floor(tileNoise(marker.x, marker.y, 7) * props.length)];
-    return this.loaded.get(pick) ? pick : marker.kind;
   }
 
   /**
@@ -1793,11 +1606,6 @@ export class DungeonRenderer {
   private updateEntranceMark(): void {
     const mark = this.entranceMark;
     if (!mark) return;
-
-    // A beacon for finding the door from above. From the corridor it is a
-    // kite the size of a person hanging in front of the camera.
-    mark.arrow.visible = this.walk === null;
-    mark.ring.visible = this.walk === null;
 
     const t = this.elapsed;
     mark.arrow.position.y = FLOOR_HEIGHT + 1.25 + Math.sin(t * 2.4) * 0.14;
@@ -2205,470 +2013,6 @@ export class DungeonRenderer {
   }
 
   /**
-   * Shake is applied here as a pure offset on top of the player's own
-   * target/distance/yaw — never by mutating them — so panning, zooming and
-   * rotating during a shake behave exactly as if it were not happening, and
-   * the camera lands back exactly where the player left it once trauma hits
-   * zero (the offset is `f(trauma, time)`, not integrated, so it can't
-   * drift).
-   */
-  /**
-   * Standing in the corridor rather than looking down at it.
-   *
-   * The board above is where a maze gets built, because planning one is a
-   * thing you do by looking at it. This is the other half: down among the
-   * things that walk it - freely between raids, or inside one of the
-   * garrison during one.
-   *
-   * Held in world units rather than tiles so the walk is smooth; the rock it
-   * cannot pass through is still read per tile. `pitch` is the vertical look,
-   * which raises and lowers the camera behind the body.
-   */
-  private walk: { at: THREE.Vector3; yaw: number; pitch: number } | null = null;
-  /**
-   * The body the camera follows: the warden's own, or the minion it rides.
-   *
-   * Drawn whole and turned the way the player faces, playing its own walk and
-   * its own swing - the same thing the rest of the room sees it do.
-   */
-  private warden: THREE.Object3D | null = null;
-  /** The ring at its feet. Apart from the body so the body's scale cannot size it. */
-  private wardenMark: THREE.Mesh | null = null;
-  /** The model and tint the warden wears when it walks as itself: its skin. */
-  private wardenModel = "warden";
-  private wardenTint: number | null = null;
-  private wardenGlow: number | null = null;
-  /** Which kind of body is being ridden, or null for the warden's own. */
-  private possessedType: string | null = null;
-  /** Set by faceThreatOnArrival; the next position turns the view and clears it. */
-  private faceOnArrival = false;
-  /** Where the simulation last put the ridden body. The view eases toward it. */
-  private rideTarget: { x: number; z: number } | null = null;
-  /** Units hidden for standing on the camera. See CAMERA_CLEARANCE. */
-  private hiddenByCamera = new Set<THREE.Object3D>();
-  /** Wall-clock time the current swing ends at. */
-  private swingUntil = 0;
-  /** Whether the body moved this frame, for idle against walk. */
-  private wardenMoving = false;
-  /** Seconds of walking since the last footfall. */
-  private stepClock = 0;
-  /** Keys held, for walking on a keyboard. */
-  private keys = new Set<string>();
-  /** A stick or pad, -1..1 on each axis. Overrides the keys while pushed. */
-  private moveInput = { forward: 0, strafe: 0 };
-
-  /** True while the camera is down in the corridor. */
-  get walking(): boolean {
-    return this.walk !== null;
-  }
-
-  /**
-   * Drops into the dungeon, or climbs back out.
-   *
-   * Entering puts the body on the doorway facing the way the raiders walk,
-   * because that is the view the whole room is designed around and the one
-   * the player has never actually had.
-   */
-  setWalking(on: boolean): void {
-    if (!on) {
-      this.walk = null;
-      this.rideTarget = null;
-      this.disposeWarden();
-      this.possessedType = null;
-      this.keys.clear();
-      this.activePointers.clear();
-      this.dragStart = null;
-      this.dragMoved = false;
-      this.moveInput.forward = 0;
-      this.moveInput.strafe = 0;
-      if (document.pointerLockElement === this.canvas) document.exitPointerLock();
-      return;
-    }
-    if (!this.entrance || !this.core) return;
-
-    this.walk = {
-      at: new THREE.Vector3(this.entrance.x, FLOOR_HEIGHT, this.entrance.y),
-      // Facing the core: the room runs down a column, so that is straight
-      // along +z, and atan2 of the difference keeps it honest if that changes.
-      yaw: Math.atan2(this.core.x - this.entrance.x, this.core.y - this.entrance.y),
-      pitch: 0,
-    };
-    this.spawnWarden();
-  }
-
-  /**
-   * Stands the followed body up where the walk is. Harmless before models load.
-   *
-   * A ridden minion is drawn at the size the board draws the garrison, so
-   * climbing into one does not make it grow; the warden's own body is sized
-   * by height, because fitting a humanoid by the span of its shoulders came
-   * out half a tile tall.
-   */
-  private spawnWarden(): void {
-    this.disposeWarden();
-    const key = this.possessedType;
-    const body = key ? this.spawnModel(key, UNIT_TILES) : (this.spawnModel(this.wardenModel, WARDEN_WIDTH) ?? this.spawnModel("warden", WARDEN_WIDTH));
-    if (!body) return;
-
-    if (!key) {
-      body.updateMatrixWorld(true);
-      const raw = new THREE.Box3().setFromObject(body);
-      const tall = raw.max.y - raw.min.y;
-      const wide = Math.max(raw.max.x - raw.min.x, raw.max.z - raw.min.z);
-      if (tall > 0.01) {
-        body.scale.multiplyScalar(
-          Math.min(WARDEN_HEIGHT / tall, wide > 0.01 ? WARDEN_MAX_SPAN / wide : Infinity),
-        );
-        body.updateMatrixWorld(true);
-        const grown = new THREE.Box3().setFromObject(body);
-        body.position.y -= grown.min.y;
-      }
-    }
-
-    body.traverse((child) => {
-      // Skinned meshes are culled against the bind pose, so a swing that
-      // leaves it can pop out of view at the edge of the frame.
-      const mesh = child as THREE.SkinnedMesh;
-      if (mesh.isMesh) mesh.frustumCulled = false;
-    });
-    // A recoloured skin. spawnModel cloned the materials, so the tint reaches
-    // this body and no other.
-    if (!key && this.wardenTint !== null) DungeonRenderer.tint(body, this.wardenTint, 1);
-    // A glowing skin smoulders all over, not only where the emissive map says.
-    if (!key && this.wardenGlow !== null) {
-      const glow = new THREE.Color(this.wardenGlow);
-      body.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const material of materials as THREE.MeshStandardMaterial[]) {
-          if (!material.emissive) continue;
-          material.emissiveMap = null;
-          material.emissive.copy(glow);
-          material.emissiveIntensity = SKIN_GLOW;
-          material.needsUpdate = true;
-        }
-      });
-    }
-
-    /*
-     * Motion from wherever this body's motion lives.
-     *
-     * The imp's kit ships no animation, so its clips are a second file on the
-     * same skeleton; the garrison and the adventurers borrow the shared rig
-     * clips, exactly as the board animates them.
-     */
-    const own = this.loaded.get(key ?? this.wardenModel)?.animations ?? [];
-    const rigged = key ? [] : (this.loaded.get("warden_clips")?.animations ?? []);
-    const clips = own.length > 0 ? own : rigged.length > 0 ? rigged : this.sharedClips;
-    this.setupAnimation("warden", body, clips);
-    this.playClip("warden", "idle");
-    this.warden = body;
-    this.scene.add(body);
-
-    // Only on a ridden body: among two identical skeletons the player has to
-    // know which one is theirs, and the warden walking alone has no twin.
-    if (key) {
-      const mark = new THREE.Mesh(
-        new THREE.RingGeometry(0.3, 0.4, 32),
-        new THREE.MeshBasicMaterial({
-          color: MARK_COLOR,
-          transparent: true,
-          opacity: 0.75,
-          depthWrite: false,
-        }),
-      );
-      mark.rotation.x = -Math.PI / 2;
-      this.wardenMark = mark;
-      this.scene.add(mark);
-    }
-  }
-
-  private disposeWarden(): void {
-    if (this.wardenMark) {
-      // disposeObject leaves geometry alone because models share theirs; this
-      // ring's is its own.
-      this.wardenMark.geometry.dispose();
-      this.disposeObject(this.scene, this.wardenMark);
-      this.wardenMark = null;
-    }
-    if (!this.warden) return;
-    this.mixers.delete("warden");
-    this.disposeObject(this.scene, this.warden);
-    this.warden = null;
-  }
-
-  /** Keeps the body where the walk is and in the right clip. */
-  private updateWarden(): void {
-    const walk = this.walk;
-    const body = this.warden;
-    if (!walk || !body) return;
-
-    body.position.x = walk.at.x;
-    body.position.z = walk.at.z;
-    body.rotation.y = walk.yaw;
-    this.wardenMark?.position.set(walk.at.x, FLOOR_HEIGHT + 0.03, walk.at.z);
-
-    // A swing owns the body until it is done, or walking would cut it off
-    // at the first frame the player moved.
-    if (performance.now() < this.swingUntil) return;
-    this.playClip("warden", this.wardenMoving ? "walk" : "idle");
-  }
-
-  /**
-   * Puts the camera behind one of the garrison instead of the warden's own body.
-   *
-   * Only the picture changes here. Where that body stands, what it hits and
-   * whether it lives are the simulation's, and arrive through
-   * `setPossessedAt`; this swaps which model is drawn under the camera.
-   *
-   * Passing null hands the view back to the warden's own body.
-   */
-  setWardenSkin(model: string, tint: number | null, glow: number | null = null): void {
-    if (this.wardenModel === model && this.wardenTint === tint && this.wardenGlow === glow) return;
-    this.wardenModel = model;
-    this.wardenTint = tint;
-    this.wardenGlow = glow;
-    // Redrawn at once if the warden is out walking as itself; a ridden minion
-    // is left as it is.
-    if (this.walk && this.possessedType === null) this.spawnWarden();
-  }
-
-  setPossessed(key: string | null): void {
-    if (this.possessedType === key) return;
-    this.possessedType = key;
-    if (key === null) this.rideTarget = null;
-    if (this.walk) this.spawnWarden();
-  }
-
-  /**
-   * Where the ridden body ended up this step.
-   *
-   * The simulation owns the position while something is being ridden - it is
-   * the thing that knows about rock, about reach and about the rest of the
-   * raid - so the view follows rather than leads.
-   */
-  setPossessedAt(x: number, y: number): void {
-    if (!this.walk) return;
-    // Eased toward in followRide rather than drawn here - see FOLLOW_RATE.
-    // A new ride or a hop is jumped to: easing would slide across the room.
-    const far = !this.rideTarget || Math.hypot(this.walk.at.x - x, this.walk.at.z - y) > FOLLOW_SNAP;
-    this.rideTarget = { x, z: y };
-    if (this.faceOnArrival || far) {
-      this.walk.at.x = x;
-      this.walk.at.z = y;
-    }
-    if (!this.faceOnArrival) return;
-    this.faceOnArrival = false;
-
-    /*
-     * Turned towards the fight.
-     *
-     * Every ride used to start facing the core, the way a walk from the door
-     * does - which in a raid is facing away from the people coming in, and the
-     * first thing a player climbing into a body felt was a blow in the back.
-     * The nearest adventurer if one is in the room, the door if not.
-     */
-    let target: { x: number; y: number } | null = this.entrance;
-    let best = Infinity;
-    for (const unit of this.lastUnits) {
-      if (!unit.id.startsWith("a:")) continue;
-      const d = Math.hypot(unit.x - x, unit.y - y);
-      if (d < best) {
-        best = d;
-        target = unit;
-      }
-    }
-    if (!target || (target.x === x && target.y === y)) return;
-    this.walk.yaw = Math.atan2(target.x - x, target.y - y);
-  }
-
-  /**
-   * Turns the view towards the nearest adventurer once the ridden body's
-   * position next arrives. Called on every new ride, hops included.
-   */
-  faceThreatOnArrival(): void {
-    this.faceOnArrival = true;
-  }
-
-  /**
-   * Which way the player is asking the ridden body to go, in arena tiles.
-   *
-   * The same two axes free walking uses, turned into the world by the heading
-   * the player is looking along, so forward is wherever they are facing. Zero
-   * on both when nothing is held.
-   */
-  moveRequest(): { x: number; y: number; facing: number } {
-    const yaw = this.walk?.yaw ?? 0;
-    const { forward, strafe } = this.moveAxes();
-    // The same basis as step(): right is forward crossed with up.
-    return {
-      x: Math.sin(yaw) * forward - Math.cos(yaw) * strafe,
-      y: Math.cos(yaw) * forward + Math.sin(yaw) * strafe,
-      facing: yaw,
-    };
-  }
-
-  /**
-   * Throws the body through one swing.
-   *
-   * Timed off the wall clock rather than counted down in the frame loop,
-   * because the swing is a picture: it has no say in what the simulation
-   * decides the blow did, and a dropped frame should not leave it stuck
-   * mid-swing.
-   */
-  swing(): void {
-    if (!this.warden) return;
-    this.swingUntil = performance.now() + SWING_MS;
-    this.playClip("warden", "attack");
-  }
-
-  /** Turns the view. Radians, from a drag. */
-  look(dYaw: number, dPitch: number): void {
-    if (!this.walk) return;
-    this.walk.yaw -= dYaw;
-    // Held to the range the camera can actually use, so a long drag past the
-    // stop does not have to be dragged all the way back before it responds.
-    this.walk.pitch = THREE.MathUtils.clamp(
-      this.walk.pitch - dPitch,
-      CHASE_ELEVATION - CHASE_ELEVATION_MAX,
-      CHASE_ELEVATION - CHASE_ELEVATION_MIN,
-    );
-  }
-
-  /**
-   * Walks forward, stopped by rock.
-   *
-   * The two axes are tried separately so a wall taken at an angle slides
-   * along it rather than stopping dead, which is the difference between a
-   * corridor that feels walkable and one that feels like a bug.
-   */
-  step(amount: number, sideways = 0): void {
-    const walk = this.walk;
-    const arena = this.arena;
-    if (!walk || !arena) return;
-
-    // Right is forward crossed with up: for a heading (sin, cos) that is
-    // (-cos, sin). It was written the other way round, and D walked left.
-    const dx = Math.sin(walk.yaw) * amount - Math.cos(walk.yaw) * sideways;
-    const dz = Math.cos(walk.yaw) * amount + Math.sin(walk.yaw) * sideways;
-
-    const { x, z } = walk.at;
-    if (this.standable(x + dx, z) && !this.bumps(x, z, x + dx, z)) walk.at.x += dx;
-    if (this.standable(walk.at.x, z + dz) && !this.bumps(walk.at.x, z, walk.at.x, z + dz)) walk.at.z += dz;
-  }
-
-  /**
-   * Whether a step would walk the warden into one of its own minions.
-   *
-   * Walking alone, it went straight through them, which made the garrison look
-   * like pictures of a garrison. A step is refused only when it ends within
-   * MINION_CLEARANCE of a minion and nearer than it began, so a warden that
-   * starts on top of one - at the door, or after a rebuild - can always walk
-   * off it instead of being stuck inside. A ridden body is moved by the
-   * simulation and never comes through here.
-   */
-  private bumps(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
-    for (const unit of this.lastUnits) {
-      if (!unit.id.startsWith("m:")) continue;
-      const after = Math.hypot(unit.x - toX, unit.y - toZ);
-      if (after >= MINION_CLEARANCE) continue;
-      if (after < Math.hypot(unit.x - fromX, unit.y - fromZ)) return true;
-    }
-    return false;
-  }
-
-  /**
-   * A stick, held. -1..1 on each axis; zero on both lets the keys speak.
-   *
-   * Applied per frame in the loop rather than on the event, so the speed is
-   * the same on every device however often the stick reports.
-   */
-  setMoveInput(forward: number, strafe: number): void {
-    this.moveInput.forward = THREE.MathUtils.clamp(forward, -1, 1);
-    this.moveInput.strafe = THREE.MathUtils.clamp(strafe, -1, 1);
-  }
-
-  /** The two movement axes, from whichever input is live. */
-  private moveAxes(): { forward: number; strafe: number } {
-    const forward = this.moveInput.forward;
-    const strafe = this.moveInput.strafe;
-    if (forward !== 0 || strafe !== 0) return { forward, strafe };
-
-    const k = this.keys;
-    return {
-      forward: (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0),
-      strafe: (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0),
-    };
-  }
-
-  /** Eases the ridden body, and the camera behind it, toward the simulation. */
-  private followRide(delta: number): void {
-    const walk = this.walk;
-    const target = this.rideTarget;
-    if (!walk || !target) return;
-    const k = 1 - Math.exp(-delta * FOLLOW_RATE);
-    walk.at.x += (target.x - walk.at.x) * k;
-    walk.at.z += (target.z - walk.at.z) * k;
-  }
-
-  /** One frame of walking, from whichever input is live. */
-  private updateWalk(delta: number): void {
-    if (!this.walk) return;
-    const { forward, strafe } = this.moveAxes();
-    this.wardenMoving = forward !== 0 || strafe !== 0;
-
-    // Footfalls on a clock of time spent moving, so they stop the moment the
-    // stick is let go and never stack up while standing still. Counted
-    // before the ridden body hands off below, because it walks too.
-    if (this.wardenMoving) {
-      this.stepClock += delta;
-      if (this.stepClock >= STEP_SECONDS) {
-        this.stepClock -= STEP_SECONDS;
-        this.callbacks.onStep?.();
-      }
-    } else {
-      this.stepClock = STEP_SECONDS * 0.6;
-    }
-    /*
-     * A ridden body is walked by the simulation, not from here.
-     *
-     * It has rock to respect that this view does not know about - other
-     * minions, the edge of the raid - and more importantly the adventurers
-     * have to see it move. So the input is read for the animation and handed
-     * out through moveRequest; the position arrives back via setPossessedAt.
-     */
-    if (this.possessedType !== null) {
-      this.followRide(delta);
-      return;
-    }
-    if (!this.wardenMoving) return;
-    // Diagonals are not faster: the two axes share one speed.
-    const length = Math.hypot(forward, strafe);
-    const scale = (WALK_SPEED * delta) / Math.max(1, length);
-    this.step(forward * scale, strafe * scale);
-  }
-
-  /**
-   * Whether a point is far enough from the rock to stand on.
-   *
-   * Kept a body-width clear of the edge, so the body is never drawn with a
-   * shoulder inside the wall.
-   */
-  private standable(x: number, z: number): boolean {
-    const arena = this.arena;
-    if (!arena) return false;
-
-    for (const [ox, oz] of [[BODY, 0], [-BODY, 0], [0, BODY], [0, -BODY]]) {
-      const tx = Math.round(x + ox);
-      const tz = Math.round(z + oz);
-      if (!inArena(arena, tx, tz)) return false;
-      if (!this.dug.has(tx + tz * arena.w)) return false;
-    }
-    return true;
-  }
-
-  /**
    * How far back the showcase camera stands.
    *
    * Far enough that the room fits in the part of the canvas the menu and the
@@ -2701,47 +2045,15 @@ export class DungeonRenderer {
     this.keyLight.intensity = KEY_INTENSITY * boost;
   }
 
+  /**
+   * Shake is applied here as a pure offset on top of the player's own
+   * target/distance/yaw — never by mutating them — so panning, zooming and
+   * rotating during a shake behave exactly as if it were not happening, and
+   * the camera lands back exactly where the player left it once trauma hits
+   * zero (the offset is `f(trauma, time)`, not integrated, so it can't
+   * drift).
+   */
   private updateCamera(): void {
-    if (this.walk) {
-      /*
-       * Behind the body and above it, looking a little past it.
-       *
-       * High enough that the line to the body clears the rock of a one-tile
-       * corridor from anywhere in the elevation clamp, so there is never a
-       * wall between the player and the thing they are steering. Aimed ahead
-       * of the body rather than at it, because what is coming down the
-       * corridor matters more than the back of one's own head.
-       */
-      const walk = this.walk;
-      const elevation = THREE.MathUtils.clamp(
-        CHASE_ELEVATION - walk.pitch,
-        CHASE_ELEVATION_MIN,
-        CHASE_ELEVATION_MAX,
-      );
-      const aimY = FLOOR_HEIGHT + CHASE_AIM;
-      const ahead = Math.cos(elevation) * CHASE_LEAD;
-      const ax = walk.at.x + Math.sin(walk.yaw) * ahead;
-      const az = walk.at.z + Math.cos(walk.yaw) * ahead;
-      const back = Math.cos(elevation) * CHASE_DISTANCE;
-      this.camera.position.set(
-        walk.at.x - Math.sin(walk.yaw) * back + this.shakeOffset.x,
-        aimY + Math.sin(elevation) * CHASE_DISTANCE + this.shakeOffset.y,
-        walk.at.z - Math.cos(walk.yaw) * back + this.shakeOffset.z,
-      );
-      this.camera.lookAt(ax, aimY, az);
-      const closeFog = this.scene.fog as THREE.Fog | null;
-      // Tighter than the overview: down here the dark is the point.
-      if (closeFog) {
-        closeFog.near = CHASE_DISTANCE + 1;
-        closeFog.far = CHASE_DISTANCE + 11;
-      }
-      return;
-    }
-
-    return this.updateOrbitCamera();
-  }
-
-  private updateOrbitCamera(): void {
     if (this.showcase) {
       const orbit = this.elapsed * SHOWCASE_SPIN;
       const distance = this.showcaseDistance();
@@ -2985,103 +2297,13 @@ export class DungeonRenderer {
     c.addEventListener("contextmenu", (e) => e.preventDefault());
   }
 
-  /**
-   * Reports every tile the drag crossed, once each, in the order crossed.
-   *
-   * Joined up rather than sampled. A browser coalesces pointer moves, so a
-   * quick swipe down the room arrives as two or three events several tiles
-   * apart - and digging only where the events landed cut a corridor with
-   * holes in it, which is not what the hand did. The tiles between the last
-   * one and this one are walked here, so the gesture means what it looked
-   * like.
-   *
-   * A straight walk (the long axis first, then the short one) rather than a
-   * true line: what matters is that consecutive tiles touch, so whatever is
-   * being painted can see its own neighbour.
-   */
-  private paintAt(clientX: number, clientY: number): void {
-    const tile = this.pointerToTile(clientX, clientY);
-    if (!tile) return;
-
-    const key = `${tile.x},${tile.y}`;
-    if (key === this.paintedTile) return;
-
-    const from = this.paintedAt;
-    this.paintedTile = key;
-    this.paintedAt = { x: tile.x, y: tile.y };
-
-    if (from) {
-      const stepX = Math.sign(tile.x - from.x);
-      const stepY = Math.sign(tile.y - from.y);
-      let x = from.x;
-      let y = from.y;
-      // Bounded: a pointer that jumped clear across the room still only
-      // walks the room, and a bad reading cannot spin here.
-      for (let guard = 0; guard < 64 && (x !== tile.x || y !== tile.y); guard += 1) {
-        if (x !== tile.x) x += stepX;
-        else y += stepY;
-        if (x === tile.x && y === tile.y) break;
-        this.callbacks.onTileDrag?.(x, y);
-      }
-    }
-
-    this.callbacks.onTileDrag?.(tile.x, tile.y);
-  }
-
   private onPointerDown = (e: PointerEvent): void => {
-    /*
-     * Down in the corridor the pointer only turns the head. Construction is
-     * deliberately confined to the overview, where the player can read the
-     * whole route before changing it.
-     */
-    if (this.walk) {
-      if (e.pointerType === "mouse") {
-        /*
-         * With the pointer locked the mouse is a proper first-person mouse:
-         * the view follows it with nothing held. The lock is asked for on the
-         * first primary click but never waited on; inside an iframe without
-         * that permission the drag fallback below still turns the head.
-         */
-        if (document.pointerLockElement === this.canvas) return;
-        if (e.button !== 0) return;
-        try {
-          const request = this.canvas.requestPointerLock?.() as unknown;
-          if (request instanceof Promise) request.catch(() => undefined);
-        } catch {
-          /* not available here; the drag turns the head instead */
-        }
-      }
-
-      // Capture is refused while a lock request is in flight; it only keeps
-      // a drag that leaves the canvas, so doing without is fine.
-      try {
-        this.canvas.setPointerCapture(e.pointerId);
-      } catch {
-        /* see above */
-      }
-      this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
-      this.dragStart = new THREE.Vector2(e.clientX, e.clientY);
-      this.dragMoved = false;
-      return;
-    }
-
     this.canvas.setPointerCapture(e.pointerId);
     this.activePointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY));
 
     if (this.activePointers.size === 1) {
       this.dragStart = new THREE.Vector2(e.clientX, e.clientY);
       this.dragMoved = false;
-      /*
-       * A drag with a tool in hand paints tiles instead of moving the camera.
-       *
-       * Decided once, here, rather than per move: a gesture that started as
-       * a dig and turned into a pan halfway through is a dungeon with a hole
-       * in a place nobody chose.
-       */
-      this.painting = this.callbacks.isPaintable?.() === true;
-      this.paintedTile = null;
-      this.paintedAt = null;
-      if (this.painting) this.paintAt(e.clientX, e.clientY);
     } else if (this.activePointers.size === 2) {
       const [a, b] = [...this.activePointers.values()];
       this.pinchStartDistance = a.distanceTo(b);
@@ -3092,26 +2314,6 @@ export class DungeonRenderer {
 
   private onPointerMove = (e: PointerEvent): void => {
     const previous = this.activePointers.get(e.pointerId);
-
-    // Down in the corridor a drag is the head turning, and there is no tile
-    // under the cursor to hover - the cursor is the player's eyes.
-    if (this.walk) {
-      if (document.pointerLockElement === this.canvas) {
-        this.look(e.movementX * LOOK_SPEED, e.movementY * LOOK_SPEED);
-        return;
-      }
-      if (!previous) return;
-      const current = new THREE.Vector2(e.clientX, e.clientY);
-      if (!this.dragMoved && this.dragStart && current.distanceTo(this.dragStart) > TAP_SLOP) {
-        this.dragMoved = true;
-      }
-      this.look(
-        (current.x - previous.x) * LOOK_SPEED,
-        (current.y - previous.y) * LOOK_SPEED,
-      );
-      this.activePointers.set(e.pointerId, current);
-      return;
-    }
 
     if (!previous) {
       // Mouse hover with no button held.
@@ -3145,12 +2347,6 @@ export class DungeonRenderer {
       this.dragMoved = true;
     }
 
-    // Painting a run of tiles, not moving the camera.
-    if (this.painting) {
-      this.paintAt(e.clientX, e.clientY);
-      return;
-    }
-
     if (!this.dragMoved) return;
 
     // Pan along the camera's own axes so dragging feels the same at every yaw.
@@ -3164,47 +2360,22 @@ export class DungeonRenderer {
   };
 
   private onPointerUp = (e: PointerEvent): void => {
-    if (this.walk) {
-      if (e.pointerType === "mouse" && document.pointerLockElement === this.canvas) {
-        if (!this.dragMoved) this.callbacks.onWalkTap?.();
-        this.activePointers.clear();
-        this.dragStart = null;
-        this.dragMoved = false;
-        return;
-      }
-      const single = this.activePointers.size === 1;
-      this.activePointers.delete(e.pointerId);
-      if (single && !this.dragMoved) this.callbacks.onWalkTap?.();
-      if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
-      if (this.activePointers.size === 0) {
-        this.dragStart = null;
-        this.dragMoved = false;
-      }
-      return;
-    }
-
     const wasSingle = this.activePointers.size === 1;
     this.activePointers.delete(e.pointerId);
     if (this.canvas.hasPointerCapture(e.pointerId)) {
       this.canvas.releasePointerCapture(e.pointerId);
     }
 
-    // A tap in the overview edits the tile; the walking branch returned above.
-    if (wasSingle && !this.dragMoved && !this.painting) {
+    // A right-click is not a tap: the browser's menu is suppressed, and the
+    // secondary button does nothing on the board.
+    if (wasSingle && !this.dragMoved && e.button !== 2) {
       const tile = this.pointerToTile(e.clientX, e.clientY);
-      if (tile && e.button === 2) {
-        this.callbacks.onTileAlt?.(tile.x, tile.y, e.clientX, e.clientY);
-      } else if (tile) {
-        this.callbacks.onTileTap(tile.x, tile.y);
-      }
+      if (tile) this.callbacks.onTileTap(tile.x, tile.y);
     }
 
     if (this.activePointers.size === 0) {
       this.dragStart = null;
       this.dragMoved = false;
-      this.painting = false;
-      this.paintedTile = null;
-      this.paintedAt = null;
       this.pinchStartDistance = 0;
     }
   };
@@ -3218,31 +2389,9 @@ export class DungeonRenderer {
     this.zoom(e.deltaY * 0.012);
   };
 
-  /**
-   * A held key by where it sits, not what it types.
-   *
-   * With the Korean input method on, W arrives as "ㅈ" and the corridor could
-   * not be walked at all. The physical code is the same whatever the layout
-   * or input method; the typed letter is only the fallback for a browser that
-   * reports no code.
-   */
-  private static keyName(e: KeyboardEvent): string {
-    if (e.code.startsWith("Key")) return e.code.slice(3).toLowerCase();
-    if (e.code.startsWith("Arrow")) return e.code.toLowerCase();
-    return e.key.toLowerCase();
-  }
-
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (this.walk) {
-      this.keys.add(DungeonRenderer.keyName(e));
-      return;
-    }
     if (e.key === "q" || e.key === "Q") this.rotate(-1);
     if (e.key === "e" || e.key === "E") this.rotate(1);
-  };
-
-  private onKeyUp = (e: KeyboardEvent): void => {
-    this.keys.delete(DungeonRenderer.keyName(e));
   };
 
   private loop = (): void => {
@@ -3265,11 +2414,7 @@ export class DungeonRenderer {
     this.updatePathFlow();
     this.updateHealthBars();
     this.updateShake(delta);
-    this.updateWalk(delta);
-    this.updateWarden();
-
     this.updateCamera();
-    this.hideUnitsAtCamera();
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -3346,7 +2491,6 @@ export class DungeonRenderer {
     cancelAnimationFrame(this.resizeFrame);
     this.resizeObserver.disconnect();
     window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
 
     const c = this.canvas;
     c.removeEventListener("pointerdown", this.onPointerDown);
@@ -3400,7 +2544,6 @@ export class DungeonRenderer {
     this.unitGeometry.dispose();
     this.trapGeometry.dispose();
     this.trapRing.dispose();
-    this.roomGeometry.dispose();
     this.highlight.geometry.dispose();
     (this.highlight.material as THREE.Material).dispose();
     this.renderer.dispose();

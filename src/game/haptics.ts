@@ -27,12 +27,8 @@ export function buzz(enabled: boolean, pattern: number | number[]): void {
 
 /** How each moment feels, in milliseconds on and off. */
 export const BUZZ = {
-  /** A swing: barely there, because it repeats. */
-  swing: 14,
-  /** A blow taken by the ridden body. */
-  hurt: 40,
-  /** The body lost: long enough to be unmistakable, broken so it is not a ring. */
-  lost: [70, 50, 140],
-  /** Seen by the party: two taps, a warning rather than a wound. */
-  noticed: [25, 60, 25],
+  /** A tower set down: barely there, because it repeats. */
+  place: 14,
+  /** A life lost at the core. */
+  leak: 40,
 };

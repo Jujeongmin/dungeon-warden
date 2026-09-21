@@ -22,26 +22,26 @@ describe("buzz", () => {
   it("vibrates with the pattern it is given, where the device can", () => {
     const vibrate = vi.fn(() => true);
     giveVibrate(vibrate);
-    buzz(true, BUZZ.lost);
-    expect(vibrate).toHaveBeenCalledWith(BUZZ.lost);
+    buzz(true, BUZZ.leak);
+    expect(vibrate).toHaveBeenCalledWith(BUZZ.leak);
   });
 
   it("does nothing when the player has turned it off", () => {
     const vibrate = vi.fn(() => true);
     giveVibrate(vibrate);
-    buzz(false, BUZZ.swing);
+    buzz(false, BUZZ.place);
     expect(vibrate).not.toHaveBeenCalled();
   });
 
   it("is quietly nothing on a device with no vibration at all", () => {
     Object.defineProperty(navigator, "vibrate", { value: undefined, configurable: true, writable: true });
-    expect(() => buzz(true, BUZZ.hurt)).not.toThrow();
+    expect(() => buzz(true, BUZZ.leak)).not.toThrow();
   });
 
   it("swallows a refusal from the page's permissions policy", () => {
     giveVibrate(() => {
       throw new Error("blocked");
     });
-    expect(() => buzz(true, BUZZ.hurt)).not.toThrow();
+    expect(() => buzz(true, BUZZ.leak)).not.toThrow();
   });
 });

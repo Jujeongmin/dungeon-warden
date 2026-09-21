@@ -69,25 +69,7 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   entrance: [/^stairs_/, /^stairs$/, /^door_/, /^doorway/],
   core: [/^chest_gold$/, /^chest$/, /^banner_red$/],
 
-  /*
-   * The player, seen from behind their own eyes.
-   *
-   * A warden is a monster, not a person, so this is a monster: the imp from
-   * the Bestiary kit, baked down by scripts/bake-warden.mjs. Its motion is a
-   * second file because the kit ships none - see warden_clips, and
-   * public/assets/warden/SOURCE.md for where both came from.
-   *
-   * The skeleton stays as a fallback: before the bake has been run there is
-   * no imp, and a warden with no body at all would leave the camera that
-   * follows it with nothing to follow.
-   */
-  warden: [/^warden$/, /^skeleton_rogue$/, /^skeleton_warrior$/],
-  /** Motion for the warden, on the same rig. Carries no mesh of its own. */
-  warden_clips: [/^warden-clips$/],
-  /** A second body for the warden, unlocked as a skin: see src/game/skins.ts. */
-  warden_puglin: [/^warden-puglin$/],
-
-  // Minions — the Skeletons pack ships one .glb per class.
+  // Towers — the Skeletons pack ships one .glb per class.
   // Keys are prefixed because "mage" exists on both sides: a skeleton mage
   // minion and a mage adventurer are different models.
   m_warrior: [/^skeleton_rogue$/, /^skeleton_warrior$/, /skeleton.*warrior/],
@@ -97,7 +79,7 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   m_guard: [/^skeleton_warrior$/],
   m_grunt: [/^skeleton_minion$/],
 
-  // Adventurers, also used for converts. Each class has its own model.
+  // Adventurers. Each class has its own model.
   a_knight: [/^knight$/],
   a_barbarian: [/^barbarian$/],
   a_rogue: [/^rogue$/, /^rogue_hooded$/],
@@ -109,33 +91,6 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   arrow: [/^wall_arrowslit/, /crossbow/, /^bow$/],
   rockfall: [/^rocks/, /rubble/, /^floor_tile_large_rocks$/],
   flame: [/^torch/, /^brazier/, /candle/],
-
-  // Room props
-  treasury: [/^chest_gold$/, /^coin/, /^chest$/],
-  vault: [/^barrel_large$/, /^barrel/, /^crate/],
-  barracks: [/^weaponrack/, /^banner_blue$/, /^banner/],
-  altar: [/^altar/, /^candle/, /^pillar/],
-  workshop: [/^table_medium$/, /^table_small$/, /^table/, /anvil/],
-  jail: [/^wall_gated/, /gated/, /^cage/, /^chain/],
-
-  // Dressing.
-  //
-  // The pack ships 211 dungeon props and the game was using eleven of them, so
-  // a finished dungeon read as corridors of bare stone with two landmarks in
-  // it. These fill the walls and the empty floor, and give each room type a
-  // few different things to put on its four tiles instead of the same model
-  // four times over.
-  prop_torch: [/^torch$/, /^torch_/, /^candle_triple$/],
-  prop_barrel: [/^barrel_large$/, /^barrel_small$/, /^barrel/],
-  prop_box: [/^box_stacked$/, /^box_small$/, /^box_large$/],
-  prop_pillar: [/^pillar_decorated$/, /^pillar$/, /^column$/],
-  prop_coin_large: [/^coin_stack_large$/, /^coin_stack/],
-  prop_coin_small: [/^coin_stack_small$/, /^coin$/],
-  prop_bed: [/^bed_frame$/, /^bed_decorated$/, /^bed/],
-  prop_shelf: [/^shelf_large$/, /^shelf_small$/, /^shelf/],
-  prop_candle: [/^candle_lit$/, /^candle_thin_lit$/, /^candle/],
-  prop_table: [/^table_long$/, /^table_medium$/, /^table/],
-  prop_banner: [/^banner_shield_red$/, /^banner_triple_red$/, /^banner_red$/],
 };
 
 /**

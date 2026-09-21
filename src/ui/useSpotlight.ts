@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { TutorialTarget } from "../game/tutorial";
+import type { TutorialTarget } from "../game/td/tutorial";
 
 export interface SpotlightBox {
   left: number;

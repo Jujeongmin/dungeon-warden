@@ -6,7 +6,7 @@
  * draws the characters whole and plays four clips, so:
  *
  *   Characters (adventurers, skeletons) - welded, deduplicated and quantized
- *   with the same settings scripts/bake-warden.mjs has shipped the warden with.
+ *   so the files are smaller without changing what they draw.
  *   three.js reads KHR_mesh_quantization natively, and every character is
  *   placed as a whole node and sized from its world bounds, so the dequantize
  *   transform the extension adds is accounted for.
@@ -15,7 +15,7 @@
  *   the bones stay), and only the clips DungeonRenderer's CLIP_PATTERNS pick
  *   are kept. Keyframes are resampled, which only removes redundant ones.
  *
- *   Everything, dungeon tiles and the baked warden included - packed with
+ *   Everything, dungeon tiles included - packed with
  *   EXT_meshopt_compression in its lossless mode. It changes how the bytes are
  *   stored, not what they decode to; ModelLibrary hands GLTFLoader the decoder.
  *
@@ -131,9 +131,6 @@ for (const [name, keep] of Object.entries(RIG_CLIPS)) {
 }
 for (const name of readdirSync(join(kaykit, "dungeon")).filter((n) => n.endsWith(".gltf"))) {
   rows.push(await packOnly(join(kaykit, "dungeon", name)));
-}
-for (const name of readdirSync(join(assets, "warden")).filter((n) => n.endsWith(".glb"))) {
-  rows.push(await packOnly(join(assets, "warden", name)));
 }
 
 let before = 0;

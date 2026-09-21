@@ -11,8 +11,8 @@ import { detectLocale, type Locale } from "../i18n/strings";
 export type Quality = "low" | "high";
 
 /**
- * Mirrors RAID_SPEEDS in useRaid.ts. Declared here rather than imported so a
- * preferences file does not depend on the raid loop.
+ * Mirrors RUN_SPEEDS in td/useStageRun.ts. Declared here rather than imported
+ * so a preferences file does not depend on the run loop.
  */
 export type RaidSpeed = 1 | 2 | 3;
 
@@ -22,17 +22,15 @@ export interface Settings {
    * a different wish from turning it off, and only one of them was available.
    */
   volume: number;
-  /** The background loop, separately from the cues: it is the first thing a
-   *  player turns off, and turning it off should not cost them the hits. */
   /** The loop, on its own fader: it is the first thing a player turns down,
    *  and turning it down should not cost them the hits. */
   musicVolume: number;
   quality: Quality;
   /**
-   * How fast raids run.
+   * How fast waves run.
    *
-   * Remembered because it is a preference, not a per-raid decision: a player
-   * twenty raids in watches at 2x, and resetting to 1x every time makes them
+   * Remembered because it is a preference, not a per-stage decision: a player
+   * twenty stages in watches at 2x, and resetting to 1x every time makes them
    * say so again every time.
    */
   raidSpeed: RaidSpeed;
@@ -41,20 +39,8 @@ export interface Settings {
   introSeen: boolean;
   /** Set when the player dismisses the step-by-step hints. */
   tutorialDone: boolean;
-  /**
-   * Set the first time the warden climbs into a minion, and the first time it
-   * swings while in one.
-   *
-   * Two lines of coaching that only make sense mid-raid, so they cannot be
-   * steps in the opening tutorial - it is finished long before the player has
-   * a garrison to climb into. They show until the thing has been done once.
-   */
-  possessSeen: boolean;
-  strikeSeen: boolean;
-  /** Vibration on a swing, a blow taken, and a body lost. A no-op where unsupported. */
+  /** Vibration on placing and on a life lost. A no-op where unsupported. */
   haptics: boolean;
-  /** Which warden skin to wear, if it is unlocked. See src/game/skins.ts. */
-  wardenSkin: string;
 }
 
 const KEY = "dw.settings";
@@ -67,10 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: "en",
   introSeen: false,
   tutorialDone: false,
-  possessSeen: false,
-  strikeSeen: false,
   haptics: true,
-  wardenSkin: "imp",
 };
 
 export function loadSettings(): Settings {
@@ -81,8 +64,7 @@ export function loadSettings(): Settings {
     const raw = localStorage.getItem(KEY);
     if (!raw) return base;
     const merged = { ...base, ...(JSON.parse(raw) as Partial<Settings>) };
-    // 4x was taken out when 3x went on sale. A speed that no longer exists
-    // falls back to the fastest free one rather than to a bought one.
+    // A speed that no longer exists falls back to the fastest free one.
     if (![1, 2, 3].includes(merged.raidSpeed)) merged.raidSpeed = 2;
     return merged;
   } catch {
