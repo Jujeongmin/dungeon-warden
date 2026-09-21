@@ -248,22 +248,6 @@ export interface UnitView {
   label?: string;
 }
 
-/** One tile of the map left behind by a raid. */
-export interface AftermathCell {
-  x: number;
-  y: number;
-  /** Share of the raid's worst tile, 0..1. */
-  heat: number;
-}
-
-/** Somewhere a body hit the floor. */
-export interface AftermathMark {
-  x: number;
-  y: number;
-  /** `fell`: an adventurer. `lost`: one of the player's own. */
-  kind: "fell" | "lost";
-}
-
 /**
  * Animation clips, matched by name against whatever the model ships.
  * KayKit uses names like "Idle", "Walking_A", "1H_Melee_Attack_Chop", "Death_A".
@@ -560,8 +544,6 @@ export class DungeonRenderer {
   /** Flat keys of the tiles that have been dug out. Empty means solid rock. */
   private dug = new Set<number>();
   private pathMarkers: THREE.Object3D[] = [];
-  private aftermathGroup = new THREE.Group();
-  private aftermathRing = new THREE.RingGeometry(0.22, 0.4, 20);
   private pathGeometry = new THREE.PlaneGeometry(0.86, 0.86);
   /**
    * The arrows that run along the route, each with the place in the queue it
@@ -647,7 +629,6 @@ export class DungeonRenderer {
 
     this.scene.add(this.unitGroup);
     this.scene.add(this.markerGroup);
-    this.scene.add(this.aftermathGroup);
 
     this.attachPointerEvents();
     window.addEventListener("keydown", this.onKeyDown);
@@ -699,9 +680,6 @@ export class DungeonRenderer {
   }
 
   setArena(arena: Arena, entrance: Point, core: Point): void {
-    // A reset hands back a different floor, and last raid's map means
-    // nothing on it.
-    this.clearAftermath();
     this.arena = arena;
     this.entrance = entrance;
     this.core = core;
@@ -1920,79 +1898,6 @@ export class DungeonRenderer {
       metalness: 0,
     });
     old.dispose();
-  }
-
-  private clearAftermath(): void {
-    for (const child of this.aftermathGroup.children.slice()) {
-      this.disposeObject(this.aftermathGroup, child);
-    }
-  }
-
-  /**
-   * What the last raid did, painted on the floor it happened on.
-   *
-   * The settlement screen reports a raid as four numbers. Numbers cannot tell
-   * a player that their whole corridor is decorative and every kill happened
-   * in the two tiles nearest the core - which is the single thing that would
-   * teach them to build a better maze. The board can, and it needs no words
-   * to do it, which is why this is a map and not a tooltip.
-   *
-   * Three readings, in one look:
-   *  - heat: where damage actually landed on the party. A dark route is a
-   *    route nothing covers.
-   *  - `fell`: where an adventurer went down. Clusters mark the killing
-   *    ground; a lone mark near the core marks a near miss.
-   *  - `lost`: where the player's own died. These are the placements that
-   *    ended up in the road.
-   *
-   * Colours are the ones the same events already flashed during the raid, so
-   * the map reads as a record of what was just watched rather than as a new
-   * legend to learn.
-   */
-  setAftermath(cells: AftermathCell[] | null, marks: AftermathMark[] = []): void {
-    this.clearAftermath();
-    if (!cells || cells.length === 0) return;
-
-    // Cold ember to lit torch. Even the coldest tile stays visible: a tile
-    // that took one arrow is information too.
-    const cold = new THREE.Color(0x6b3a1c);
-    const hot = new THREE.Color(0xe8a44c);
-
-    for (const cell of cells) {
-      const heat = Math.max(0, Math.min(1, cell.heat));
-      const mesh = new THREE.Mesh(
-        this.pathGeometry,
-        new THREE.MeshBasicMaterial({
-          color: cold.clone().lerp(hot, heat),
-          transparent: true,
-          opacity: 0.16 + 0.42 * heat,
-          depthWrite: false,
-        }),
-      );
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(cell.x, FLOOR_HEIGHT + 0.025, cell.y);
-      this.aftermathGroup.add(mesh);
-    }
-
-    for (const mark of marks) {
-      const mesh = new THREE.Mesh(
-        this.aftermathRing,
-        new THREE.MeshBasicMaterial({
-          // Lighter than the flash the same event made during the raid: a
-          // ring is drawn on top of the hottest tiles of the heat map, and
-          // the raid colours sit too close to that orange to survive there.
-          color: mark.kind === "fell" ? 0xffb4a0 : 0xc9baff,
-          transparent: true,
-          opacity: 1,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      );
-      mesh.rotation.x = -Math.PI / 2;
-      // Above the heat, so a ring on a bright tile still reads as a ring.
-      mesh.position.set(mark.x, FLOOR_HEIGHT + 0.045, mark.y);
-      this.aftermathGroup.add(mesh);
-    }
   }
 
   /**
@@ -3481,8 +3386,6 @@ export class DungeonRenderer {
     this.pathGeometry.dispose();
     this.arrowGeometry.dispose();
     this.barGeometry.dispose();
-    this.aftermathRing.dispose();
-    this.clearAftermath();
     this.disposeEntranceMark();
     this.setRangeRing(null);
     for (const object of this.landmarks) this.disposeObject(this.scene, object);

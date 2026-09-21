@@ -277,7 +277,6 @@ export const zhHans: Record<StringKey, string> = {
   adv_mage: "法师",
   adv_ranger: "游侠",
   banner_offline: "缺少 VITE_AGENT8_VERSE — 本地模式，不会保存。",
-  aftermath_note: "上次入侵的记录 — 在哪挨打，在哪倒下",
   rotate_hint: "请横过来拿",
   result_champion: "击溃首领",
   party_summary: "Lv{level} · {count}人",

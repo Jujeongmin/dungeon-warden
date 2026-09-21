@@ -276,7 +276,6 @@ export const en: Record<StringKey, string> = {
   adv_mage: "Mage",
   adv_ranger: "Ranger",
   banner_offline: "Missing VITE_AGENT8_VERSE — local mode, unsaved.",
-  aftermath_note: "Last raid: where they were hurt, and where they fell",
   rotate_hint: "Turn your device sideways",
   result_champion: "Champion stopped",
   party_summary: "Lv{level} · {count} raiders",

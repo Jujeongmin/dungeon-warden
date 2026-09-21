@@ -282,7 +282,6 @@ export const ja: Record<StringKey, string> = {
   adv_mage: "メイジ",
   adv_ranger: "レンジャー",
   banner_offline: "VITE_AGENT8_VERSE がありません — ローカルモード、未保存。",
-  aftermath_note: "前回の侵入の記録 — どこで受け、どこで倒れたか",
   rotate_hint: "横向きにしてください",
   result_champion: "頭目を倒した",
   party_summary: "Lv{level} · {count}人",

@@ -40,7 +40,6 @@ import { isBroke } from "./game/relief";
 import { BUZZ, buzz } from "./game/haptics";
 import { nextBody } from "./game/sim/hop";
 import { planRebuild } from "./game/rebuild";
-import { emptyTally, recordEvents, tallyCells, type RaidTally } from "./game/aftermath";
 import { translate, type StringKey } from "./i18n/strings";
 import {
   ADVENTURER_LABEL,
@@ -321,40 +320,12 @@ export default function App() {
   >([]);
   const floaterSeq = useRef(0);
 
-  /**
-   * The raid, recorded while it happens.
-   *
-   * A ref rather than state on purpose: this is written from the event drain
-   * many times a second and read exactly twice - once when the raid ends, to
-   * paint the map, and once when the next one starts, to wipe it. Putting it
-   * in state would re-render the tree on every arrow hit for a picture that
-   * is not drawn until the fighting stops.
-   */
-  const aftermathRef = useRef<RaidTally>(emptyTally());
-
-  /**
-   * Whether the board is showing the last raid or the next one.
-   *
-   * Both are painted on the same floor and they answer different questions -
-   * "where were they hurt" and "where will they walk" - so drawn together the
-   * cool end of the record is indistinguishable from the route and neither
-   * reads. The record wins from the moment the fighting stops until the
-   * player touches the dungeon, which is exactly when their attention moves
-   * from what happened to what happens next.
-   */
-  const [showAftermath, setShowAftermath] = useState(false);
-
   /** Set for a moment when the body the warden was riding is the one that died. */
   const [bodyLost, setBodyLost] = useState(false);
 
   const onSimEvents = useCallback((events: SimEvent[]) => {
     const renderer = rendererRef.current;
     if (!renderer) return;
-
-    // Accumulated as it happens rather than replayed afterwards: the events
-    // are drained per frame and nobody keeps them, so this is the only place
-    // the raid can be recorded at all.
-    recordEvents(aftermathRef.current, events);
 
     const added: Array<{ id: number; text: string; x: number; y: number; kind: string }> = [];
 
@@ -896,12 +867,6 @@ export default function App() {
     else {
       // Moving rock sounds like rock; everything else is set down on it.
       audio.play(tool.kind === "dig" || tool.kind === "fill" ? "dig" : "place");
-      // Building is the answer to the map, so the map steps aside for the
-      // route the change just altered.
-      if (showAftermath) {
-        setShowAftermath(false);
-        rendererRef.current?.setAftermath(null);
-      }
     }
   };
 
@@ -1390,7 +1355,7 @@ export default function App() {
   // The route is shown while building and hidden during a raid, where the
   // adventurers themselves show it.
   useEffect(() => {
-    if (!meta || raid.raiding || showAftermath || screen === "title") {
+    if (!meta || raid.raiding || screen === "title") {
       rendererRef.current?.setPathPreview(null);
       return;
     }
@@ -1407,7 +1372,7 @@ export default function App() {
         new Set(terrain),
       ),
     );
-  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, showAftermath, rendererReady, screen]);
+  }, [arena, entrance, core, terrain, meta, rooms, raid.raiding, rendererReady, screen]);
 
   /*
    * What the route becomes if the tile under the cursor changes.
@@ -1453,50 +1418,6 @@ export default function App() {
 
     renderer.setPathGhost(same ? null : after);
   }, [hover, tool, meta, raid.raiding, arena, entrance, core, terrain, rooms, ghostLegal, rendererReady]);
-
-  /**
-   * Paint the aftermath when the fighting stops; wipe it when it starts again.
-   *
-   * Driven off `raid.raiding` rather than off the result, because the result
-   * arrives from the server and the map is the client's own record - it has
-   * to appear even on the offline preview, and it has to survive the player
-   * dismissing the settlement screen, which is the moment they actually start
-   * looking at the board.
-   *
-   * It then stays until the next raid opens. Editing does not clear it: the
-   * map is the reason to edit, and rebuilding a corridor with the record of
-   * why still under it is the entire point.
-   */
-  useEffect(() => {
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-
-    if (raid.raiding) {
-      aftermathRef.current = emptyTally();
-      renderer.setAftermath(null);
-      setShowAftermath(false);
-      return;
-    }
-
-    /*
-     * Not during a build window.
-     *
-     * The window is for deciding where the next wave walks, and the question
-     * it asks is answered by the route - so the route gets the floor. The
-     * record of the wave just fought would be painted over the same tiles and
-     * the two together read as neither.
-     */
-    if (raid.raidOpen) {
-      renderer.setAftermath(null);
-      setShowAftermath(false);
-      return;
-    }
-
-    const cells = tallyCells(aftermathRef.current);
-    if (!cells) return;
-    renderer.setAftermath(cells, aftermathRef.current.marks);
-    setShowAftermath(true);
-  }, [raid.raiding]);
 
   // Combat feedback, throttled inside the audio engine so a busy raid does not
   // turn into noise.
@@ -1965,25 +1886,6 @@ export default function App() {
           </div>
         )}
 
-        {/* The map has no legend and no words on it, which is the point -
-            but a ring that appears on its own and stays needs to say once
-            what it is, and offer the way out it already had. */}
-        {showAftermath && (
-          <div className="banner">
-            <button
-              className="banner-close"
-              onClick={() => {
-                setShowAftermath(false);
-                rendererRef.current?.setAftermath(null);
-              }}
-              aria-label="close"
-            >
-              ×
-            </button>
-            {t("aftermath_note")}
-          </div>
-        )}
-
         {/*
          * Stuck: no gold for a warrior and nobody ready to fight.
          *
@@ -2322,10 +2224,6 @@ export default function App() {
                     setRebuildArmed(false);
                     const ok = save.rebuild();
                     audio.play(ok ? "dig" : "error");
-                    if (ok) {
-                      setShowAftermath(false);
-                      rendererRef.current?.setAftermath(null);
-                    }
                   }}
                 >
                   {rebuildArmed ? t("tool_rebuild_confirm", { n: rebuildRefund }) : t("tool_rebuild")}
