@@ -34,6 +34,25 @@ const EMPTY: Progress = { bestWaves: 0, souls: 0, research: [] };
 
 /** Where the offline preview keeps its progress, so a dev can play past one run. */
 const LOCAL_KEY = "dungeon-warden:endless-progress";
+/** The offline preview's run in progress: waves checkpointed, for a closed tab. */
+const LOCAL_RUN_KEY = "dungeon-warden:endless-run";
+
+function readLocalRun(): number {
+  try {
+    return Number(window.localStorage.getItem(LOCAL_RUN_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeLocalRun(waves: number | null): void {
+  try {
+    if (waves === null) window.localStorage.removeItem(LOCAL_RUN_KEY);
+    else window.localStorage.setItem(LOCAL_RUN_KEY, String(waves));
+  } catch {
+    // As above.
+  }
+}
 
 function readLocal(): Progress {
   try {
@@ -118,31 +137,62 @@ export function useProgress() {
     if (!HAS_VERSE) writeLocal(next);
   }, []);
 
-  /** Opens a run on the server. Resolves false if it was refused. */
-  const startRun = useCallback(async (): Promise<boolean> => {
-    if (!HAS_VERSE) return true;
+  /** Pays a run's souls in the offline preview, the way the server does. */
+  const settleLocal = useCallback(
+    (wavesCleared: number): RunResult => {
+      const current = progressRef.current;
+      const souls = Math.floor(wavesCleared / WAVES_PER_STAGE);
+      const improved = wavesCleared > current.bestWaves;
+      update({ ...current, souls: current.souls + souls, bestWaves: Math.max(current.bestWaves, wavesCleared) });
+      return { souls, improved };
+    },
+    [update],
+  );
+
+  /**
+   * Opens a run on the server. Resolves null if it was refused, or the souls
+   * paid for a run left open last time - closed mid-run, it still counts up
+   * to its last stage.
+   */
+  const startRun = useCallback(async (): Promise<number | null> => {
+    if (!HAS_VERSE) {
+      const left = readLocalRun();
+      const souls = left > 0 ? settleLocal(left).souls : 0;
+      writeLocalRun(0);
+      return souls;
+    }
     try {
-      await server.remoteFunction("startRun", []);
-      return true;
+      const result: { settled: number; progress: Progress } = await server.remoteFunction("startRun", []);
+      update(fromServer(result.progress));
+      return result.settled ?? 0;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      return false;
+      return null;
     }
-  }, [server]);
+  }, [server, update, settleLocal]);
+
+  /** Records how far the run has got, so it counts even if never finished. */
+  const checkpointRun = useCallback(
+    async (wavesCleared: number): Promise<void> => {
+      if (!HAS_VERSE) {
+        writeLocalRun(wavesCleared);
+        return;
+      }
+      try {
+        await server.remoteFunction("checkpointRun", [{ wavesCleared }]);
+      } catch {
+        // The finish still pays; a checkpoint only guards a run that never ends.
+      }
+    },
+    [server],
+  );
 
   /** Closes a run. Null when the server would not record it. */
   const finishRun = useCallback(
     async (wavesCleared: number): Promise<RunResult | null> => {
       if (!HAS_VERSE) {
-        const current = progressRef.current;
-        const souls = Math.floor(wavesCleared / WAVES_PER_STAGE);
-        const improved = wavesCleared > current.bestWaves;
-        update({
-          ...current,
-          souls: current.souls + souls,
-          bestWaves: Math.max(current.bestWaves, wavesCleared),
-        });
-        return { souls, improved };
+        writeLocalRun(null);
+        return settleLocal(wavesCleared);
       }
       try {
         const result: RunResult & { progress: Progress } = await server.remoteFunction("finishRun", [{ wavesCleared }]);
@@ -153,7 +203,7 @@ export function useProgress() {
         return null;
       }
     },
-    [server, update],
+    [server, update, settleLocal],
   );
 
   const research = useCallback(
@@ -239,6 +289,7 @@ export function useProgress() {
     nickname,
     soulsLeft: soulsToSpend(progress.souls, progress.research),
     startRun,
+    checkpointRun,
     finishRun,
     research,
     setNickname,

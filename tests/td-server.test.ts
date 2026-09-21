@@ -9,7 +9,7 @@ import { SPAWN_INTERVAL, WAVES_PER_STAGE, endlessWave, waveSize } from "../src/g
  * mirrors from the client is checked against the client's own rules.
  */
 
-const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
+const source = readFileSync(new URL("../server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 interface Store {
   state: Record<string, unknown>;
@@ -107,6 +107,23 @@ describe("a run", () => {
     expect(again.improved).toBe(false);
     expect(again.progress.bestWaves).toBe(20);
     expect(again.progress.souls).toBe(5);
+  });
+
+  it("pays for a run left open, up to its last checkpoint, when the next one starts", async () => {
+    const { server } = boot(store);
+    await server.startRun();
+    vi.setSystemTime(1_000_000 + 600_000);
+    await server.checkpointRun({ wavesCleared: 10 });
+    const next = await server.startRun();
+    expect(next.settled).toBe(2);
+    expect(next.progress.bestWaves).toBe(10);
+  });
+
+  it("refuses a checkpoint faster than the waves could come in", async () => {
+    const { server } = boot(store);
+    await server.startRun();
+    vi.setSystemTime(1_000_000 + 2_000);
+    await expect(server.checkpointRun({ wavesCleared: 20 })).rejects.toThrow("RUN_TOO_FAST");
   });
 
   it("needs a run opened first", async () => {

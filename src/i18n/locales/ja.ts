@@ -166,4 +166,5 @@ export const ja: Record<StringKey, string> = {
   board_name: "ランキングの名前",
   board_offline: "公開後にランキングが見られます",
   board_loading: "読み込み中…",
+  settled_note: "前回の挑戦で突破したステージ分、魂 +{n}",
 };

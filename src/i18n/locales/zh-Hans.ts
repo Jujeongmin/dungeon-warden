@@ -161,4 +161,5 @@ export const zhHans: Record<StringKey, string> = {
   board_name: "排行榜名字",
   board_offline: "发布后可查看排行榜",
   board_loading: "加载中…",
+  settled_note: "上一局突破的关卡：灵魂 +{n}",
 };

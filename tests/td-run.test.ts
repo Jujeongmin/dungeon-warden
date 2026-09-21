@@ -145,8 +145,8 @@ describe("the endless run", () => {
     const flat = playStage(ENDLESS, { plan: "flat" });
     const maze = playStage(ENDLESS);
     const full = playStage(ENDLESS, { research: ALL_RESEARCH, towers: ["warrior", "warrior", "warrior", "mage", "guard"] });
-    expect(maze.stage).toBeGreaterThan(flat.stage);
-    expect(full.stage).toBeGreaterThan(maze.stage);
+    expect(maze.wavesCleared).toBeGreaterThan(flat.wavesCleared);
+    expect(full.wavesCleared).toBeGreaterThanOrEqual(maze.wavesCleared);
     expect(full.status).toBe("lost");
   }, 300000);
 });

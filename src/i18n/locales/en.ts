@@ -160,4 +160,5 @@ export const en: Record<StringKey, string> = {
   board_name: "Name on the rankings",
   board_offline: "Rankings appear once the game is deployed",
   board_loading: "Loading…",
+  settled_note: "+{n} souls for the stages your last run got past",
 };

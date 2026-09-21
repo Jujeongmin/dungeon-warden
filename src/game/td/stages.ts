@@ -36,7 +36,7 @@ export const SPAWN_INTERVAL = 0.9;
 /** Waves to a stage: the number a run is ranked by goes up every this many. */
 export const WAVES_PER_STAGE = 5;
 
-export const STARTING_LIVES = 20;
+export const STARTING_LIVES = 5;
 export const START_GOLD = 150;
 
 /** Gold for clearing wave `index` (0-based). */
@@ -64,7 +64,7 @@ export function hasChampion(index: number): boolean {
 
 /** Health multiplier for wave `index`: steady growth, so a run always ends. */
 export function waveToughness(index: number): number {
-  return Math.round(2.2 * Math.pow(1.07, index) * 100) / 100;
+  return Math.round(2.2 * Math.pow(1.09, index) * 100) / 100;
 }
 
 /**

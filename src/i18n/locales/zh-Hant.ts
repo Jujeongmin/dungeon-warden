@@ -161,4 +161,5 @@ export const zhHant: Record<StringKey, string> = {
   board_name: "排行榜名字",
   board_offline: "發布後可查看排行榜",
   board_loading: "載入中…",
+  settled_note: "上一局突破的關卡：靈魂 +{n}",
 };

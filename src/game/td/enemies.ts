@@ -32,7 +32,7 @@ export const LEVEL_HP_STEP = 0.2;
 /** A champion: this much tougher, worth this much more, and this many lives. */
 export const CHAMPION_HP = 6;
 export const CHAMPION_BOUNTY = 6;
-export const CHAMPION_LIVES = 5;
+export const CHAMPION_LIVES = 2;
 
 export function enemyHp(cls: AdventurerClass, level: number, champion = false): number {
   const base = ENEMIES[cls].hp * (1 + LEVEL_HP_STEP * Math.max(0, level - 1));

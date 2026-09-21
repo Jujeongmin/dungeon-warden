@@ -95,6 +95,8 @@ export default function App() {
   const [homeArmed, setHomeArmed] = useState(false);
 
   const [rankingOpen, setRankingOpen] = useState(false);
+  /** Souls paid on starting for a run that was left open, shown once. */
+  const [settledNote, setSettledNote] = useState<number | null>(null);
   const [researchOpen, setResearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -116,7 +118,9 @@ export default function App() {
     });
   }, []);
 
+  const checkpointRef = useRef<(waves: number) => Promise<void>>(async () => {});
   const progress = useProgress();
+  checkpointRef.current = progress.checkpointRun;
   const effects = useMemo(() => researchEffects(progress.progress.research), [progress.progress.research]);
   const owns3x = progress.entitlements.fastForward === true;
 
@@ -163,6 +167,7 @@ export default function App() {
           float(t("wave_bonus", { n: event.bonus }), run.core.x, run.core.y - 1, "bonus");
         } else if (event.kind === "stageCleared") {
           audio.play("victory");
+          void checkpointRef.current(run.wavesCleared);
           float(t("stage_cleared", { n: event.stage }), run.core.x, run.core.y - 3, "stage");
         } else if (event.kind === "won" || event.kind === "lost") {
           finishRef.current(run);
@@ -294,11 +299,12 @@ export default function App() {
   // ----------------------------------------------------------- run flow
 
   const beginRun = useCallback(async () => {
-    const ok = await progress.startRun();
-    if (!ok) {
+    const settled = await progress.startRun();
+    if (settled === null) {
       audio.play("error");
       return;
     }
+    setSettledNote(settled > 0 ? settled : null);
     audio.play("click");
     setResult(null);
     setSelection(null);
@@ -585,6 +591,12 @@ export default function App() {
                   {enemiesIn > 0 && <span>{t("enemies_in", { n: enemiesIn })}</span>}
                 </div>
                 {homeArmed && <div className="banner">{t("leave_confirm")}</div>}
+                {settledNote !== null && (
+                  <div className="banner">
+                    <button className="banner-close" onClick={() => setSettledNote(null)} aria-label="close">×</button>
+                    {t("settled_note", { n: settledNote })}
+                  </div>
+                )}
                 {teaching && (
                   <div key={teaching.hint} className="tutorial">
                     <span className="tutorial-count">{teaching.index + 1}/{teaching.count}</span>

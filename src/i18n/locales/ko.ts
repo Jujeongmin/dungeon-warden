@@ -159,4 +159,5 @@ export const ko = {
   board_name: "랭킹에 표시할 이름",
   board_offline: "배포 후에 랭킹을 볼 수 있어요",
   board_loading: "불러오는 중…",
+  settled_note: "지난 판에서 돌파한 스테이지로 영혼 +{n}",
 };

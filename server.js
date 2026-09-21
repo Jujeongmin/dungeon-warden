@@ -152,6 +152,40 @@ async function writeRanking(account, nickname, bestWaves) {
   return entry;
 }
 
+/** A client's wave count, or a refusal. */
+function checkedWaves(value) {
+  const waves = Math.floor(Number(value));
+  if (!Number.isFinite(waves) || waves < 0 || waves > MAX_WAVES) throw new Error("BAD_WAVES");
+  return waves;
+}
+
+/** Refuses a count of waves that could not have been played since the run opened. */
+function checkPace(state, pending, waves) {
+  const elapsed = Date.now() - pending.startedAt;
+  const least = (leastSeconds(waves) * 1000) / speedFor(state) - CLOCK_SLACK_MS;
+  if (elapsed < least) throw new Error("RUN_TOO_FAST");
+}
+
+/** Pays a run's souls into `progress`, keeps the best and ranks it. Does not save progress. */
+async function settleRun(state, progress, waves) {
+  const souls = Math.floor(waves / WAVES_PER_STAGE);
+  const improved = waves > progress.bestWaves;
+  progress.souls += souls;
+  if (improved) {
+    progress.bestWaves = waves;
+    await writeRanking($sender.account, state && state.nickname, progress.bestWaves);
+  }
+  return { souls, improved, progress };
+}
+
+/** Settles a run left open, on its last checkpoint. */
+async function settleOpenRun(state) {
+  const progress = progressOf(state);
+  const pending = state && state.pendingRun;
+  if (!pending || !(pending.wavesCleared > 0)) return { souls: 0, progress };
+  return await settleRun(state, progress, pending.wavesCleared);
+}
+
 // ---------------------------------------------------------------------------
 // VXShop
 // ---------------------------------------------------------------------------
@@ -235,12 +269,39 @@ class Server {
     return { entitlements: (state && state.entitlements) || emptyEntitlements() };
   }
 
-  /** Opens a run: remembers when, for finishRun to check. */
+  /**
+   * Opens a run: remembers when, for finishRun to check.
+   *
+   * A run still open is settled first, on the waves it last checkpointed: a
+   * run left by closing the tab still pays for the stages it got past.
+   */
   async startRun() {
     return await $lock(`progress:${$sender.account}`, async () => {
+      const state = await $global.getMyState();
+      const settled = await settleOpenRun(state);
       const startedAt = Date.now();
-      await $global.updateMyState({ pendingRun: { startedAt } });
-      return { startedAt };
+      await $global.updateMyState({ progress: settled.progress, pendingRun: { startedAt, wavesCleared: 0 } });
+      return { startedAt, settled: settled.souls, progress: settled.progress };
+    });
+  }
+
+  /**
+   * Records how far a run has got without ending it.
+   *
+   * Sent at every stage cleared, so a run that is never finished - a closed
+   * tab, a lost connection - is paid for up to its last stage next time.
+   */
+  async checkpointRun({ wavesCleared } = {}) {
+    const waves = checkedWaves(wavesCleared);
+    return await $lock(`progress:${$sender.account}`, async () => {
+      const state = await $global.getMyState();
+      const pending = state && state.pendingRun;
+      if (!pending) throw new Error("NO_RUN_OPEN");
+      checkPace(state, pending, waves);
+      if (waves > (pending.wavesCleared || 0)) {
+        await $global.updateMyState({ pendingRun: { ...pending, wavesCleared: waves } });
+      }
+      return { ok: true };
     });
   }
 
@@ -252,24 +313,15 @@ class Server {
    * puts the best on the ranking.
    */
   async finishRun({ wavesCleared } = {}) {
-    const waves = Math.floor(Number(wavesCleared));
-    if (!Number.isFinite(waves) || waves < 0 || waves > MAX_WAVES) throw new Error("BAD_WAVES");
+    const waves = checkedWaves(wavesCleared);
     return await $lock(`progress:${$sender.account}`, async () => {
       const state = await $global.getMyState();
-      const progress = progressOf(state);
       const pending = state && state.pendingRun;
       if (!pending) throw new Error("NO_RUN_OPEN");
-      const elapsed = Date.now() - pending.startedAt;
-      const least = (leastSeconds(waves) * 1000) / speedFor(state) - CLOCK_SLACK_MS;
-      if (elapsed < least) throw new Error("RUN_TOO_FAST");
-
-      const souls = Math.floor(waves / WAVES_PER_STAGE);
-      const improved = waves > progress.bestWaves;
-      progress.souls += souls;
-      if (improved) progress.bestWaves = waves;
-      await $global.updateMyState({ progress, pendingRun: null });
-      if (improved) await writeRanking($sender.account, state && state.nickname, progress.bestWaves);
-      return { souls, improved, progress };
+      checkPace(state, pending, waves);
+      const result = await settleRun(state, progressOf(state), Math.max(waves, pending.wavesCleared || 0));
+      await $global.updateMyState({ progress: result.progress, pendingRun: null });
+      return result;
     });
   }
 
