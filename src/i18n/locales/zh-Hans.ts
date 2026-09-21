@@ -355,6 +355,7 @@ export const zhHans: Record<StringKey, string> = {
   guide_warden: "附身",
   guide_warden_1: "**附身** 袭击中点部下即可操控。攻击更强，受到伤害更少。",
   guide_warden_2: "**操作** 移动 WASD/摇杆 · 攻击 Space/F/按钮 · 技能 E · 下一个部下 Q/Tab · 离开 M",
+  guide_warden_2_touch: "**操作** 左侧摇杆移动，右侧按钮攻击、技能、切换部下、返回地图。",
   guide_warden_3: "**小心** 附近的冒险者会针对附身的身体。身体倒下会回到地图。",
   guide_warden_4: "**守卫者等级** 亲手击倒的冒险者越多，守卫者越强；3级解锁皮肤。",
   guide_more: "其他",

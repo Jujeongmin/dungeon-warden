@@ -3,6 +3,12 @@ import { useEscape } from "./useEscape";
 import { useT } from "../i18n";
 import { GUIDE, type GuideSection } from "../game/guide";
 
+/** A mouse and so a keyboard, most likely; see HAS_MOUSE in App. */
+const HAS_MOUSE =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
 interface Props {
   onClose: () => void;
 }
@@ -54,7 +60,7 @@ export function GuideDialog({ onClose }: Props) {
 
         <ul className="guide-list">
           {section.lines.map((line) => (
-            <Line key={line.key} text={t(line.key, line.vars)} />
+            <Line key={line.key} text={t(!HAS_MOUSE && line.touchKey ? line.touchKey : line.key, line.vars)} />
           ))}
         </ul>
       </div>

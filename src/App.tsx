@@ -2591,7 +2591,8 @@ export default function App() {
         </div>
       )}
 
-      {possessed && !settings.strikeSeen && (
+      {/* Keys only: a touch screen has the buttons, each with its own label. */}
+      {possessed && !settings.strikeSeen && HAS_MOUSE && (
         <div className="possess-hint strike-hint">{t("strike_hint")}</div>
       )}
 

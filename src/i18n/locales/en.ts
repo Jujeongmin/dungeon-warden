@@ -354,6 +354,7 @@ export const en: Record<StringKey, string> = {
   guide_warden: "Possession",
   guide_warden_1: "**Possess** Tap a minion during a raid to steer it. It hits harder and takes less damage.",
   guide_warden_2: "**Controls** Move WASD/stick · Attack Space/F/button · Skill E · Next body Q/Tab · Leave M",
+  guide_warden_2_touch: "**Controls** Move with the stick on the left; the buttons on the right attack, use the skill, hop to the next body and leave to the map.",
   guide_warden_3: "**Careful** Nearby adventurers go for the possessed body. If it dies, you return to the map.",
   guide_warden_4: "**Warden level** Adventurers you put down yourself make the warden stronger; level 3 unlocks a skin.",
   guide_more: "More",

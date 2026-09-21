@@ -39,6 +39,8 @@ export type GuideSection = "basics" | "gold" | "minions" | "build" | "prison" | 
 
 export interface GuideLine {
   key: StringKey;
+  /** Said instead on a touch screen, where there are no keys to name. */
+  touchKey?: StringKey;
   vars?: Record<string, string | number>;
 }
 
@@ -127,7 +129,7 @@ export const GUIDE: Array<{ id: GuideSection; title: StringKey; lines: GuideLine
     title: "guide_warden",
     lines: [
       { key: "guide_warden_1" },
-      { key: "guide_warden_2" },
+      { key: "guide_warden_2", touchKey: "guide_warden_2_touch" },
       { key: "guide_warden_3" },
       { key: "guide_warden_4" },
     ],

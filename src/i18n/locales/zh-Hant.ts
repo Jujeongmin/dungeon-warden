@@ -355,6 +355,7 @@ export const zhHant: Record<StringKey, string> = {
   guide_warden: "附身",
   guide_warden_1: "**附身** 襲擊中點部下即可操控。攻擊更強，受到傷害更少。",
   guide_warden_2: "**操作** 移動 WASD/搖桿 · 攻擊 Space/F/按鈕 · 技能 E · 下一個部下 Q/Tab · 離開 M",
+  guide_warden_2_touch: "**操作** 左側搖桿移動，右側按鈕攻擊、技能、切換部下、返回地圖。",
   guide_warden_3: "**小心** 附近的冒險者會針對附身的身體。身體倒下會回到地圖。",
   guide_warden_4: "**守衛者等級** 親手擊倒的冒險者越多，守衛者越強；3級解鎖皮膚。",
   guide_more: "其他",

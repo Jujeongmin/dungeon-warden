@@ -360,6 +360,7 @@ export const ja: Record<StringKey, string> = {
   guide_warden: "憑依",
   guide_warden_1: "**憑依** 襲撃中に配下をタップすると操作できます。攻撃は強く、受けるダメージは減ります。",
   guide_warden_2: "**操作** 移動 WASD・スティック / 攻撃 Space・F・ボタン / スキル E / 次の配下 Q・Tab / 離脱 M",
+  guide_warden_2_touch: "**操作** 左のスティックで移動、右のボタンで攻撃・スキル・次の配下・マップへ戻る。",
   guide_warden_3: "**注意** 近くの冒険者は憑依した体を狙います。体が倒れるとマップに戻ります。",
   guide_warden_4: "**ワーデンレベル** 自分で倒した冒険者が増えると少しずつ強くなり、レベル3でスキンが解放されます。",
   guide_more: "その他",

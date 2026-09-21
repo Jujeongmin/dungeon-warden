@@ -42,6 +42,10 @@ describe("the guide", () => {
           const text = translate(locale, line.key, line.vars);
           expect(text, `${locale} ${line.key}`).not.toMatch(/\{\w+\}/);
           expect(text, `${locale} ${line.key}`).toMatch(/^\*\*[^*]+\*\* /);
+          if (line.touchKey) {
+            const touch = translate(locale, line.touchKey, line.vars);
+            expect(touch, `${locale} ${line.touchKey}`).toMatch(/^\*\*[^*]+\*\* /);
+          }
         }
       }
     }
