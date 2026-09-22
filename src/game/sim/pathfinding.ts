@@ -18,18 +18,8 @@ function walkable(arena: Arena, x: number, y: number, blocked: Set<number>): boo
  * there is no corridor joining the two. Null is not a game state during a
  * raid - nothing can be dug or filled while one is running, and a raid is
  * refused unless the door already reaches the core.
- *
- * `slow` tiles can be walked but cost `slow.cost` steps each (rubble, which
- * is climbed at half speed), so the way found is the quickest, not merely the
- * fewest tiles. Costs are never under 1, so the heuristic stays admissible.
  */
-export function findPath(
-  arena: Arena,
-  start: Point,
-  goal: Point,
-  blocked: Set<number>,
-  slow?: { tiles: Set<number>; cost: number },
-): Point[] | null {
+export function findPath(arena: Arena, start: Point, goal: Point, blocked: Set<number>): Point[] | null {
   if (!walkable(arena, start.x, start.y, blocked) || !walkable(arena, goal.x, goal.y, blocked)) {
     return null;
   }
@@ -89,7 +79,7 @@ export function findPath(
       const neighbourKey = blockedKey(nx, ny, w);
       if (closed[neighbourKey]) continue;
 
-      const tentative = gScore[current] + (slow?.tiles.has(neighbourKey) ? slow.cost : 1);
+      const tentative = gScore[current] + 1;
       if (tentative >= gScore[neighbourKey]) continue;
 
       cameFrom[neighbourKey] = current;

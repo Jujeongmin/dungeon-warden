@@ -117,41 +117,12 @@ describe("new floor traps", () => {
 });
 
 describe("the room thrown down anew", () => {
-  it("slows a walker that climbs over rubble", () => {
-    const walk = (rubble: boolean) => {
-      const run = new StageRun({ ...corridor(1), rubble: rubble ? [2, 3, 4].map((y) => ({ x: 1, y })) : [] }, everything);
-      run.startWave();
-      let n = 0;
-      while (run.status === "wave" && n < 2000) { run.step(); n++; }
-      return n;
-    };
-    // Three tiles at half speed: about three tiles' worth longer.
-    expect(walk(true) - walk(false)).toBeGreaterThan(30);
-  });
-
-  it("goes round rubble when that is quicker than climbing it", () => {
-    const stage: Stage = {
-      arena: { w: 3, h: 7 },
-      bedrock: [],
-      rubble: [2, 3, 4].map((y) => ({ x: 1, y })),
-      startGold: 0,
-      lives: 5,
-      waves: [[{ cls: "knight", count: 1, level: 1 }]],
-    };
-    const run = new StageRun(stage, everything);
-    const route = run.route()!;
-    expect(route.some((p) => run.isRubble(p.x, p.y))).toBe(false);
-    // One rubble tile is cheaper to climb than a detour of two: it is climbed.
-    const short = new StageRun({ ...stage, rubble: [{ x: 1, y: 3 }] }, everything);
-    expect(short.route()!.some((p) => short.isRubble(p.x, p.y))).toBe(true);
-  });
-
-  it("never builds on rubble, but walks over it", () => {
-    const stage: Stage = { ...corridor(1), rubble: [{ x: 1, y: 4 }] };
+  it("treats rubble as in the way: nothing is built on it and nobody walks through it", () => {
+    const stage: Stage = { ...corridor(1), arena: { w: 3, h: 12 }, bedrock: [], rubble: [{ x: 1, y: 4 }] };
     const run = new StageRun(stage, everything);
     expect(run.placeTower("warrior", 1, 4)).toEqual({ ok: false, reason: "rubble" });
     expect(run.placeTrap("spike", 1, 4)).toEqual({ ok: false, reason: "rubble" });
-    expect(run.route()).not.toBeNull();
+    expect(run.route()!.some((p) => run.isRubble(p.x, p.y))).toBe(false);
   });
 
   it("makes the same room from the same number, and different ones from different numbers", () => {
@@ -165,6 +136,7 @@ describe("the room thrown down anew", () => {
       const stage = endlessStage(seed);
       const { w, h } = stage.arena;
       const rock = new Set(stage.bedrock.map((t) => t.y * w + t.x));
+      const inTheWay = new Set([...rock, ...(stage.rubble ?? []).map((t) => t.y * w + t.x)]);
       expect(stage.bedrock.length, `seed ${seed}`).toBeGreaterThan(2);
       for (const t of [...stage.bedrock, ...(stage.rubble ?? [])]) {
         expect(t.y >= 2 && t.y < h - 2, `seed ${seed}`).toBe(true);
@@ -173,8 +145,8 @@ describe("the room thrown down anew", () => {
       const run = new StageRun(stage, everything);
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          if (rock.has(y * w + x)) continue;
-          expect(findPath(stage.arena, run.entrance, { x, y }, rock), `seed ${seed} ${x},${y}`).not.toBeNull();
+          if (inTheWay.has(y * w + x)) continue;
+          expect(findPath(stage.arena, run.entrance, { x, y }, inTheWay), `seed ${seed} ${x},${y}`).not.toBeNull();
         }
       }
     }

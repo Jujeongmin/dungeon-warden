@@ -24,7 +24,7 @@ export interface Stage {
   arena: Arena;
   /** Rock nothing can stand on or walk through. */
   bedrock: Array<{ x: number; y: number }>;
-  /** Fallen rock: adventurers climb over it slowly, and nothing can be built on it. */
+  /** Fallen rock: in the way like bedrock, and drawn as a heap of rubble rather than a pillar. */
   rubble?: Array<{ x: number; y: number }>;
   startGold: number;
   lives: number;
@@ -215,19 +215,24 @@ export function endlessStage(seed: number): Stage {
     // The core is floor, so a room with no sealed pocket always has a way to it.
     if (!allConnected(w, h, rock, entrance)) continue;
 
+    // Rubble blocks the way as rock does, so a patch that would seal off
+    // any floor is left out.
     const rubble = new Set<number>();
     const patches = 2 + pick(2);
     for (let i = 0; i < patches; i++) {
       let x = pick(w);
       let y = 2 + pick(h - 4);
       const size = 1 + pick(2);
+      const patch: number[] = [];
       for (let j = 0; j < size; j++) {
         const k = y * w + x;
-        if (inner(x, y) && !rock.has(k)) rubble.add(k);
+        if (inner(x, y) && !rock.has(k) && !rubble.has(k)) patch.push(k);
         const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][pick(4)];
         x += dx;
         y += dy;
       }
+      const all = new Set([...rock, ...rubble, ...patch]);
+      if (allConnected(w, h, all, entrance)) for (const k of patch) rubble.add(k);
     }
 
     const tiles = (set: Set<number>) => [...set].sort((a, b) => a - b).map((k) => ({ x: k % w, y: Math.floor(k / w) }));

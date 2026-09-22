@@ -52,9 +52,6 @@ const OCCUPIED_RADIUS = 0.75;
 /** How long a tower is drawn mid-swing after it fires. */
 const ATTACK_POSE_SECONDS = 0.35;
 
-/** Share of its speed an adventurer keeps while climbing over rubble. */
-export const RUBBLE_SPEED = 0.5;
-
 export interface RunTower {
   id: string;
   type: TowerType;
@@ -166,7 +163,7 @@ export class StageRun {
 
   private readonly effects: ResearchEffects;
   private readonly bedrock: Set<number>;
-  /** Fallen rock: climbed over slowly, never built on. */
+  /** Fallen rock: in the way like bedrock, drawn as a heap. */
   private readonly rubble: Set<number>;
   private readonly dug = new Set<number>();
   private queue: Spawn[] = [];
@@ -222,7 +219,7 @@ export class StageRun {
     return this.traps.find((t) => t.x === x && t.y === y);
   }
 
-  /** What an adventurer cannot walk through: rock, and every tower. */
+  /** What an adventurer cannot walk through: rock, rubble, and every tower. */
   private blocked(extra?: number): Set<number> {
     const { w, h } = this.stage.arena;
     const set = new Set<number>();
@@ -232,22 +229,15 @@ export class StageRun {
         if (!this.dug.has(k)) set.add(k);
       }
     }
+    for (const k of this.rubble) set.add(k);
     for (const t of this.towers) set.add(this.key(t.x, t.y));
     if (extra !== undefined) set.add(extra);
     return set;
   }
 
-  /** Rubble as the pathfinder weighs it: walkable, but slow. */
-  private get climb(): { tiles: Set<number>; cost: number } {
-    return { tiles: this.rubble, cost: 1 / RUBBLE_SPEED };
-  }
-
-  /**
-   * The way in, door to core, or null while there is none: the quickest,
-   * which goes round rubble when going round is faster than climbing it.
-   */
+  /** The way in, door to core, or null while there is none. */
   route(): Point[] | null {
-    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(), this.climb);
+    return findPath(this.stage.arena, this.entrance, this.core, this.blocked());
   }
 
   /** How many waves the stage has: without end for the endless run. */
@@ -333,7 +323,7 @@ export class StageRun {
 
   /** The way in if a tower stood here too, for drawing the maze it would make. */
   routeWithTower(x: number, y: number): Point[] | null {
-    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(this.key(x, y)), this.climb);
+    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(this.key(x, y)));
   }
 
   placeTower(type: TowerType, x: number, y: number): BuildResult {
@@ -410,7 +400,7 @@ export class StageRun {
     for (const enemy of this.enemies) {
       if (ENEMIES[enemy.cls].flies) continue;
       const from = this.standingTile(enemy);
-      const path = findPath(this.stage.arena, from, this.core, blocked, this.climb);
+      const path = findPath(this.stage.arena, from, this.core, blocked);
       if (!path) continue;
       enemy.route = path;
       enemy.next = 0;
@@ -497,10 +487,7 @@ export class StageRun {
   private moveEnemies(dt: number): void {
     for (const enemy of this.enemies) {
       const slow = enemy.slowUntil > this.time ? enemy.slowFactor : 1;
-      // Scrambling over a heap of rubble takes a walker twice as long; a
-      // flyer goes over it like everything else.
-      const climbing = !ENEMIES[enemy.cls].flies && this.isRubble(Math.round(enemy.x), Math.round(enemy.y));
-      let budget = ENEMIES[enemy.cls].speed * slow * (climbing ? RUBBLE_SPEED : 1) * dt;
+      let budget = ENEMIES[enemy.cls].speed * slow * dt;
       while (budget > 0 && enemy.next < enemy.route.length) {
         const target = enemy.route[enemy.next];
         const dx = target.x - enemy.x;

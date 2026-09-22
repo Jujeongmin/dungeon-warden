@@ -187,7 +187,7 @@ export const zhHant: Record<StringKey, string> = {
   res_trap_rune: "時之符文",
   res_trap_rune_n: "解鎖回溯符文",
   refuse_rubble: "碎石上不能建造",
-  guide_basics_5: "**障礙** 每局都會重新擺放岩石和碎石。岩石無法通過。爬過碎石速度減半，所以繞路更快時敵人會避開碎石。碎石上不能建造。",
+  guide_basics_5: "**障礙** 每局都會重新擺放岩石和碎石。兩者都無法通過，上面也不能建造。",
   guide_towers_7: "**弩手** 射程極遠，緩慢地射出一發重箭。",
   guide_towers_8: "**狂戰士** 只能打到身邊，但會同時砍中所有夠得著的敵人。適合兩條路並排經過的地方。",
   guide_towers_9: "**薩滿** 自己不攻擊，讓周圍的塔射得更快。多個薩滿不疊加，只取最強的效果。",
