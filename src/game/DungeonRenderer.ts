@@ -69,6 +69,10 @@ const SHOWCASE_SPAN = 12;
 const SHOWCASE_LIGHT = 1.8;
 const MIN_DISTANCE = 8;
 const MAX_DISTANCE = 70;
+/** Canvas height (px) below which the screen counts as a phone: see fitToArena. */
+const PHONE_HEIGHT = 520;
+/** How much closer than the whole room a phone starts. */
+const PHONE_START_ZOOM = 0.7;
 const FOV = 45;
 
 /** Camera shake: trauma decays exponentially and is never integrated, so the
@@ -721,8 +725,15 @@ export class DungeonRenderer {
     const forHeight = (along * margin * fullHeight) / (2 * Math.tan(halfFov) * visibleHeight);
     const forWidth = (across * margin * fullHeight) / (2 * Math.tan(halfFov) * visibleWidth);
 
+    /*
+     * On a phone the whole room fits only at a size nobody can tap: squeezed
+     * between the top bar and the build panel, a tile came out about fifteen
+     * pixels. So a short screen starts closer in, on the middle of the room,
+     * and the player drags or pinches out to see the rest.
+     */
+    const phone = height < PHONE_HEIGHT && !this.showcase;
     this.distance = THREE.MathUtils.clamp(
-      Math.max(forHeight, forWidth),
+      Math.max(forHeight, forWidth) * (phone ? PHONE_START_ZOOM : 1),
       MIN_DISTANCE,
       MAX_DISTANCE,
     );
@@ -2351,6 +2362,8 @@ export class DungeonRenderer {
     const boost = on ? SHOWCASE_LIGHT : 1;
     this.ambientLight.intensity = AMBIENT_INTENSITY * boost;
     this.keyLight.intensity = KEY_INTENSITY * boost;
+    // A phone frames play closer than the title: see fitToArena.
+    if (!this.userAdjustedZoom) this.fitToArena();
   }
 
   /**
