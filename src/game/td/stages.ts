@@ -59,6 +59,16 @@ export function waveCount(index: number): number {
   return 4 + Math.floor(index * 0.8);
 }
 
+/**
+ * Flyers in wave `index`: the third wave of every stage from the second
+ * brings a few, more as the stages go. Mirrored in server.js (flyerCount).
+ */
+export function flyerCount(index: number): number {
+  const stage = stageOfWave(index);
+  if (stage < 2 || index % WAVES_PER_STAGE !== 2) return 0;
+  return 2 + Math.floor(stage / 2);
+}
+
 /** Whether wave `index` is led by a champion: the last of every stage from the second. */
 export function hasChampion(index: number): boolean {
   return stageOfWave(index) >= 2 && index % WAVES_PER_STAGE === WAVES_PER_STAGE - 1;
@@ -91,6 +101,8 @@ export function endlessWave(index: number): Wave {
           { cls: first, count: Math.ceil(count / 2), level, toughness },
           { cls: second, count: Math.floor(count / 2), level, toughness },
         ];
+  const flyers = flyerCount(index);
+  if (flyers > 0) wave.push({ cls: "flyer", count: flyers, level, toughness });
   if (hasChampion(index)) {
     wave.push({ cls: pool[stage % pool.length], count: 1, level: level + 1, champion: true, toughness });
   }

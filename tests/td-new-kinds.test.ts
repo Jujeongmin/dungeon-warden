@@ -151,3 +151,52 @@ describe("the room thrown down anew", () => {
     }
   });
 });
+
+describe("flyers", () => {
+  const openRoom = (): Stage => ({
+    arena: { w: 5, h: 8 },
+    bedrock: [],
+    startGold: 1000,
+    lives: 20,
+    waves: [[{ cls: "flyer", count: 1, level: 1 }]],
+  });
+
+  it("float straight over the maze to the core", () => {
+    // Rock across the room but for one end: walkers would have to go round.
+    const walled = { ...openRoom(), bedrock: [0, 1, 2, 3].map((x) => ({ x, y: 3 })) };
+    const run = new StageRun(walled, everything);
+    run.startWave();
+    let steps = 0;
+    let lastX = run.entrance.x;
+    while (run.status === "wave" && steps < 400) {
+      run.step();
+      steps++;
+      if (run.enemies[0]) lastX = run.enemies[0].x;
+    }
+    expect(lastX).toBe(run.entrance.x);
+    expect(run.lives).toBe(run.lives0 - 1);
+    // Seven tiles at a tile a second, give or take a step.
+    expect(steps * 0.05).toBeLessThan(8);
+  });
+
+  it("are not caught by floor traps, but the arrow trap shoots them", () => {
+    const floor = new StageRun(openRoom(), everything);
+    for (let y = 1; y < 7; y++) floor.placeTrap("spike", floor.entrance.x, y);
+    floor.startWave();
+    const floorHits = steps(floor, 400).filter((e) => e.kind === "damage").length;
+    expect(floorHits).toBe(0);
+
+    const arrow = new StageRun(openRoom(), everything);
+    arrow.placeTrap("arrow", 0, 4);
+    arrow.startWave();
+    expect(steps(arrow, 400).some((e) => e.kind === "damage" && e.source === "trap")).toBe(true);
+  });
+
+  it("do not stop a tower being built under them", () => {
+    const run = new StageRun(openRoom(), everything);
+    run.startWave();
+    steps(run, 50);
+    const flyer = run.enemies[0];
+    expect(run.placeTower("warrior", Math.round(flyer.x), Math.round(flyer.y) + 1).ok).toBe(true);
+  });
+});

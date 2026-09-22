@@ -8,7 +8,7 @@ export const TILE = {
 
 export type TileId = (typeof TILE)[keyof typeof TILE];
 
-export type AdventurerClass = "knight" | "barbarian" | "rogue" | "mage" | "ranger";
+export type AdventurerClass = "knight" | "barbarian" | "rogue" | "mage" | "ranger" | "flyer";
 
 export const ADVENTURER_LABEL: Record<AdventurerClass, StringKey> = {
   knight: "adv_knight",
@@ -16,6 +16,7 @@ export const ADVENTURER_LABEL: Record<AdventurerClass, StringKey> = {
   rogue: "adv_rogue",
   mage: "adv_mage",
   ranger: "adv_ranger",
+  flyer: "adv_flyer",
 };
 
 /** How much larger a champion is drawn. The only thing that marks it on the board. */

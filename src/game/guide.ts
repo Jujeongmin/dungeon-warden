@@ -56,6 +56,7 @@ export const GUIDE: Array<{ id: GuideSection; title: StringKey; lines: GuideLine
       { key: "guide_waves_2", vars: { lives: STARTING_LIVES, champ: CHAMPION_LIVES } },
       { key: "guide_waves_3" },
       { key: "guide_waves_4" },
+      { key: "guide_waves_5" },
     ],
   },
   {

@@ -102,6 +102,8 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   a_rogue: [/^rogue$/, /^rogue_hooded$/],
   a_ranger: [/^ranger$/],
   a_mage: [/^mage$/],
+  // The flyer: a young dragon (Quaternius, CC0), flying over the maze.
+  a_flyer: [/^dragon$/],
 
   // Traps
   spike: [/^floor_tile_big_spikes$/, /spikes/],

@@ -266,7 +266,7 @@ export class StageRun {
   }
 
   private occupied(x: number, y: number): boolean {
-    return this.enemies.some((e) => Math.hypot(e.x - x, e.y - y) < OCCUPIED_RADIUS);
+    return this.enemies.some((e) => !ENEMIES[e.cls].flies && Math.hypot(e.x - x, e.y - y) < OCCUPIED_RADIUS);
   }
 
   private isFixed(x: number, y: number): boolean {
@@ -279,6 +279,7 @@ export class StageRun {
     const arena = this.stage.arena;
     if (!findPath(arena, this.entrance, this.core, blocked)) return false;
     for (const enemy of this.enemies) {
+      if (ENEMIES[enemy.cls].flies) continue;
       const from = this.standingTile(enemy);
       if (from.x === x && from.y === y) return false;
       if (!findPath(arena, from, this.core, blocked)) return false;
@@ -396,6 +397,7 @@ export class StageRun {
     if (this.enemies.length === 0) return;
     const blocked = this.blocked();
     for (const enemy of this.enemies) {
+      if (ENEMIES[enemy.cls].flies) continue;
       const from = this.standingTile(enemy);
       const path = findPath(this.stage.arena, from, this.core, blocked);
       if (!path) continue;
@@ -469,7 +471,8 @@ export class StageRun {
         y: this.entrance.y,
         hp,
         maxHp: hp,
-        route: path,
+        // A flyer's way is the straight line over everything.
+        route: ENEMIES[s.cls].flies ? [this.entrance, this.core] : path,
         next: 1,
         slowUntil: 0,
         slowFactor: 1,
@@ -620,7 +623,7 @@ export class StageRun {
        */
       const reach = Math.max(stats.triggerRadius, stats.aoe);
       const hit = this.enemies.filter(
-        (e) => !trap.hit.has(e.id) && Math.hypot(e.x - trap.x, e.y - trap.y) <= reach,
+        (e) => !ENEMIES[e.cls].flies && !trap.hit.has(e.id) && Math.hypot(e.x - trap.x, e.y - trap.y) <= reach,
       );
       if (hit.length === 0) continue;
       this.events.push({ kind: "trap", trapId: trap.id, x: trap.x, y: trap.y });

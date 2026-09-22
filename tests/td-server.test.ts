@@ -33,7 +33,7 @@ function boot(store: Store, account = "acct") {
   };
   const $lock = async (_key: string, fn: () => Promise<unknown>) => fn();
   const Server = Function("$global", "$sender", "$lock", `${source}\nreturn Server;`)($global, { account }, $lock);
-  const helpers = Function("$global", "$sender", "$lock", `${source}\nreturn { waveCount, hasChampion, leastSeconds };`)(
+  const helpers = Function("$global", "$sender", "$lock", `${source}\nreturn { waveCount, flyerCount, hasChampion, leastSeconds };`)(
     $global,
     { account },
     $lock,
@@ -59,7 +59,7 @@ describe("server mirrors", () => {
   it("counts each wave as the client builds it", () => {
     const { helpers } = boot(store);
     for (let i = 0; i < 60; i++) {
-      expect(helpers.waveCount(i) + (helpers.hasChampion(i) ? 1 : 0), `wave ${i}`).toBe(waveSize(endlessWave(i)));
+      expect(helpers.waveCount(i) + helpers.flyerCount(i) + (helpers.hasChampion(i) ? 1 : 0), `wave ${i}`).toBe(waveSize(endlessWave(i)));
     }
     let spread = 0;
     for (let i = 0; i < 20; i++) spread += (waveSize(endlessWave(i)) - 1) * SPAWN_INTERVAL;

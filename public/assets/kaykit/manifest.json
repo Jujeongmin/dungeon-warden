@@ -37,6 +37,12 @@
       "bytes": 6275
     },
     {
+      "url": "/assets/quaternius/Dragon.glb",
+      "name": "dragon",
+      "group": "quaternius",
+      "bytes": 268896
+    },
+    {
       "url": "/assets/kaykit/dungeon/floor_tile_big_spikes.gltf",
       "name": "floor_tile_big_spikes",
       "group": "kaykit/dungeon",

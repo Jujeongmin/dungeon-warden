@@ -16,6 +16,12 @@ export interface EnemySpec {
   bounty: number;
   /** Multiplier on damage taken from traps. */
   trapResistance: number;
+  /**
+   * Floats over the room: straight from the door to the core, over towers
+   * and rock alike, and over the floor traps too. Only towers and the arrow
+   * trap can reach it - so a maze alone does not stop everything.
+   */
+  flies?: boolean;
 }
 
 export const ENEMIES: Record<AdventurerClass, EnemySpec> = {
@@ -24,6 +30,7 @@ export const ENEMIES: Record<AdventurerClass, EnemySpec> = {
   barbarian: { hp: 70, speed: 1.4, bounty: 8, trapResistance: 1.15 },
   ranger: { hp: 40, speed: 1.7, bounty: 7, trapResistance: 1 },
   mage: { hp: 55, speed: 1.15, bounty: 8, trapResistance: 1.2 },
+  flyer: { hp: 40, speed: 1.0, bounty: 7, trapResistance: 1, flies: true },
 };
 
 /** Each level adds this share of the base health. */

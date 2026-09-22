@@ -194,4 +194,7 @@ export const ko = {
   trap_arrow_note: "4초마다 가까운 적을 쏨",
   trap_rockfall_note: "옆 칸까지 큰 피해",
   trap_flame_note: "옆 칸까지 피해 + 화상",
+  adv_flyer: "새끼 드래곤",
+  guide_waves_5: "**비행 적** 스테이지 2부터 각 스테이지 세 번째 웨이브에 새끼 드래곤이 와요. 미로를 무시하고 입구에서 코어로 곧장 날아가고, 바닥 함정에도 안 걸려요. 타워와 화살 함정으로 막으세요.",
+  boss_name: "챔피언 {name}",
 };

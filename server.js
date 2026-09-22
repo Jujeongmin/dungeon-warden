@@ -44,6 +44,13 @@ function waveCount(index) {
   return 4 + Math.floor(index * 0.8);
 }
 
+/** Flyers in wave `index`: the third of every stage from the second. Mirrors flyerCount. */
+function flyerCount(index) {
+  const stage = Math.floor(index / WAVES_PER_STAGE) + 1;
+  if (stage < 2 || index % WAVES_PER_STAGE !== 2) return 0;
+  return 2 + Math.floor(stage / 2);
+}
+
 /** The last wave of every stage from the second is led by a champion. */
 function hasChampion(index) {
   return Math.floor(index / WAVES_PER_STAGE) + 1 >= 2 && index % WAVES_PER_STAGE === WAVES_PER_STAGE - 1;
@@ -56,7 +63,7 @@ function hasChampion(index) {
 function leastSeconds(waves) {
   let total = 0;
   for (let i = 0; i < waves; i++) {
-    const size = waveCount(i) + (hasChampion(i) ? 1 : 0);
+    const size = waveCount(i) + flyerCount(i) + (hasChampion(i) ? 1 : 0);
     total += (size - 1) * SPAWN_INTERVAL;
   }
   return total;

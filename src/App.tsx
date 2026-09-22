@@ -480,6 +480,8 @@ export default function App() {
     ? nextWave.map((g) => `${g.champion ? "♛ " : ""}${t(ADVENTURER_LABEL[g.cls])} ${g.count}`).join(" · ")
     : null;
   const enemiesIn = run ? run.enemies.length : 0;
+  // The champion in the room, if one is: its health gets the top of the screen.
+  const boss = run?.enemies.find((e) => e.champion) ?? null;
 
   const hint = refusal
     ? t(REFUSAL_TEXT[refusal])
@@ -565,6 +567,15 @@ export default function App() {
               </header>
 
               <div className="topstack">
+                {boss && (
+                  <div className="boss-bar" role="status">
+                    <span className="boss-name">♛ {t("boss_name", { name: t(ADVENTURER_LABEL[boss.cls]) })}</span>
+                    <span className="boss-track">
+                      <span className="boss-fill" style={{ width: `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%` }} />
+                    </span>
+                    <span className="boss-hp">{Math.ceil(Math.max(0, boss.hp))} / {boss.maxHp}</span>
+                  </div>
+                )}
                 <div className="raid-bar">
                   <span className="speeds">
                     {RUN_SPEEDS.map((s) => {

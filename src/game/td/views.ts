@@ -1,9 +1,16 @@
 import type { MarkerView, UnitView } from "../DungeonRenderer";
 import { CHAMPION_MODEL_SCALE } from "../types";
+import { ENEMIES } from "./enemies";
 import type { StageRun } from "./StageRun";
 
 /** How much bigger each tower level is drawn: a level you can see. */
 const LEVEL_SCALE_STEP = 0.15;
+
+/** How high a flyer floats over the floor, in tiles. */
+const FLYER_HOVER = 0.75;
+
+/** A flyer is drawn a little larger than a walker: wings take width, and it has to read from above. */
+const FLYER_SCALE = 1.35;
 
 /** What the board draws for a run: its towers and whoever is walking in. */
 export function runUnits(run: StageRun, options: { labels?: boolean } = {}): UnitView[] {
@@ -35,7 +42,8 @@ export function runUnits(run: StageRun, options: { labels?: boolean } = {}): Uni
       action: "walk",
       facing: enemy.facing,
       showHealth: true,
-      scale: enemy.champion ? CHAMPION_MODEL_SCALE : undefined,
+      scale: enemy.champion ? CHAMPION_MODEL_SCALE : ENEMIES[enemy.cls].flies ? FLYER_SCALE : undefined,
+      hover: ENEMIES[enemy.cls].flies ? FLYER_HOVER : undefined,
     });
   }
   return units;

@@ -196,4 +196,7 @@ export const zhHans: Record<StringKey, string> = {
   trap_arrow_note: "每4秒射击附近敌人",
   trap_rockfall_note: "波及相邻格子的重击",
   trap_flame_note: "波及相邻格子，附带灼烧",
+  adv_flyer: "幼龙",
+  guide_waves_5: "**飞行敌人** 从第2关起，每关第三波会有幼龙。它们无视迷宫，从入口直飞核心，也不会触发地面陷阱。用塔和箭矢陷阱拦住它们。",
+  boss_name: "冠军 {name}",
 };

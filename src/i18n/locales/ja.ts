@@ -201,4 +201,7 @@ export const ja: Record<StringKey, string> = {
   trap_arrow_note: "4秒ごとに近くの敵を撃つ",
   trap_rockfall_note: "隣のマスまで大ダメージ",
   trap_flame_note: "隣のマスまでダメージ＋炎上",
+  adv_flyer: "子ドラゴン",
+  guide_waves_5: "**飛行する敵** ステージ2から、各ステージ3番目のウェーブに子ドラゴンが来ます。迷路を無視して入口からコアへまっすぐ飛び、床のトラップにもかかりません。タワーと矢のトラップで止めましょう。",
+  boss_name: "チャンピオン {name}",
 };

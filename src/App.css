@@ -498,6 +498,36 @@ h3.section {
 
 .topstack > * { pointer-events: auto; }
 
+/* The champion's health, top and centre while it is in the room. */
+.boss-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: min(460px, 100%);
+  padding: 6px 14px;
+  border: 1px solid rgba(232, 100, 76, 0.6);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: var(--fs-sm);
+  pointer-events: none;
+}
+.boss-name { color: #ffb08a; font-weight: 700; white-space: nowrap; }
+.boss-track {
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.boss-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b8322a, #ff6a4a);
+  transition: width 0.2s ease-out;
+}
+.boss-hp { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 .banner {
   position: relative;
   max-width: min(680px, 100%);

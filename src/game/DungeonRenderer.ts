@@ -151,6 +151,8 @@ export interface UnitView {
   resting?: boolean;
   /** A short tag over the unit's head - a tower's level. */
   label?: string;
+  /** Floats this far over the floor, bobbing: a flyer. */
+  hover?: number;
   /**
    * A tower's upgrade level, 1 to 3. Level 2 stands in a cold glow and level 3
    * in a gold one with light rising off it, so a garrison's strong points
@@ -186,7 +188,7 @@ interface Aura {
  */
 const CLIP_PATTERNS: Record<string, RegExp[]> = {
   idle: [/^idle_a$/i, /^idle$/i, /idle/i],
-  walk: [/^walking_a$/i, /^walk/i, /^running_a$/i, /run/i],
+  walk: [/^walking_a$/i, /^walk/i, /^running_a$/i, /run/i, /flying/i],
   // The free tier ships no attack clips; Interact is the closest arm motion.
   // Adding a paid animation pack later lets the first patterns take over.
   attack: [/melee_attack/i, /attack/i, /shoot/i, /spellcast/i, /^interact$/i, /^throw$/i],
@@ -236,6 +238,7 @@ const UNIT_COLORS: Record<string, number> = {
   a_rogue: 0xa8564e,
   a_ranger: 0xb08a4a,
   a_mage: 0xb05ac4,
+  a_flyer: 0x8fb4f0,
 };
 
 const MARKER_COLORS: Record<string, number> = {
@@ -789,6 +792,7 @@ export class DungeonRenderer {
         // scale; the punch below multiplies on top of it rather than
         // overwriting it, so it has to be remembered up front.
         object.userData.baseScale = object.scale.x || 1;
+        object.userData.groundY = object.position.y;
       }
 
       const impact = this.impacts.get(unit.id);
@@ -803,6 +807,25 @@ export class DungeonRenderer {
       const tx = unit.x + (impact?.kx ?? 0) * knock;
       const tz = unit.y + (impact?.ky ?? 0) * knock;
       if (!usesModel) object.position.y = UNIT_HEIGHT;
+      if (unit.hover) {
+        const ground = usesModel ? ((object.userData.groundY as number | undefined) ?? 0) : UNIT_HEIGHT;
+        object.position.y = ground + unit.hover + Math.sin(this.elapsed * 3 + unit.x * 1.7) * 0.08;
+        // A soft dark patch on the floor under it: how high it is flying.
+        let shadow = object.userData.shadow as THREE.Mesh | undefined;
+        if (!shadow) {
+          shadow = new THREE.Mesh(
+            this.drawnGeometry,
+            new THREE.MeshBasicMaterial({ map: this.glowMap(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false }),
+          );
+          shadow.rotation.x = -Math.PI / 2;
+          shadow.userData.ui = true;
+          object.add(shadow);
+          object.userData.shadow = shadow;
+        }
+        const scale = object.scale.y || 1;
+        shadow.scale.setScalar(0.8 / scale);
+        shadow.position.y = (FLOOR_HEIGHT + 0.02 - object.position.y) / scale;
+      }
       if (created || Math.hypot(object.position.x - tx, object.position.z - tz) > FOLLOW_SNAP) {
         object.position.x = tx;
         object.position.z = tz;
@@ -951,6 +974,12 @@ export class DungeonRenderer {
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((m) => m.clone())
         : mesh.material.clone();
+      // Coloured by its materials rather than a texture (the dragon): tint
+      // must darken those colours, not paint over them. See tint.
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const colored = material as THREE.MeshStandardMaterial;
+        if (colored.color && !colored.map) colored.userData.own = colored.color.getHex();
+      }
     });
 
     fitToTile(object, targetTiles);
@@ -984,7 +1013,11 @@ export class DungeonRenderer {
       for (const material of materials) {
         const colored = material as THREE.MeshStandardMaterial;
         if (!colored.color) continue;
-        colored.color.setHex(base);
+        // A model coloured by its materials keeps those colours - wounded
+        // darker, and the flat flash colour only for a hit, the one call
+        // brighter than 1.
+        const own = colored.userData.own as number | undefined;
+        colored.color.setHex(own !== undefined && factor <= 1 ? own : base);
         colored.color.multiplyScalar(factor);
       }
     });

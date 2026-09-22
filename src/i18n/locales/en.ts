@@ -195,4 +195,7 @@ export const en: Record<StringKey, string> = {
   trap_arrow_note: "Shoots the nearest foe every 4s",
   trap_rockfall_note: "Heavy damage, next tiles too",
   trap_flame_note: "Damage and burning, next tiles too",
+  adv_flyer: "Dragonling",
+  guide_waves_5: "**Flyers** From stage 2, dragonlings come with the third wave of every stage. They fly straight from the door to the core over the maze, and over floor traps too. Stop them with towers and arrow traps.",
+  boss_name: "Champion {name}",
 };
