@@ -1728,10 +1728,10 @@ button.primary {
    --------------------------------------------------------------------------- */
 .rotate-guard { display: none; }
 
-/* Any portrait window, not only a phone's: the game is played sideways,
-   and a tall desktop window gets the same tall keyhole a held-upright
-   phone does. */
-@media (orientation: portrait) {
+/* A phone held upright only: it can be turned. A tall desktop window -
+   Verse8 frames the game in one until it is made fullscreen - cannot, so it
+   is played as it is. */
+@media (orientation: portrait) and (pointer: coarse) {
   .rotate-guard {
     position: fixed;
     inset: 0;
