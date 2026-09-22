@@ -144,8 +144,35 @@ export interface UnitView {
    * solid it looked ready - then was simply missing once the raid began.
    */
   resting?: boolean;
-  /** A short tag over the unit's head - a resting minion's time left. */
+  /** A short tag over the unit's head - a tower's level. */
   label?: string;
+  /**
+   * A tower's upgrade level, 1 to 3. Level 2 stands in a cold glow and level 3
+   * in a gold one with light rising off it, so a garrison's strong points
+   * read across the room without looking for the tag.
+   */
+  tier?: number;
+}
+
+/** The glow each tower level stands in; level 1 has none. */
+const AURA_COLORS: Record<number, number> = { 2: 0x6cc8ff, 3: 0xffc444 };
+/** The level tag's text colour, by level. */
+const LABEL_TONES: Record<number, { text: string; edge: string }> = {
+  2: { text: "#9ddcff", edge: "rgba(108, 200, 255, 0.85)" },
+  3: { text: "#ffd66b", edge: "rgba(255, 196, 68, 0.95)" },
+};
+/** Sparks rising off a level 3 tower. */
+const AURA_SPARKS = 6;
+
+interface Aura {
+  group: THREE.Group;
+  tier: number;
+  disc: THREE.Mesh;
+  ring: THREE.Mesh;
+  column: THREE.Mesh | null;
+  sparks: THREE.Sprite[];
+  /** Offsets each tower's pulse, so a row of them does not breathe in step. */
+  phase: number;
 }
 
 /**
@@ -370,6 +397,14 @@ export class DungeonRenderer {
   /** A unit-length bar down +z, stretched to whatever span it has to cover. */
   private boltGeometry = new THREE.BoxGeometry(BOLT_WIDTH, BOLT_WIDTH, 1);
   private ringGeometry = new THREE.RingGeometry(0.2, 0.34, 20);
+
+  /** The glow under each upgraded tower, by unit id. See UnitView.tier. */
+  private auras = new Map<string, Aura>();
+  private auraDiscGeometry = new THREE.PlaneGeometry(1.9, 1.9);
+  private auraRingGeometry = new THREE.RingGeometry(0.42, 0.5, 36);
+  private auraColumnGeometry = new THREE.CylinderGeometry(0.34, 0.5, 2.1, 24, 1, true);
+  private glowTexture: THREE.Texture | null = null;
+  private columnTexture: THREE.Texture | null = null;
 
   /** Per-unit scale punch (on every hit) and knockback nudge (on a kill). */
   private impacts = new Map<string, { punch: number; kx: number; ky: number; kLife: number }>();
@@ -765,7 +800,8 @@ export class DungeonRenderer {
         flash > 0 ? 0xffd9b0 : usesModel ? 0xffffff : (UNIT_COLORS[unit.kind] ?? 0xffffff),
         flash > 0 ? 1 + flash : 0.35 + 0.65 * health,
       );
-      this.syncLabel(unit.id, object, unit.label);
+      this.syncLabel(unit.id, object, unit.label, unit.tier);
+      this.syncAura(unit.id, object, unit.tier ?? 1, created);
       const resting = unit.resting === true;
       if (object.userData.resting !== resting) {
         object.userData.resting = resting;
@@ -782,6 +818,7 @@ export class DungeonRenderer {
       // is just the bookkeeping that stops updateHealthBars walking corpses.
       this.healthBars.delete(id);
       this.syncLabel(id, object, undefined);
+      this.disposeAura(id);
 
       const impact = this.impacts.get(id);
       if (impact && (impact.kLife > 0 || impact.punch > 0)) {
@@ -999,7 +1036,7 @@ export class DungeonRenderer {
    * it goes where the unit goes. Redrawn only when the text changes - once a
    * second for a countdown.
    */
-  private syncLabel(id: string, host: THREE.Object3D, text: string | undefined): void {
+  private syncLabel(id: string, host: THREE.Object3D, text: string | undefined, tier?: number): void {
     let sprite = this.labels.get(id);
     if (!text) {
       if (!sprite) return;
@@ -1025,21 +1062,23 @@ export class DungeonRenderer {
     }
     if (sprite.parent !== host) host.add(sprite);
 
-    if (sprite.userData.text !== text) {
+    const tone = (tier && LABEL_TONES[tier]) || { text: "#f0b660", edge: "rgba(232, 164, 76, 0.7)" };
+    if (sprite.userData.text !== text || sprite.userData.tone !== tone.text) {
       sprite.userData.text = text;
+      sprite.userData.tone = tone.text;
       const texture = sprite.material.map as THREE.CanvasTexture;
       const canvas = texture.image as HTMLCanvasElement;
       const g = canvas.getContext("2d");
       if (g) {
         g.clearRect(0, 0, LABEL_W, LABEL_H);
         g.fillStyle = "rgba(14, 10, 8, 0.82)";
-        g.strokeStyle = "rgba(232, 164, 76, 0.7)";
-        g.lineWidth = 3;
+        g.strokeStyle = tone.edge;
+        g.lineWidth = 4;
         g.beginPath();
         g.roundRect(2, 2, LABEL_W - 4, LABEL_H - 4, (LABEL_H - 4) / 2);
         g.fill();
         g.stroke();
-        g.fillStyle = "#f0b660";
+        g.fillStyle = tone.text;
         g.font = `700 ${Math.round(LABEL_H * 0.56)}px Pretendard, system-ui, sans-serif`;
         g.textAlign = "center";
         g.textBaseline = "middle";
@@ -1052,6 +1091,151 @@ export class DungeonRenderer {
     const scale = host.scale.x || 1;
     sprite.position.set(0, 1.4 / scale, 0);
     sprite.scale.set(0.84 / scale, (0.84 * LABEL_H) / LABEL_W / scale, 1);
+  }
+
+  /**
+   * Puts an upgraded tower in its glow, and marks the moment it goes up.
+   *
+   * The glow lives in the scene rather than under the model: the model is
+   * scaled to its tile and tinted on every hit, and the glow should be
+   * neither. updateAuras keeps it under the tower.
+   */
+  private syncAura(id: string, host: THREE.Object3D, tier: number, created: boolean): void {
+    const aura = this.auras.get(id);
+    const was = aura?.tier ?? (created ? tier : 1);
+    if (aura && aura.tier === tier) return;
+    if (aura) this.disposeAura(id);
+
+    // An upgrade: a burst in the new level's colour, and the tower punches up.
+    if (!created && tier > was) {
+      const color = AURA_COLORS[tier] ?? 0xe8a44c;
+      this.spawnRing(host.position.x, host.position.z, color);
+      this.spawnRing(host.position.x, host.position.z, 0xffffff);
+      this.flashUnit(id);
+      this.shake(0.12);
+    }
+
+    const color = AURA_COLORS[tier];
+    if (color === undefined) return;
+
+    const glow = this.glowMap();
+    const group = new THREE.Group();
+    const additive = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color };
+
+    const disc = new THREE.Mesh(this.auraDiscGeometry, new THREE.MeshBasicMaterial({ ...additive, map: glow }));
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = FLOOR_HEIGHT + 0.02;
+    disc.renderOrder = 5;
+
+    const ring = new THREE.Mesh(
+      this.auraRingGeometry,
+      new THREE.MeshBasicMaterial({ ...additive, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = FLOOR_HEIGHT + 0.03;
+    ring.renderOrder = 5;
+    group.add(disc, ring);
+
+    let column: THREE.Mesh | null = null;
+    const sparks: THREE.Sprite[] = [];
+    if (tier >= 3) {
+      column = new THREE.Mesh(
+        this.auraColumnGeometry,
+        new THREE.MeshBasicMaterial({ ...additive, map: this.columnMap(), side: THREE.DoubleSide }),
+      );
+      column.position.y = FLOOR_HEIGHT + 1.05;
+      column.renderOrder = 6;
+      group.add(column);
+      for (let i = 0; i < AURA_SPARKS; i++) {
+        const spark = new THREE.Sprite(new THREE.SpriteMaterial({ ...additive, map: glow }));
+        spark.renderOrder = 7;
+        group.add(spark);
+        sparks.push(spark);
+      }
+    }
+
+    group.position.set(host.position.x, 0, host.position.z);
+    this.scene.add(group);
+    this.auras.set(id, { group, tier, disc, ring, column, sparks, phase: Math.random() * Math.PI * 2 });
+  }
+
+  private disposeAura(id: string): void {
+    const aura = this.auras.get(id);
+    if (!aura) return;
+    this.scene.remove(aura.group);
+    // Geometry and textures are shared; only the materials are per tower.
+    aura.group.traverse((child) => {
+      const material = (child as THREE.Mesh).material as THREE.Material | undefined;
+      material?.dispose();
+    });
+    this.auras.delete(id);
+  }
+
+  /** Keeps each glow under its tower, breathing, with level 3's sparks rising. */
+  private updateAuras(): void {
+    const t = this.elapsed;
+    for (const [id, aura] of this.auras) {
+      const host = this.unitMeshes.get(id);
+      if (host) aura.group.position.set(host.position.x, 0, host.position.z);
+
+      const beat = 0.5 + 0.5 * Math.sin(t * 2.6 + aura.phase);
+      const strong = aura.tier >= 3;
+      (aura.disc.material as THREE.MeshBasicMaterial).opacity = (strong ? 0.55 : 0.5) + 0.2 * beat;
+      aura.disc.scale.setScalar((strong ? 1.1 : 0.9) + 0.08 * beat);
+      (aura.ring.material as THREE.MeshBasicMaterial).opacity = 0.55 + 0.4 * beat;
+      aura.ring.scale.setScalar(1 + 0.1 * beat);
+
+      if (aura.column) {
+        (aura.column.material as THREE.MeshBasicMaterial).opacity = 0.32 + 0.18 * beat;
+        aura.column.rotation.y = t * 0.8;
+      }
+      aura.sparks.forEach((spark, i) => {
+        // Each spark climbs from the floor and fades out at the top, then again.
+        const rise = (t * 0.55 + i / aura.sparks.length + aura.phase) % 1;
+        const angle = (i / aura.sparks.length) * Math.PI * 2 + t * 1.2;
+        spark.position.set(Math.sin(angle) * 0.36, FLOOR_HEIGHT + 0.1 + rise * 1.9, Math.cos(angle) * 0.36);
+        spark.scale.setScalar(0.24 * (1 - rise * 0.5));
+        (spark.material as THREE.SpriteMaterial).opacity = Math.sin(rise * Math.PI);
+      });
+    }
+  }
+
+  /** A soft round light: white in the middle, nothing at the edge. */
+  private glowMap(): THREE.Texture {
+    if (this.glowTexture) return this.glowTexture;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    const g = canvas.getContext("2d");
+    if (g) {
+      const gradient = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(0.35, "rgba(255,255,255,0.55)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = gradient;
+      g.fillRect(0, 0, 64, 64);
+    }
+    this.glowTexture = new THREE.CanvasTexture(canvas);
+    return this.glowTexture;
+  }
+
+  /** Light that is strong at the floor and gone by the top, for level 3's column. */
+  private columnMap(): THREE.Texture {
+    if (this.columnTexture) return this.columnTexture;
+    const canvas = document.createElement("canvas");
+    canvas.width = 4;
+    canvas.height = 64;
+    const g = canvas.getContext("2d");
+    if (g) {
+      // Canvas y runs down, and a cylinder's texture v runs up: the top row is the column's top.
+      const gradient = g.createLinearGradient(0, 0, 0, 64);
+      gradient.addColorStop(0, "rgba(255,255,255,0)");
+      gradient.addColorStop(0.6, "rgba(255,255,255,0.35)");
+      gradient.addColorStop(1, "rgba(255,255,255,0.9)");
+      g.fillStyle = gradient;
+      g.fillRect(0, 0, 4, 64);
+    }
+    this.columnTexture = new THREE.CanvasTexture(canvas);
+    return this.columnTexture;
   }
 
   /** Turns every bar to face the camera. Cheap: a handful of quaternion copies. */
@@ -1080,6 +1264,7 @@ export class DungeonRenderer {
     for (const [, object] of this.unitMeshes) this.disposeObject(this.unitGroup, object);
     this.unitMeshes.clear();
     this.healthBars.clear();
+    for (const id of [...this.auras.keys()]) this.disposeAura(id);
   }
 
   private clearMarkers(): void {
@@ -2420,6 +2605,7 @@ export class DungeonRenderer {
     this.updateClutter(delta);
     this.updateFlames();
     this.updateEntranceMark();
+    this.updateAuras();
     this.updatePathFlow();
     this.updateHealthBars();
     this.updateShake(delta);
@@ -2511,6 +2697,9 @@ export class DungeonRenderer {
 
     this.disposeInstanced();
     this.clearUnits();
+    for (const geometry of [this.auraDiscGeometry, this.auraRingGeometry, this.auraColumnGeometry]) geometry.dispose();
+    this.glowTexture?.dispose();
+    this.columnTexture?.dispose();
     this.clearMarkers();
     for (const [, corpse] of this.corpses) this.disposeObject(this.unitGroup, corpse.object);
     this.corpses.clear();

@@ -3,7 +3,7 @@ import { CHAMPION_MODEL_SCALE } from "../types";
 import type { StageRun } from "./StageRun";
 
 /** How much bigger each tower level is drawn: a level you can see. */
-const LEVEL_SCALE_STEP = 0.12;
+const LEVEL_SCALE_STEP = 0.15;
 
 /** What the board draws for a run: its towers and whoever is walking in. */
 export function runUnits(run: StageRun, options: { labels?: boolean } = {}): UnitView[] {
@@ -21,6 +21,7 @@ export function runUnits(run: StageRun, options: { labels?: boolean } = {}): Uni
       facing: tower.facing,
       scale: 1 + LEVEL_SCALE_STEP * (tower.level - 1),
       label: labels && tower.level > 1 ? `Lv${tower.level}` : undefined,
+      tier: tower.level,
     });
   }
   for (const enemy of run.enemies) {
