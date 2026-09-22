@@ -498,6 +498,25 @@ h3.section {
 
 .topstack > * { pointer-events: auto; }
 
+/* The once-a-run ad: quieter than the wave button it sits over. */
+.ad-gold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px dashed rgba(232, 164, 76, 0.55);
+  border-radius: 10px;
+  background: rgba(232, 164, 76, 0.08);
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.ad-gold i { font-style: normal; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
+.ad-gold:disabled { opacity: 0.5; }
+
 /* The champion's health, top and centre while it is in the room. */
 .boss-bar {
   display: grid;

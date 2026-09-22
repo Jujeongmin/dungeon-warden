@@ -199,4 +199,7 @@ export const zhHant: Record<StringKey, string> = {
   adv_flyer: "幼龍",
   guide_waves_5: "**飛行敵人** 從第2關起，每關第三波會有幼龍。牠們無視迷宮，從入口直飛核心，也不會觸發地面陷阱。用塔和箭矢陷阱攔住牠們。",
   boss_name: "冠軍 {name}",
+  ad_gold: "看廣告 +{n}金幣",
+  ad_once: "（每局一次）",
+  guide_more_4: "**廣告** 每局一次，點建造列表下方的按鈕看廣告可得 +{n} 金幣。廣告播放時遊戲暫停。",
 };

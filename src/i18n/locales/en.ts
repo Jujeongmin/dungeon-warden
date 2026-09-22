@@ -198,4 +198,7 @@ export const en: Record<StringKey, string> = {
   adv_flyer: "Dragonling",
   guide_waves_5: "**Flyers** From stage 2, dragonlings come with the third wave of every stage. They fly straight from the door to the core over the maze, and over floor traps too. Stop them with towers and arrow traps.",
   boss_name: "Champion {name}",
+  ad_gold: "Watch an ad: +{n} gold",
+  ad_once: "(once a run)",
+  guide_more_4: "**Ad** Once a run, the button under the build list plays an ad for +{n} gold. The game waits while it plays.",
 };

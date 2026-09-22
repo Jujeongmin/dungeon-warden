@@ -201,3 +201,17 @@ describe("flyers", () => {
     expect(run.placeTower("warrior", Math.round(flyer.x), Math.round(flyer.y) + 1).ok).toBe(true);
   });
 });
+
+describe("the ad reward", () => {
+  it("pays its gold once a run, and not once the run is over", () => {
+    const run = new StageRun(corridor(1), everything);
+    const gold = run.gold;
+    expect(run.claimAdGold()).toBe(true);
+    expect(run.gold).toBe(gold + 50);
+    expect(run.claimAdGold()).toBe(false);
+    expect(run.gold).toBe(gold + 50);
+    const over = new StageRun(corridor(1), everything);
+    over.status = "lost";
+    expect(over.claimAdGold()).toBe(false);
+  });
+});

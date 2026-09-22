@@ -104,6 +104,7 @@ export function useStageRun(options: {
     placeTrap: (type: TrapType, x: number, y: number) => act((r) => r.placeTrap(type, x, y)),
     upgradeTower: (id: string) => act((r) => r.upgradeTower(id)),
     sellTower: (id: string) => act((r) => r.sellTower(id)),
+    claimAdGold: (): boolean => act((r) => (r.claimAdGold() ? { ok: true } : { ok: false, reason: "over" })).ok,
     sellTrap: (id: string) => act((r) => r.sellTrap(id)),
     startWave: (): boolean => {
       const run = runRef.current;

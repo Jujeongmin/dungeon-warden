@@ -199,4 +199,7 @@ export const zhHans: Record<StringKey, string> = {
   adv_flyer: "幼龙",
   guide_waves_5: "**飞行敌人** 从第2关起，每关第三波会有幼龙。它们无视迷宫，从入口直飞核心，也不会触发地面陷阱。用塔和箭矢陷阱拦住它们。",
   boss_name: "冠军 {name}",
+  ad_gold: "看广告 +{n}金币",
+  ad_once: "（每局一次）",
+  guide_more_4: "**广告** 每局一次，点建造列表下方的按钮看广告可得 +{n} 金币。广告播放时游戏暂停。",
 };

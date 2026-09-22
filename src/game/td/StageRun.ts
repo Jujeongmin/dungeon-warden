@@ -49,6 +49,9 @@ export const SIM_DT = 0.05;
 /** How near an adventurer has to be to a tile for it to count as standing on it. */
 const OCCUPIED_RADIUS = 0.75;
 
+/** Gold for watching the one rewarded ad a run allows. */
+export const AD_GOLD = 50;
+
 /** How long a tower is drawn mid-swing after it fires. */
 const ATTACK_POSE_SECONDS = 0.35;
 
@@ -160,6 +163,8 @@ export class StageRun {
   /** Waves started so far. */
   wavesStarted = 0;
   status: RunStatus = "build";
+  /** Whether this run's one ad reward has been taken. */
+  adGoldClaimed = false;
 
   towers: RunTower[] = [];
   traps: RunTrap[] = [];
@@ -360,6 +365,14 @@ export class StageRun {
     this.gold -= cost;
     tower.level += 1;
     return { ok: true };
+  }
+
+  /** Pays the ad reward, once a run. False if already taken or the run is over. */
+  claimAdGold(): boolean {
+    if (this.adGoldClaimed || this.status === "won" || this.status === "lost") return false;
+    this.adGoldClaimed = true;
+    this.gold += AD_GOLD;
+    return true;
   }
 
   sellTower(id: string): BuildResult {

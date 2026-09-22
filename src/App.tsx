@@ -1,12 +1,13 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DungeonRenderer } from "./game/DungeonRenderer";
+import { adButtonShown, watchGoldAd } from "./game/ads";
 import { audio, type Cue } from "./game/audio";
 import { installDevTools } from "./game/devtools";
 import { BUZZ, buzz } from "./game/haptics";
 import { loadSettings, pixelRatioFor, saveSettings, type Settings } from "./game/settings";
 import { TRAP_STATS } from "./game/sim/traps";
 import { researchEffects } from "./game/td/research";
-import type { Refusal, RunEvent, StageRun } from "./game/td/StageRun";
+import { AD_GOLD, type Refusal, type RunEvent, type StageRun } from "./game/td/StageRun";
 import { endlessStage, WAVES_PER_STAGE, stageOfWave } from "./game/td/stages";
 import { MAX_TOWER_LEVEL, sellValue, TOWER_TYPES, TOWERS, towerStats, upgradeCost, type TowerType } from "./game/td/towers";
 import { tutorialFor } from "./game/td/tutorial";
@@ -104,6 +105,8 @@ export default function App() {
   const [result, setResult] = useState<Result | null>(null);
   const [hudOpen, setHudOpen] = useState(true);
   const [homeArmed, setHomeArmed] = useState(false);
+  /** An ad is showing: the run waits, and the button cannot be pressed twice. */
+  const [adShowing, setAdShowing] = useState(false);
 
   const [rankingOpen, setRankingOpen] = useState(false);
   /** Souls paid on starting for a run that was left open, shown once. */
@@ -685,6 +688,31 @@ export default function App() {
                 <p className="hint small">{t("hint_tap_tower")}</p>
               </div>
               <div className="hud-foot">
+                {adButtonShown() && !run.adGoldClaimed && run.status !== "lost" && (
+                  <button
+                    className="ad-gold"
+                    disabled={adShowing}
+                    onClick={async () => {
+                      audio.play("click");
+                      setAdShowing(true);
+                      const wasPaused = runner.paused;
+                      runner.setPaused(true);
+                      const watched = await watchGoldAd();
+                      runner.setPaused(wasPaused);
+                      setAdShowing(false);
+                      if (watched && runner.claimAdGold()) {
+                        audio.play("coins");
+                        float(`+${AD_GOLD}`, run.core.x, run.core.y - 1, "gold");
+                      } else if (!watched) {
+                        audio.play("error");
+                      }
+                    }}
+                  >
+                    <Icon name="play" size={12} />
+                    {t("ad_gold", { n: AD_GOLD })}
+                    <i>{t("ad_once")}</i>
+                  </button>
+                )}
                 <button
                   className="primary go"
                   data-tut="action:wave"

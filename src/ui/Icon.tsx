@@ -25,7 +25,8 @@ export type IconName =
   | "eye"
   | "walk"
   | "chevronDown"
-  | "chevronUp";
+  | "chevronUp"
+  | "play";
 
 const PATHS: Record<IconName, string> = {
   // Speaker cone plus two arcs of sound.
@@ -53,6 +54,8 @@ const PATHS: Record<IconName, string> = {
   walk: "M12 5l8 9h-5v5H9v-5H4l8-9z",
   chevronDown: "M6 9l6 6 6-6H6z",
   chevronUp: "M6 15l6-6 6 6H6z",
+  // A play triangle: the ad button.
+  play: "M7 4.5v15l12-7.5-12-7.5z",
 };
 
 interface Props {
