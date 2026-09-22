@@ -20,7 +20,20 @@ export type Cue =
   | "hit"
   | "trap"
   | "victory"
-  | "defeat";
+  | "defeat"
+  /** A bow or crossbow tower looses. */
+  | "shoot"
+  /** A blade or axe tower swings. */
+  | "swing"
+  /** The mage tower casts. */
+  | "cast"
+  | "upgrade"
+  /** A wave cleared: its bonus gold. */
+  | "coins"
+  /** A champion comes in. */
+  | "roar"
+  /** Dragonlings come in. */
+  | "dragon";
 
 interface ToneSpec {
   /** Start frequency in Hz. */
@@ -62,6 +75,16 @@ const TONES: Record<Cue, ToneSpec[]> = {
     { from: 220, seconds: 0.16, type: "sawtooth", gain: 0.07 },
     { from: 150, seconds: 0.32, type: "sawtooth", gain: 0.07 },
   ],
+  shoot: [{ from: 900, to: 300, seconds: 0.06, type: "triangle", gain: 0.03 }],
+  swing: [{ from: 500, to: 150, seconds: 0.08, type: "sawtooth", gain: 0.03 }],
+  cast: [{ from: 300, to: 900, seconds: 0.14, type: "sine", gain: 0.05 }],
+  upgrade: [
+    { from: 440, seconds: 0.08, type: "triangle", gain: 0.07 },
+    { from: 660, seconds: 0.14, type: "triangle", gain: 0.07 },
+  ],
+  coins: [{ from: 1200, to: 1500, seconds: 0.1, type: "square", gain: 0.03 }],
+  roar: [{ from: 120, to: 60, seconds: 0.6, type: "sawtooth", gain: 0.1 }],
+  dragon: [{ from: 300, to: 120, seconds: 0.4, type: "sawtooth", gain: 0.07 }],
 };
 
 /**
@@ -71,16 +94,24 @@ const TONES: Record<Cue, ToneSpec[]> = {
 const FILE_PATTERNS: Record<Cue, RegExp[]> = {
   click: [/click_00[12]/, /^click/, /select/, /^tick/],
   place: [/^drop_00/, /^switch/, /^bong/, /place/],
-  sell: [/rubble/, /^rock/, /impact.*heavy/, /^footstep/],
+  sell: [/^sfx_stone/, /rubble/, /^rock/, /impact.*heavy/, /^footstep/],
   // Nothing in the packs reads as this, and a wrong sound is worse than the
   // synthesised one the engine falls back to.
   leak: [],
   error: [/error/, /^back_00/, /^close/, /wrong/],
-  raidStart: [/^jingles_steel/, /^jingles_pizzi/, /horn/, /alarm/],
+  // The portcullis chains: the door opening for the wave.
+  raidStart: [/^sfx_gate/, /^jingles_steel/, /^jingles_pizzi/, /horn/, /alarm/],
   hit: [/impact.*generic/, /^impact/, /^hit/, /punch/],
   trap: [/impact.*plate/, /explosion/, /^spike/, /metal/],
   victory: [/jingles.*win/, /win/, /^success/, /^complete/],
   defeat: [/jingles.*lose/, /lose/, /^fail/, /^gameover/],
+  shoot: [/^sfx_bow/],
+  swing: [/^sfx_swing/],
+  cast: [/^sfx_cast/],
+  upgrade: [/^sfx_upgrade/],
+  coins: [/^sfx_coins/],
+  roar: [/^sfx_roar/],
+  dragon: [/^sfx_dragon/],
 };
 
 /**

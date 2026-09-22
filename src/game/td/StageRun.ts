@@ -108,6 +108,10 @@ export type RunEvent =
       from?: { x: number; y: number };
     }
   | { kind: "trap"; trapId: string; x: number; y: number }
+  /** A tower loosed, swung or cast: for its sound. */
+  | { kind: "fired"; towerId: string; type: TowerType; x: number; y: number }
+  /** Someone came in at the door. */
+  | { kind: "spawned"; targetId: string; cls: AdventurerClass; champion: boolean }
   | { kind: "killed"; targetId: string; x: number; y: number; bounty: number }
   | { kind: "leaked"; targetId: string; x: number; y: number; lives: number }
   | { kind: "waveCleared"; wave: number; bonus: number }
@@ -461,6 +465,7 @@ export class StageRun {
       const s = this.queue.shift()!;
       if (!path) continue;
       this.seq += 1;
+      this.events.push({ kind: "spawned", targetId: `e${this.seq}`, cls: s.cls, champion: s.champion });
       const hp = Math.round(enemyHp(s.cls, s.level, s.champion) * s.toughness);
       this.enemies.push({
         id: `e${this.seq}`,
@@ -565,6 +570,7 @@ export class StageRun {
       }
       if (!target) continue;
       tower.cooldown = stats.interval / (1 + this.hasteFor(tower));
+      this.events.push({ kind: "fired", towerId: tower.id, type: tower.type, x: tower.x, y: tower.y });
       tower.facing = Math.atan2(target.x - tower.x, target.y - tower.y);
       tower.attackUntil = this.time + ATTACK_POSE_SECONDS;
       const damage = stats.damage * this.effects.towerDamageScale;

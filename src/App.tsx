@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DungeonRenderer } from "./game/DungeonRenderer";
-import { audio } from "./game/audio";
+import { audio, type Cue } from "./game/audio";
 import { installDevTools } from "./game/devtools";
 import { BUZZ, buzz } from "./game/haptics";
 import { loadSettings, pixelRatioFor, saveSettings, type Settings } from "./game/settings";
@@ -36,6 +36,16 @@ const ShopDialog = lazy(() => import("./ui/ShopDialog").then((m) => ({ default: 
 
 /** A shot from further than this draws a line; one from beside the target does not. */
 const BOLT_MIN_SPAN = 1.3;
+
+/** The sound each tower makes when it fires. The shaman fires at nothing. */
+const TOWER_SOUND: Partial<Record<TowerType, Cue>> = {
+  warrior: "shoot",
+  crossbow: "shoot",
+  mage: "cast",
+  guard: "swing",
+  grunt: "swing",
+  berserker: "swing",
+};
 
 /** How long a refusal stays on the hint line. */
 const REFUSAL_MS = 2200;
@@ -151,6 +161,12 @@ export default function App() {
               renderer.spawnBolt(event.from.x, event.from.y, event.x, event.y, event.source === "trap" ? 0xffc27a : 0xc9b6ff);
             }
           }
+        } else if (event.kind === "fired") {
+          const cue = TOWER_SOUND[event.type];
+          if (cue) audio.play(cue, 90);
+        } else if (event.kind === "spawned") {
+          if (event.champion) audio.play("roar", 1500);
+          else if (event.cls === "flyer") audio.play("dragon", 1500);
         } else if (event.kind === "trap") {
           const trap = run.traps.find((tp) => tp.id === event.trapId);
           renderer.spawnTrapRing(event.x, event.y, trap?.type ?? "spike");
@@ -167,6 +183,7 @@ export default function App() {
           float(`-${event.lives}♥`, event.x, event.y, "leak");
         } else if (event.kind === "waveCleared") {
           float(t("wave_bonus", { n: event.bonus }), run.core.x, run.core.y - 1, "bonus");
+          audio.play("coins");
         } else if (event.kind === "stageCleared") {
           audio.play("victory");
           void checkpointRef.current(run.wavesCleared);
@@ -698,7 +715,7 @@ export default function App() {
                       }
                       onClick={() => {
                         const outcome = runner.upgradeTower(selectedTower.id);
-                        if (outcome.ok) audio.play("place");
+                        if (outcome.ok) audio.play("upgrade");
                         else refuse(outcome.reason);
                       }}
                     >

@@ -61,6 +61,60 @@
       "bytes": 1563267
     },
     {
+      "url": "/assets/audio/sfx_bow.wav",
+      "name": "sfx_bow",
+      "group": "",
+      "bytes": 96814
+    },
+    {
+      "url": "/assets/audio/sfx_cast.ogg",
+      "name": "sfx_cast",
+      "group": "",
+      "bytes": 39482
+    },
+    {
+      "url": "/assets/audio/sfx_coins.ogg",
+      "name": "sfx_coins",
+      "group": "",
+      "bytes": 31942
+    },
+    {
+      "url": "/assets/audio/sfx_dragon.ogg",
+      "name": "sfx_dragon",
+      "group": "",
+      "bytes": 15061
+    },
+    {
+      "url": "/assets/audio/sfx_gate.ogg",
+      "name": "sfx_gate",
+      "group": "",
+      "bytes": 23007
+    },
+    {
+      "url": "/assets/audio/sfx_roar.ogg",
+      "name": "sfx_roar",
+      "group": "",
+      "bytes": 22480
+    },
+    {
+      "url": "/assets/audio/sfx_stone.ogg",
+      "name": "sfx_stone",
+      "group": "",
+      "bytes": 34170
+    },
+    {
+      "url": "/assets/audio/sfx_swing.wav",
+      "name": "sfx_swing",
+      "group": "",
+      "bytes": 66114
+    },
+    {
+      "url": "/assets/audio/sfx_upgrade.ogg",
+      "name": "sfx_upgrade",
+      "group": "",
+      "bytes": 29121
+    },
+    {
       "url": "/assets/audio/win_jingle.ogg",
       "name": "win_jingle",
       "group": "",
