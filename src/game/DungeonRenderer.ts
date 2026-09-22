@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { TILE, type TileId } from "./types";
 import { ModelLibrary, MODEL_PATTERNS, fitToTile, type LoadedModel } from "./assets/ModelLibrary";
-import { attachGear, drawnTrapCanvas, gearFor, removeGear, tintFor } from "./assets/dressing";
+import { attachGear, drawnTrapCanvas, gearFor, removeGear, tintFor, wearOutfit } from "./assets/dressing";
 import { bakeModelIcons } from "./assets/modelIcons";
 import { inArena, type Arena } from "./arena";
 import { tileNoise } from "./noise";
@@ -1112,13 +1112,14 @@ export class DungeonRenderer {
 
   /**
    * Puts in a tower's hands what its level holds (see dressing.ts), once per
-   * level. The gear gets its own materials, so the hit flash and the level 3
+   * level, with the outfit its level wears. The gear gets its own materials, so the hit flash and the level 3
    * gilding that tint the body tint it too.
    */
   private dressUnit(object: THREE.Object3D, kind: string, tier: number): void {
     if (object.userData.dressedTier === tier) return;
     object.userData.dressedTier = tier;
     removeGear(object);
+    wearOutfit(object, tier);
     for (const { key, hand } of gearFor(kind, tier)) {
       const model = this.loaded.get(key);
       if (!model) continue;

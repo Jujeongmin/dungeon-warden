@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { attachGear, drawnTrapCanvas, gearFor, tintObject, UNIT_TINT } from "./dressing";
+import { attachGear, drawnTrapCanvas, gearFor, tintObject, UNIT_TINT, wearOutfit } from "./dressing";
 import { ModelLibrary, fitToTile, type LoadedModel } from "./ModelLibrary";
 
 /**
@@ -91,6 +91,7 @@ export async function bakeModelIcons(
       });
       tintObject(object, tint);
     }
+    if (modelKey.startsWith("m_")) wearOutfit(object, 1);
     for (const { key, hand } of gearFor(modelKey, 1)) {
       const item = await models.load(key);
       if (item) attachGear(object, models.instantiate(item), hand);

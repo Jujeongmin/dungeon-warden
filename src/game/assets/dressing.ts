@@ -71,6 +71,26 @@ export function attachGear(body: THREE.Object3D, item: THREE.Object3D, hand: "r"
   (slot as THREE.Object3D).add(item);
 }
 
+/**
+ * The body's own outfit, worn as the level rises.
+ *
+ * Each skeleton ships its cloth and headgear as separate meshes, so a level
+ * 1 tower stands in bare bones, puts on its cape or cloak at level 2, and its
+ * hat, helmet or hood at level 3. Which pieces a body has depends on the body.
+ */
+const OUTFIT: Array<{ name: RegExp; from: number }> = [
+  { name: /_(cape|cloak)$/i, from: 2 },
+  { name: /_(hat|helmet|hood)$/i, from: 3 },
+];
+
+export function wearOutfit(body: THREE.Object3D, tier: number): void {
+  body.traverse((child) => {
+    if (child.userData.gear) return;
+    const piece = OUTFIT.find((o) => o.name.test(child.name));
+    if (piece) child.visible = tier >= piece.from;
+  });
+}
+
 /** Takes off everything attachGear put on. */
 export function removeGear(body: THREE.Object3D): void {
   const worn: THREE.Object3D[] = [];
