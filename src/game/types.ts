@@ -43,8 +43,12 @@ export const TRAP_LABEL: Record<TrapType, StringKey> = {
   rune: "trap_rune",
 };
 
-/** What the three traps that do not simply hurt do, for the build panel. */
-export const TRAP_NOTE: Partial<Record<TrapType, StringKey>> = {
+/** What each trap does, for the build panel. */
+export const TRAP_NOTE: Record<TrapType, StringKey> = {
+  spike: "trap_spike_note",
+  arrow: "trap_arrow_note",
+  rockfall: "trap_rockfall_note",
+  flame: "trap_flame_note",
   web: "trap_web_note",
   poison: "trap_poison_note",
   rune: "trap_rune_note",

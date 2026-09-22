@@ -486,7 +486,7 @@ export default function App() {
     : tool
       ? tool.kind === "tower"
         ? t(TOWERS[tool.type].note)
-        : `${TRAP_NOTE[tool.type] ? `${t(TRAP_NOTE[tool.type]!)} · ` : ""}${t("hint_trap_td")}`
+        : `${t(TRAP_NOTE[tool.type])} · ${t("hint_trap_td")}`
       : "";
 
   const best = progress.progress.bestWaves;
