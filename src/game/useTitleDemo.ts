@@ -30,6 +30,7 @@ export function useTitleDemo(
     const show = (r: StageRun) => {
       renderer.setArena(r.stage.arena, r.entrance, r.core);
       renderer.setDug(runFloor(r));
+      renderer.setRubble(r.stage.rubble ?? []);
       renderer.setMarkers(runMarkers(r));
       renderer.setPathPreview(null);
     };

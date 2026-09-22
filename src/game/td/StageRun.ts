@@ -91,6 +91,7 @@ export interface RunEnemy {
   slowUntil: number;
   slowFactor: number;
   burn: { dps: number; until: number } | null;
+  poison: { dps: number; until: number } | null;
   facing: number;
 }
 
@@ -103,7 +104,7 @@ export type RunEvent =
       amount: number;
       x: number;
       y: number;
-      source: "tower" | "trap" | "burn";
+      source: "tower" | "trap" | "burn" | "poison";
       from?: { x: number; y: number };
     }
   | { kind: "trap"; trapId: string; x: number; y: number }
@@ -120,6 +121,7 @@ export type Refusal =
   | "gold"
   | "rock"
   | "bedrock"
+  | "rubble"
   | "not_dug"
   | "taken"
   | "occupied"
@@ -161,6 +163,8 @@ export class StageRun {
 
   private readonly effects: ResearchEffects;
   private readonly bedrock: Set<number>;
+  /** Fallen rock: walked over, never built on. */
+  private readonly rubble: Set<number>;
   private readonly dug = new Set<number>();
   private queue: Spawn[] = [];
   /** Adventurers of each wave not yet stopped or through. */
@@ -174,6 +178,7 @@ export class StageRun {
     this.entrance = stageEntrance(stage);
     this.core = stageCore(stage);
     this.bedrock = new Set(stage.bedrock.map((t) => this.key(t.x, t.y)));
+    this.rubble = new Set((stage.rubble ?? []).map((t) => this.key(t.x, t.y)));
     for (let k = 0; k < stage.arena.w * stage.arena.h; k++) {
       if (!this.bedrock.has(k)) this.dug.add(k);
     }
@@ -194,6 +199,10 @@ export class StageRun {
 
   isBedrock(x: number, y: number): boolean {
     return this.bedrock.has(this.key(x, y));
+  }
+
+  isRubble(x: number, y: number): boolean {
+    return this.rubble.has(this.key(x, y));
   }
 
   /** Every open tile: all but the bedrock. */
@@ -298,6 +307,7 @@ export class StageRun {
       : this.effects.traps.includes(type as TrapType);
     if (!unlocked) return "locked";
     if (!this.isDug(x, y)) return "not_dug";
+    if (this.isRubble(x, y)) return "rubble";
     if (this.isFixed(x, y)) return "fixed";
     if (this.towerAt(x, y) || this.trapAt(x, y)) return "taken";
     const cost = kind === "tower" ? TOWERS[type as TowerType].cost[0] : TRAP_COST[type as TrapType];
@@ -318,6 +328,7 @@ export class StageRun {
     if (this.status === "won" || this.status === "lost") return { ok: false, reason: "over" };
     if (!this.effects.towers.includes(type)) return { ok: false, reason: "locked" };
     if (!this.isDug(x, y)) return { ok: false, reason: "not_dug" };
+    if (this.isRubble(x, y)) return { ok: false, reason: "rubble" };
     if (this.isFixed(x, y)) return { ok: false, reason: "fixed" };
     if (this.towerAt(x, y) || this.trapAt(x, y)) return { ok: false, reason: "taken" };
     const cost = TOWERS[type].cost[0];
@@ -360,6 +371,7 @@ export class StageRun {
     if (this.status === "won" || this.status === "lost") return { ok: false, reason: "over" };
     if (!this.effects.traps.includes(type)) return { ok: false, reason: "locked" };
     if (!this.isDug(x, y)) return { ok: false, reason: "not_dug" };
+    if (this.isRubble(x, y)) return { ok: false, reason: "rubble" };
     if (this.isFixed(x, y)) return { ok: false, reason: "fixed" };
     if (this.towerAt(x, y) || this.trapAt(x, y)) return { ok: false, reason: "taken" };
     const cost = TRAP_COST[type];
@@ -462,6 +474,7 @@ export class StageRun {
         slowUntil: 0,
         slowFactor: 1,
         burn: null,
+        poison: null,
         facing: 0,
       });
     }
@@ -502,13 +515,24 @@ export class StageRun {
 
   private burnEnemies(dt: number): void {
     for (const enemy of [...this.enemies]) {
-      if (!enemy.burn) continue;
-      if (enemy.burn.until <= this.time) {
-        enemy.burn = null;
-        continue;
-      }
-      this.hurt(enemy, enemy.burn.dps * dt, "burn");
+      if (enemy.burn && enemy.burn.until <= this.time) enemy.burn = null;
+      if (enemy.poison && enemy.poison.until <= this.time) enemy.poison = null;
+      if (enemy.burn) this.hurt(enemy, enemy.burn.dps * dt, "burn");
+      if (enemy.poison) this.hurt(enemy, enemy.poison.dps * dt, "poison");
     }
+  }
+
+  /** How much faster each tower fires for the shamans round it: the best one in reach. */
+  private hasteFor(tower: RunTower): number {
+    let best = 0;
+    for (const other of this.towers) {
+      if (other === tower) continue;
+      const stats = towerStats(other.type, other.level);
+      if (!stats.haste) continue;
+      if (Math.hypot(other.x - tower.x, other.y - tower.y) > stats.range) continue;
+      best = Math.max(best, stats.haste);
+    }
+    return best;
   }
 
   /** How far an adventurer still has to walk: the tower's reason to pick it. */
@@ -523,6 +547,7 @@ export class StageRun {
       tower.cooldown = Math.max(0, tower.cooldown - dt);
       if (tower.cooldown > 0) continue;
       const stats = towerStats(tower.type, tower.level);
+      if (stats.haste) continue;
       // The one nearest the core that is in reach: the classic "first".
       let target: RunEnemy | null = null;
       let best = Infinity;
@@ -535,12 +560,17 @@ export class StageRun {
         }
       }
       if (!target) continue;
-      tower.cooldown = stats.interval;
+      tower.cooldown = stats.interval / (1 + this.hasteFor(tower));
       tower.facing = Math.atan2(target.x - tower.x, target.y - tower.y);
       tower.attackUntil = this.time + ATTACK_POSE_SECONDS;
       const damage = stats.damage * this.effects.towerDamageScale;
       const from = { x: tower.x, y: tower.y };
-      if (stats.splash) {
+      if (stats.cleave) {
+        for (const enemy of [...this.enemies]) {
+          if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) > stats.range) continue;
+          this.hurt(enemy, damage, "tower");
+        }
+      } else if (stats.splash) {
         const cx = target.x;
         const cy = target.y;
         for (const enemy of [...this.enemies]) {
@@ -598,15 +628,44 @@ export class StageRun {
         trap.hit.add(enemy.id);
         const resist = ENEMIES[enemy.cls].trapResistance;
         if (stats.burn) enemy.burn = { dps: stats.burn.dps * scale * resist, until: this.time + stats.burn.duration };
+        if (stats.poison) enemy.poison = { dps: stats.poison.dps * scale * resist, until: this.time + stats.poison.duration };
+        if (stats.slow) {
+          const active = enemy.slowUntil > this.time ? enemy.slowFactor : 1;
+          enemy.slowFactor = Math.min(active, stats.slow.factor);
+          enemy.slowUntil = Math.max(enemy.slowUntil, this.time + stats.slow.duration);
+        }
+        if (stats.pushBack) this.pushBack(enemy, stats.pushBack);
         this.hurt(enemy, stats.damage * scale * resist, "trap");
       }
     }
   }
 
+  /**
+   * Sends an adventurer back along the way it came, up to `tiles` tiles.
+   *
+   * Only as far back as its current route goes, and never onto a tile a
+   * tower has since been built on: it is put down where it could have
+   * walked from.
+   */
+  private pushBack(enemy: RunEnemy, tiles: number): void {
+    const blocked = this.blocked();
+    let back = enemy.next - 1;
+    for (let i = 0; i < tiles && back > 0; i++) {
+      const prev = enemy.route[back - 1];
+      if (blocked.has(this.key(prev.x, prev.y))) break;
+      back -= 1;
+    }
+    if (back < 0 || back >= enemy.next - 1) return;
+    const at = enemy.route[back];
+    enemy.x = at.x;
+    enemy.y = at.y;
+    enemy.next = back + 1;
+  }
+
   private hurt(
     enemy: RunEnemy,
     amount: number,
-    source: "tower" | "trap" | "burn",
+    source: "tower" | "trap" | "burn" | "poison",
     from?: { x: number; y: number },
   ): void {
     if (!this.enemies.includes(enemy) || amount <= 0) return;

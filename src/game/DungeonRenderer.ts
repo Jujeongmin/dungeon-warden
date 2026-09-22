@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { TILE, type TileId } from "./types";
 import { ModelLibrary, MODEL_PATTERNS, fitToTile, type LoadedModel } from "./assets/ModelLibrary";
+import { attachGear, drawnTrapCanvas, gearFor, removeGear, tintFor } from "./assets/dressing";
 import { bakeModelIcons } from "./assets/modelIcons";
 import { inArena, type Arena } from "./arena";
 import { tileNoise } from "./noise";
@@ -223,6 +224,9 @@ const UNIT_COLORS: Record<string, number> = {
   m_mage: 0x9d8bd8,
   m_guard: 0xb9a98a,
   m_grunt: 0xcfc6b0,
+  m_crossbow: 0xb8c4e8,
+  m_berserker: 0xd89880,
+  m_shaman: 0x9cd48c,
   a_knight: 0xd86a4c,
   a_barbarian: 0xc4553a,
   a_rogue: 0xa8564e,
@@ -235,6 +239,9 @@ const MARKER_COLORS: Record<string, number> = {
   arrow: 0x8fae7e,
   rockfall: 0x8a7a63,
   flame: 0xd98443,
+  web: 0xe6e8ef,
+  poison: 0x72d35c,
+  rune: 0xa77cff,
 };
 
 const UNIT_HEIGHT = 0.7;
@@ -405,6 +412,13 @@ export class DungeonRenderer {
   private auraColumnGeometry = new THREE.CylinderGeometry(0.34, 0.5, 2.1, 24, 1, true);
   private glowTexture: THREE.Texture | null = null;
   private columnTexture: THREE.Texture | null = null;
+  /** The pictures of the traps with no model, one texture per kind. */
+  private drawnTextures = new Map<string, THREE.Texture>();
+  private drawnGeometry = new THREE.PlaneGeometry(0.9, 0.9);
+  /** This run's rubble, and the tiles it was made for. */
+  private rubbleProps: THREE.Object3D[] = [];
+  private rubbleKey = "";
+  private rubbleTiles: Array<{ x: number; y: number }> = [];
 
   /** Per-unit scale punch (on every hit) and knockback nudge (on a kill). */
   private impacts = new Map<string, { punch: number; kx: number; ky: number; kLife: number }>();
@@ -797,9 +811,10 @@ export class DungeonRenderer {
         object,
         // A hit whites the unit out for a moment, which is the only way to
         // read damage at a glance once several units are fighting.
-        flash > 0 ? 0xffd9b0 : usesModel ? 0xffffff : (UNIT_COLORS[unit.kind] ?? 0xffffff),
+        flash > 0 ? 0xffd9b0 : usesModel ? tintFor(unit.kind, unit.tier ?? 1) : (UNIT_COLORS[unit.kind] ?? 0xffffff),
         flash > 0 ? 1 + flash : 0.35 + 0.65 * health,
       );
+      if (usesModel) this.dressUnit(object, unit.kind, unit.tier ?? 1);
       this.syncLabel(unit.id, object, unit.label, unit.tier);
       this.syncAura(unit.id, object, unit.tier ?? 1, created);
       const resting = unit.resting === true;
@@ -900,6 +915,8 @@ export class DungeonRenderer {
     this.clearMarkers();
     this.setUnits(this.lastUnits);
     this.setMarkers(this.lastMarkers);
+    this.rubbleKey = "";
+    this.setRubble(this.rubbleTiles);
     // The floor/walls/landmarks/decor were built at mount, before models
     // existed, so every tileProto/spawnModel lookup came back null and they
     // never rebuild on their own. Rebuild them now that models are loaded.
@@ -1091,6 +1108,27 @@ export class DungeonRenderer {
     const scale = host.scale.x || 1;
     sprite.position.set(0, 1.4 / scale, 0);
     sprite.scale.set(0.84 / scale, (0.84 * LABEL_H) / LABEL_W / scale, 1);
+  }
+
+  /**
+   * Puts in a tower's hands what its level holds (see dressing.ts), once per
+   * level. The gear gets its own materials, so the hit flash and the level 3
+   * gilding that tint the body tint it too.
+   */
+  private dressUnit(object: THREE.Object3D, kind: string, tier: number): void {
+    if (object.userData.dressedTier === tier) return;
+    object.userData.dressedTier = tier;
+    removeGear(object);
+    for (const { key, hand } of gearFor(kind, tier)) {
+      const model = this.loaded.get(key);
+      if (!model) continue;
+      const item = this.models.instantiate(model);
+      item.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.isMesh) mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => m.clone()) : mesh.material.clone();
+      });
+      attachGear(object, item, hand);
+    }
   }
 
   /**
@@ -1401,6 +1439,11 @@ export class DungeonRenderer {
     this.bolts.push({ mesh, life: 1 });
   }
 
+  /** The ring a trap of this kind flashes when it fires: its own colour. */
+  spawnTrapRing(x: number, y: number, kind: string): void {
+    this.spawnRing(x, y, kind === "spike" ? 0xe8a44c : (MARKER_COLORS[kind] ?? 0xe8a44c));
+  }
+
   spawnRing(x: number, y: number, color = 0xe8a44c): void {
     const mesh = new THREE.Mesh(
       this.ringGeometry,
@@ -1440,6 +1483,7 @@ export class DungeonRenderer {
       if (!object) {
         object =
           this.spawnModel(modelKey, 0.78) ??
+          this.drawnTrap(marker.kind) ??
           new THREE.Mesh(
             this.trapGeometry,
             new THREE.MeshLambertMaterial({
@@ -1487,7 +1531,7 @@ export class DungeonRenderer {
        * every frame, a trap rose into the air the moment it was placed.
        */
       if (object.userData.lift === undefined) {
-        object.userData.lift = usesModel ? object.position.y : MARKER_HEIGHT / 2;
+        object.userData.lift = usesModel || object.userData.drawn ? object.position.y : MARKER_HEIGHT / 2;
       }
       object.position.set(marker.x, FLOOR_HEIGHT + (object.userData.lift as number), marker.y);
     }
@@ -1499,6 +1543,75 @@ export class DungeonRenderer {
     }
 
     this.syncClutter();
+  }
+
+  /**
+   * A trap with no model, as the picture dressing.ts draws of it, flat on the floor.
+   *
+   * Wrapped in a group so the flat plane can lie down while the trap's ring,
+   * added to the group like any model's, keeps its own orientation.
+   */
+  private drawnTrap(kind: string): THREE.Object3D | null {
+    const canvas = drawnTrapCanvas(kind);
+    if (!canvas) return null;
+    let texture = this.drawnTextures.get(kind);
+    if (!texture) {
+      texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      this.drawnTextures.set(kind, texture);
+    }
+    const plane = new THREE.Mesh(
+      this.drawnGeometry,
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        blending: kind === "rune" ? THREE.AdditiveBlending : THREE.NormalBlending,
+      }),
+    );
+    plane.rotation.x = -Math.PI / 2;
+    const group = new THREE.Group();
+    group.add(plane);
+    group.position.y = 0.02;
+    group.userData.drawn = true;
+    return group;
+  }
+
+  /**
+   * The rubble lying about this run's room.
+   *
+   * Props rather than floor: the tile under it is ordinary paving, and the
+   * adventurers walk over it - the heap only says nothing can be built there.
+   */
+  setRubble(tiles: Array<{ x: number; y: number }>): void {
+    const key = tiles.map((t) => `${t.x},${t.y}`).join(";");
+    if (key === this.rubbleKey) return;
+    this.rubbleKey = key;
+    this.rubbleTiles = tiles;
+    for (const prop of this.rubbleProps) this.disposeObject(this.scene, prop);
+    this.rubbleProps = [];
+    for (const tile of tiles) {
+      const heap =
+        this.spawnModel("obstacle_rubble", 1.05) ??
+        new THREE.Mesh(this.trapGeometry, new THREE.MeshLambertMaterial({ color: 0x6d6255 }));
+      // Turned by where it lies, so a patch of it is not a row of one heap.
+      heap.rotation.y = ((tile.x * 7 + tile.y * 13) % 8) * (Math.PI / 4);
+      DungeonRenderer.tint(heap, 0xe0cfb4, 1.1);
+      // A darker, broken patch of floor under it: the tile reads as spoiled
+      // for building even where the heap is small.
+      const patch = new THREE.Mesh(
+        this.drawnGeometry,
+        new THREE.MeshBasicMaterial({ color: 0x1c1712, transparent: true, opacity: 0.6, depthWrite: false }),
+      );
+      patch.rotation.x = -Math.PI / 2;
+      patch.scale.setScalar(1.05);
+      patch.position.y = 0.012;
+      const prop = new THREE.Group();
+      prop.add(patch, heap);
+      prop.position.set(tile.x, FLOOR_HEIGHT, tile.y);
+      this.scene.add(prop);
+      this.rubbleProps.push(prop);
+    }
   }
 
   /**
@@ -2700,6 +2813,9 @@ export class DungeonRenderer {
     for (const geometry of [this.auraDiscGeometry, this.auraRingGeometry, this.auraColumnGeometry]) geometry.dispose();
     this.glowTexture?.dispose();
     this.columnTexture?.dispose();
+    for (const prop of this.rubbleProps) this.disposeObject(this.scene, prop);
+    for (const texture of this.drawnTextures.values()) texture.dispose();
+    this.drawnGeometry.dispose();
     this.clearMarkers();
     for (const [, corpse] of this.corpses) this.disposeObject(this.unitGroup, corpse.object);
     this.corpses.clear();

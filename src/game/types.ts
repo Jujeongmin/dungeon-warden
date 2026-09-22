@@ -21,13 +21,16 @@ export const ADVENTURER_LABEL: Record<AdventurerClass, StringKey> = {
 /** How much larger a champion is drawn. The only thing that marks it on the board. */
 export const CHAMPION_MODEL_SCALE = 1.35;
 
-export type TrapType = "spike" | "rockfall" | "flame" | "arrow";
+export type TrapType = "spike" | "rockfall" | "flame" | "arrow" | "web" | "poison" | "rune";
 
 export const TRAP_COST: Record<TrapType, number> = {
   spike: 30,
   arrow: 35,
   rockfall: 45,
   flame: 55,
+  web: 30,
+  poison: 40,
+  rune: 60,
 };
 
 export const TRAP_LABEL: Record<TrapType, StringKey> = {
@@ -35,6 +38,16 @@ export const TRAP_LABEL: Record<TrapType, StringKey> = {
   arrow: "trap_arrow",
   rockfall: "trap_rockfall",
   flame: "trap_flame",
+  web: "trap_web",
+  poison: "trap_poison",
+  rune: "trap_rune",
+};
+
+/** What the three traps that do not simply hurt do, for the build panel. */
+export const TRAP_NOTE: Partial<Record<TrapType, StringKey>> = {
+  web: "trap_web_note",
+  poison: "trap_poison_note",
+  rune: "trap_rune_note",
 };
 
 /**

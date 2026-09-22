@@ -78,6 +78,23 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   // body there are many of. Same pack, same rig, same shared clips.
   m_guard: [/^skeleton_warrior$/],
   m_grunt: [/^skeleton_minion$/],
+  // Bodies the four above already wear, told apart by what they hold and a
+  // tint (see dressing.ts).
+  m_crossbow: [/^skeleton_rogue$/],
+  m_berserker: [/^skeleton_warrior$/],
+  m_shaman: [/^skeleton_mage$/],
+  // What they hold: see dressing.ts GEAR.
+  w_crossbow: [/^skeleton_crossbow$/],
+  w_axe: [/^skeleton_axe$/],
+  w_staff: [/^skeleton_staff$/],
+  w_blade: [/^skeleton_blade$/],
+  w_shield_small: [/^skeleton_shield_small_a$/],
+  w_shield_large: [/^skeleton_shield_large_a$/],
+  w_bow: [/^bow_withstring$/],
+  w_arrows: [/^arrow_bow_bundle$/],
+  w_bolts: [/^arrow_crossbow$/],
+  w_book: [/^spellbook_open$/],
+  w_wand: [/^wand$/],
 
   // Adventurers. Each class has its own model.
   a_knight: [/^knight$/],
@@ -91,6 +108,11 @@ export const MODEL_PATTERNS: Record<string, RegExp[]> = {
   arrow: [/^wall_arrowslit/, /crossbow/, /^bow$/],
   rockfall: [/^rocks/, /rubble/, /^floor_tile_large_rocks$/],
   flame: [/^torch/, /^brazier/, /candle/],
+  poison: [/^bottle_a_green$/],
+  // The web and the rune have no model; see dressing.ts DRAWN_TRAPS.
+
+  // Rubble lying on the floor: walked over, never built on.
+  obstacle_rubble: [/^rubble_large$/],
 };
 
 /**

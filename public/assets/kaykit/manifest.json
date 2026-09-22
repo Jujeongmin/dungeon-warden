@@ -1,6 +1,12 @@
 {
   "models": [
     {
+      "url": "/assets/kaykit/adventurers/arrow_bow_bundle.gltf",
+      "name": "arrow_bow_bundle",
+      "group": "kaykit/adventurers",
+      "bytes": 3221
+    },
+    {
       "url": "/assets/kaykit/adventurers/arrow_crossbow.gltf",
       "name": "arrow_crossbow",
       "group": "kaykit/adventurers",
@@ -11,6 +17,18 @@
       "name": "barbarian",
       "group": "kaykit/adventurers",
       "bytes": 160772
+    },
+    {
+      "url": "/assets/kaykit/dungeon/bottle_A_green.gltf",
+      "name": "bottle_a_green",
+      "group": "kaykit/dungeon",
+      "bytes": 3835
+    },
+    {
+      "url": "/assets/kaykit/adventurers/bow_withString.gltf",
+      "name": "bow_withstring",
+      "group": "kaykit/adventurers",
+      "bytes": 4511
     },
     {
       "url": "/assets/kaykit/dungeon/chest_gold.gltf",
@@ -73,6 +91,30 @@
       "bytes": 3819
     },
     {
+      "url": "/assets/kaykit/dungeon/rubble_large.gltf",
+      "name": "rubble_large",
+      "group": "kaykit/dungeon",
+      "bytes": 3822
+    },
+    {
+      "url": "/assets/kaykit/skeletons/Skeleton_Axe.gltf",
+      "name": "skeleton_axe",
+      "group": "kaykit/skeletons",
+      "bytes": 3181
+    },
+    {
+      "url": "/assets/kaykit/skeletons/Skeleton_Blade.gltf",
+      "name": "skeleton_blade",
+      "group": "kaykit/skeletons",
+      "bytes": 3183
+    },
+    {
+      "url": "/assets/kaykit/skeletons/Skeleton_Crossbow.gltf",
+      "name": "skeleton_crossbow",
+      "group": "kaykit/skeletons",
+      "bytes": 3188
+    },
+    {
       "url": "/assets/kaykit/skeletons/Skeleton_Mage.glb",
       "name": "skeleton_mage",
       "group": "kaykit/skeletons",
@@ -91,10 +133,34 @@
       "bytes": 150808
     },
     {
+      "url": "/assets/kaykit/skeletons/Skeleton_Shield_Large_A.gltf",
+      "name": "skeleton_shield_large_a",
+      "group": "kaykit/skeletons",
+      "bytes": 3207
+    },
+    {
+      "url": "/assets/kaykit/skeletons/Skeleton_Shield_Small_A.gltf",
+      "name": "skeleton_shield_small_a",
+      "group": "kaykit/skeletons",
+      "bytes": 3205
+    },
+    {
+      "url": "/assets/kaykit/skeletons/Skeleton_Staff.gltf",
+      "name": "skeleton_staff",
+      "group": "kaykit/skeletons",
+      "bytes": 3193
+    },
+    {
       "url": "/assets/kaykit/skeletons/Skeleton_Warrior.glb",
       "name": "skeleton_warrior",
       "group": "kaykit/skeletons",
       "bytes": 165088
+    },
+    {
+      "url": "/assets/kaykit/adventurers/spellbook_open.gltf",
+      "name": "spellbook_open",
+      "group": "kaykit/adventurers",
+      "bytes": 3209
     },
     {
       "url": "/assets/kaykit/dungeon/stairs_long.gltf",
@@ -113,6 +179,12 @@
       "name": "wall",
       "group": "kaykit/dungeon",
       "bytes": 3718
+    },
+    {
+      "url": "/assets/kaykit/adventurers/wand.gltf",
+      "name": "wand",
+      "group": "kaykit/adventurers",
+      "bytes": 3179
     }
   ]
 }

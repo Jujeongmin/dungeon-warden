@@ -29,6 +29,7 @@ export const GUIDE: Array<{ id: GuideSection; title: StringKey; lines: GuideLine
       { key: "guide_basics_2" },
       { key: "guide_basics_3" },
       { key: "guide_basics_4" },
+      { key: "guide_basics_5" },
     ],
   },
   {
@@ -39,8 +40,12 @@ export const GUIDE: Array<{ id: GuideSection; title: StringKey; lines: GuideLine
       { key: "guide_towers_2" },
       { key: "guide_towers_3" },
       { key: "guide_towers_4" },
+      { key: "guide_towers_7" },
+      { key: "guide_towers_8" },
+      { key: "guide_towers_9" },
       { key: "guide_towers_5", vars: { pct: Math.round(SELL_REFUND * 100) } },
       { key: "guide_towers_6" },
+      { key: "guide_towers_10" },
     ],
   },
   {

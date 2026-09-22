@@ -12,13 +12,16 @@ import type { StringKey } from "../../i18n/strings";
  *  - guard: little damage, but what it hits is slowed, so everything else
  *    gets longer to shoot.
  *  - grunt: cheap and fast, with a short reach - for a corner the path turns.
+ *  - crossbow: one heavy bolt, slowly, from further than anything else.
+ *  - berserker: an arm's length of reach, and everything in it is hit at once.
+ *  - shaman: fights nothing; the towers round it fire faster.
  *
  * The type ids are the old minion ids so the models and their names carry
  * over unchanged.
  */
-export type TowerType = "warrior" | "mage" | "guard" | "grunt";
+export type TowerType = "warrior" | "mage" | "guard" | "grunt" | "crossbow" | "berserker" | "shaman";
 
-export const TOWER_TYPES: TowerType[] = ["warrior", "mage", "guard", "grunt"];
+export const TOWER_TYPES: TowerType[] = ["warrior", "mage", "guard", "grunt", "crossbow", "berserker", "shaman"];
 
 export const MAX_TOWER_LEVEL = 3;
 
@@ -32,6 +35,14 @@ export interface TowerLevelStats {
   splash?: number;
   /** Guard: what it hits moves at this share of its speed for a while. */
   slow?: number;
+  /** Berserker: hits every adventurer in range, not just one. */
+  cleave?: boolean;
+  /**
+   * Shaman: fires at nothing, and every other tower within `range` shoots
+   * this much faster (0.25 = a quarter more shots). The best one in reach
+   * applies; they do not stack.
+   */
+  haste?: number;
 }
 
 export interface TowerSpec {
@@ -88,6 +99,36 @@ export const TOWERS: Record<TowerType, TowerSpec> = {
     ],
     label: "minion_grunt",
     note: "tower_grunt_note",
+  },
+  crossbow: {
+    cost: [40, 45, 80],
+    levels: [
+      { damage: 22, interval: 2.4, range: 4.5 },
+      { damage: 44, interval: 2.3, range: 5.0 },
+      { damage: 80, interval: 2.2, range: 5.5 },
+    ],
+    label: "minion_crossbow",
+    note: "tower_crossbow_note",
+  },
+  berserker: {
+    cost: [35, 40, 70],
+    levels: [
+      { damage: 9, interval: 1.0, range: 1.5, cleave: true },
+      { damage: 16, interval: 0.95, range: 1.6, cleave: true },
+      { damage: 28, interval: 0.9, range: 1.7, cleave: true },
+    ],
+    label: "minion_berserker",
+    note: "tower_berserker_note",
+  },
+  shaman: {
+    cost: [40, 40, 70],
+    levels: [
+      { damage: 0, interval: 1, range: 2.2, haste: 0.25 },
+      { damage: 0, interval: 1, range: 2.5, haste: 0.4 },
+      { damage: 0, interval: 1, range: 2.8, haste: 0.6 },
+    ],
+    label: "minion_shaman",
+    note: "tower_shaman_note",
   },
 };
 

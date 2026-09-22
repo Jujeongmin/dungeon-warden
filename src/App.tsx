@@ -7,13 +7,13 @@ import { loadSettings, pixelRatioFor, saveSettings, type Settings } from "./game
 import { TRAP_STATS } from "./game/sim/traps";
 import { researchEffects } from "./game/td/research";
 import type { Refusal, RunEvent, StageRun } from "./game/td/StageRun";
-import { ENDLESS, WAVES_PER_STAGE, stageOfWave } from "./game/td/stages";
+import { endlessStage, WAVES_PER_STAGE, stageOfWave } from "./game/td/stages";
 import { MAX_TOWER_LEVEL, sellValue, TOWER_TYPES, TOWERS, towerStats, upgradeCost, type TowerType } from "./game/td/towers";
 import { tutorialFor } from "./game/td/tutorial";
 import { useProgress } from "./game/td/useProgress";
 import { FREE_RUN_SPEED, PAID_RUN_SPEED, RUN_SPEEDS, useStageRun } from "./game/td/useStageRun";
 import { runFloor, runMarkers, runUnits } from "./game/td/views";
-import { ADVENTURER_LABEL, TRAP_COST, TRAP_LABEL, type TrapType } from "./game/types";
+import { ADVENTURER_LABEL, TRAP_COST, TRAP_LABEL, TRAP_NOTE, type TrapType } from "./game/types";
 import { useTitleDemo } from "./game/useTitleDemo";
 import { LocaleProvider, type Translate } from "./i18n";
 import { translate, type StringKey } from "./i18n/strings";
@@ -40,7 +40,7 @@ const BOLT_MIN_SPAN = 1.3;
 /** How long a refusal stays on the hint line. */
 const REFUSAL_MS = 2200;
 
-const TRAP_TYPES: TrapType[] = ["spike", "arrow", "rockfall", "flame"];
+const TRAP_TYPES: TrapType[] = ["spike", "arrow", "rockfall", "flame", "web", "poison", "rune"];
 
 type Tool = { kind: "tower"; type: TowerType } | { kind: "trap"; type: TrapType };
 
@@ -55,6 +55,7 @@ const REFUSAL_TEXT: Record<Refusal, StringKey> = {
   gold: "refuse_gold",
   rock: "refuse_rock",
   bedrock: "refuse_rock",
+  rubble: "refuse_rubble",
   not_dug: "refuse_rock",
   taken: "refuse_taken",
   occupied: "refuse_occupied",
@@ -151,7 +152,8 @@ export default function App() {
             }
           }
         } else if (event.kind === "trap") {
-          renderer.spawnRing(event.x, event.y);
+          const trap = run.traps.find((tp) => tp.id === event.trapId);
+          renderer.spawnTrapRing(event.x, event.y, trap?.type ?? "spike");
           audio.play("trap", 90);
         } else if (event.kind === "killed") {
           renderer.spawnRing(event.x, event.y, 0xd86a4c);
@@ -227,20 +229,21 @@ export default function App() {
     rendererRef.current?.setShowcase(screen === "title");
   }, [screen, rendererReady]);
 
-  // A new run is a new object: the room is redrawn once per run.
-  const [runSerial, setRunSerial] = useState(0);
-  const lastRun = useRef<StageRun | null>(null);
-  if (run && run !== lastRun.current) {
-    lastRun.current = run;
-    setRunSerial((n) => n + 1);
-  }
+  /*
+   * A new run is a new object, and the same object changes in place while it
+   * is played - so the room is redrawn when the object is a different one.
+   *
+   * This used to count runs with a setState during render, which StrictMode's
+   * second render swallowed: the room kept whatever was drawn before, and a
+   * run's own rock never appeared.
+   */
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer || !run) return;
     renderer.setArena(run.stage.arena, run.entrance, run.core);
     renderer.setDug(runFloor(run));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runSerial, rendererReady]);
+    renderer.setRubble(run.stage.rubble ?? []);
+  }, [run, rendererReady]);
 
   // Everything that moves, every render: the run changes in place.
   useEffect(() => {
@@ -310,7 +313,8 @@ export default function App() {
     setSelection(null);
     setResearchOpen(false);
     setToolId("warrior");
-    runner.begin(ENDLESS, effects);
+    // A new scatter of rock and rubble every run, so no two mazes are the same.
+    runner.begin(endlessStage(Math.floor(Math.random() * 2 ** 31)), effects);
     setScreen("play");
     if (!settings.introSeen) {
       setIntroOpen(true);
@@ -438,7 +442,7 @@ export default function App() {
       window.removeEventListener("resize", onResize);
       observer?.disconnect();
     };
-  }, [screen, hudOpen, rendererReady, runSerial]);
+  }, [screen, hudOpen, rendererReady, run]);
 
   // ------------------------------------------------------------- tutorial
 
@@ -482,7 +486,7 @@ export default function App() {
     : tool
       ? tool.kind === "tower"
         ? t(TOWERS[tool.type].note)
-        : t("hint_trap_td")
+        : `${TRAP_NOTE[tool.type] ? `${t(TRAP_NOTE[tool.type]!)} · ` : ""}${t("hint_trap_td")}`
       : "";
 
   const best = progress.progress.bestWaves;

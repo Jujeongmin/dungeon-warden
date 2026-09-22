@@ -31,7 +31,13 @@ export function playStage(
         .map((t) => ({ t, cost: upgradeCost(t.type, t.level) }))
         .filter((u): u is { t: typeof u.t; cost: number } => u.cost !== null)
         .sort((a, b) => a.cost - b.cost);
-      const spot = run.gold < cost ? null : plan === "serpentine" ? nextInOrder(run, order) : bestSpot(run, towerStats(type, 1).range, plan === "greedy");
+      // Serpentine falls back to the greedy spot once the rows are done or the
+      // room's rock and rubble have broken them up: what a player would do.
+      const spot = run.gold < cost
+        ? null
+        : plan === "serpentine"
+          ? (nextInOrder(run, order) ?? bestSpot(run, towerStats(type, 1).range, true))
+          : bestSpot(run, towerStats(type, 1).range, plan === "greedy");
       // The maze first; upgrades once there is nowhere left to wall.
       const upgradeFirst = spot === null && upgradable.length > 0;
       if (upgradeFirst && run.gold >= upgradable[0].cost) {
@@ -82,7 +88,7 @@ function bestSpot(run: StageRun, range: number, maze: boolean): Point | null {
   let bestScore = -Infinity;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (!run.isDug(x, y) || run.towerAt(x, y) || run.trapAt(x, y)) continue;
+      if (!run.isDug(x, y) || run.isRubble(x, y) || run.towerAt(x, y) || run.trapAt(x, y)) continue;
       if ((x === run.entrance.x && y === run.entrance.y) || (x === run.core.x && y === run.core.y)) continue;
       let cover = 0;
       for (const p of route) if (Math.hypot(p.x - x, p.y - y) <= range) cover += 1;
@@ -118,10 +124,35 @@ export const ALL_RESEARCH = RESEARCH.map((n) => n.id);
  * Built from the side, so each row turns the party a little more as it grows.
  */
 function serpentine(run: StageRun): Point[] {
+  // Rows on even or odd lines, whichever the room's rock and rubble break up
+  // less: tried out on an empty copy of the room with gold to spare.
+  let best: Point[] = [];
+  let longest = -1;
+  for (const first of [2, 3]) {
+    const order = serpentineFrom(run, first);
+    const trial = new StageRun({ ...run.stage, startGold: 1e6 }, researchEffects([]));
+    // Judged on the maze the opening gold buys as well as the finished one:
+    // rows whose first stretch leaves the road straight lose the first waves.
+    let opening = 0;
+    for (const tile of order) {
+      if (trial.isRubble(tile.x, tile.y) || !trial.isDug(tile.x, tile.y)) continue;
+      trial.placeTower("warrior", tile.x, tile.y);
+      if (trial.towers.length === 15) opening = trial.route()?.length ?? 0;
+    }
+    const length = (trial.route()?.length ?? 0) + opening * 2;
+    if (length > longest) {
+      longest = length;
+      best = order;
+    }
+  }
+  return best;
+}
+
+function serpentineFrom(run: StageRun, first: number): Point[] {
   const { w, h } = run.stage.arena;
   const tiles: Point[] = [];
   let row = 0;
-  for (let y = 2; y <= h - 3; y += 2) {
+  for (let y = first; y <= h - 3; y += 2) {
     const gap = row % 2 === 0 ? 0 : w - 1;
     // From the wall's anchored end towards its gap: a wall half built from the
     // side already turns the party, where one started in the middle does not.
@@ -136,7 +167,7 @@ function serpentine(run: StageRun): Point[] {
 
 function nextInOrder(run: StageRun, order: Point[]): Point | null {
   for (const tile of order) {
-    if (!run.isDug(tile.x, tile.y) || run.towerAt(tile.x, tile.y)) continue;
+    if (!run.isDug(tile.x, tile.y) || run.isRubble(tile.x, tile.y) || run.towerAt(tile.x, tile.y)) continue;
     if (routeWith(run, tile.x, tile.y) === null) continue;
     return tile;
   }

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { attachGear, drawnTrapCanvas, gearFor, tintObject, UNIT_TINT } from "./dressing";
 import { ModelLibrary, fitToTile, type LoadedModel } from "./ModelLibrary";
 
 /**
@@ -72,10 +73,28 @@ export async function bakeModelIcons(
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 50);
 
   for (const modelKey of keys) {
+    const drawn = drawnTrapCanvas(modelKey);
+    if (drawn) {
+      icons[modelKey] = drawn.toDataURL("image/png");
+      continue;
+    }
     const model: LoadedModel | null = await models.load(modelKey);
     if (!model) continue;
 
     const object = models.instantiate(model);
+    const tint = UNIT_TINT[modelKey];
+    if (tint !== undefined) {
+      // Its own materials first: the instance shares the cached model's.
+      object.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.isMesh) mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => m.clone()) : mesh.material.clone();
+      });
+      tintObject(object, tint);
+    }
+    for (const { key, hand } of gearFor(modelKey, 1)) {
+      const item = await models.load(key);
+      if (item) attachGear(object, models.instantiate(item), hand);
+    }
     // One tile wide, so every icon is drawn to the same scale as its
     // neighbours rather than each filling its own frame.
     fitToTile(object, 1);

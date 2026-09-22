@@ -13,6 +13,12 @@ export interface TrapStats {
   range: number;
   /** Damage over time applied on hit. */
   burn?: { dps: number; duration: number };
+  /** Poison: its own damage over time, which a burn does not replace. */
+  poison?: { dps: number; duration: number };
+  /** Web: what it catches moves at `factor` of its speed for `duration` seconds. */
+  slow?: { factor: number; duration: number };
+  /** Rune: sends what steps on it this many tiles back the way it came. */
+  pushBack?: number;
 }
 
 export const TRAP_STATS: Record<TrapType, TrapStats> = {
@@ -27,4 +33,7 @@ export const TRAP_STATS: Record<TrapType, TrapStats> = {
     range: 0,
     burn: { dps: 9, duration: 4 },
   },
+  web: { damage: 0, cooldown: 0, triggerRadius: 0.5, aoe: 0, range: 0, slow: { factor: 0.4, duration: 3 } },
+  poison: { damage: 0, cooldown: 0, triggerRadius: 0.5, aoe: 0, range: 0, poison: { dps: 6, duration: 8 } },
+  rune: { damage: 0, cooldown: 0, triggerRadius: 0.45, aoe: 0, range: 0, pushBack: 3 },
 };
