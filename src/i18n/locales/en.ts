@@ -186,7 +186,7 @@ export const en: Record<StringKey, string> = {
   res_trap_rune: "Rune of Time",
   res_trap_rune_n: "Unlocks the recall rune",
   refuse_rubble: "Nothing can go on rubble",
-  guide_basics_5: "**Obstacles** Rock and rubble are thrown down anew every run. Rock blocks the way. Adventurers climb over rubble at half speed, and nothing can be built on it - so a maze that runs over rubble holds them longer.",
+  guide_basics_5: "**Obstacles** Rock and rubble are thrown down anew every run. Rock blocks the way. Rubble is climbed at half speed, so adventurers go round it when that is quicker. Nothing can be built on rubble.",
   guide_towers_7: "**Crossbowman** Reaches very far and fires one heavy bolt, slowly.",
   guide_towers_8: "**Berserker** Only reaches next to itself, but hits everyone there at once. Good where two lanes run side by side.",
   guide_towers_9: "**Shaman** Attacks nothing, but makes the towers around it fire faster. Several in reach do not stack: the strongest applies.",

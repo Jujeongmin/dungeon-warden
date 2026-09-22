@@ -129,6 +129,23 @@ describe("the room thrown down anew", () => {
     expect(walk(true) - walk(false)).toBeGreaterThan(30);
   });
 
+  it("goes round rubble when that is quicker than climbing it", () => {
+    const stage: Stage = {
+      arena: { w: 3, h: 7 },
+      bedrock: [],
+      rubble: [2, 3, 4].map((y) => ({ x: 1, y })),
+      startGold: 0,
+      lives: 5,
+      waves: [[{ cls: "knight", count: 1, level: 1 }]],
+    };
+    const run = new StageRun(stage, everything);
+    const route = run.route()!;
+    expect(route.some((p) => run.isRubble(p.x, p.y))).toBe(false);
+    // One rubble tile is cheaper to climb than a detour of two: it is climbed.
+    const short = new StageRun({ ...stage, rubble: [{ x: 1, y: 3 }] }, everything);
+    expect(short.route()!.some((p) => short.isRubble(p.x, p.y))).toBe(true);
+  });
+
   it("never builds on rubble, but walks over it", () => {
     const stage: Stage = { ...corridor(1), rubble: [{ x: 1, y: 4 }] };
     const run = new StageRun(stage, everything);

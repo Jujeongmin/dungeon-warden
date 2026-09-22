@@ -237,9 +237,17 @@ export class StageRun {
     return set;
   }
 
-  /** The way in, door to core, or null while there is none. */
+  /** Rubble as the pathfinder weighs it: walkable, but slow. */
+  private get climb(): { tiles: Set<number>; cost: number } {
+    return { tiles: this.rubble, cost: 1 / RUBBLE_SPEED };
+  }
+
+  /**
+   * The way in, door to core, or null while there is none: the quickest,
+   * which goes round rubble when going round is faster than climbing it.
+   */
   route(): Point[] | null {
-    return findPath(this.stage.arena, this.entrance, this.core, this.blocked());
+    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(), this.climb);
   }
 
   /** How many waves the stage has: without end for the endless run. */
@@ -325,7 +333,7 @@ export class StageRun {
 
   /** The way in if a tower stood here too, for drawing the maze it would make. */
   routeWithTower(x: number, y: number): Point[] | null {
-    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(this.key(x, y)));
+    return findPath(this.stage.arena, this.entrance, this.core, this.blocked(this.key(x, y)), this.climb);
   }
 
   placeTower(type: TowerType, x: number, y: number): BuildResult {
@@ -402,7 +410,7 @@ export class StageRun {
     for (const enemy of this.enemies) {
       if (ENEMIES[enemy.cls].flies) continue;
       const from = this.standingTile(enemy);
-      const path = findPath(this.stage.arena, from, this.core, blocked);
+      const path = findPath(this.stage.arena, from, this.core, blocked, this.climb);
       if (!path) continue;
       enemy.route = path;
       enemy.next = 0;
