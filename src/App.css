@@ -347,6 +347,9 @@ h3.section {
   font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--muted);
+  /* Korean breaks between words, and the two lines come out even. */
+  word-break: keep-all;
+  text-wrap: balance;
 }
 
 /* Three readings rather than a panel: label over number, ruled off. */
