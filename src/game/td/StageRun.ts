@@ -52,6 +52,9 @@ const OCCUPIED_RADIUS = 0.75;
 /** How long a tower is drawn mid-swing after it fires. */
 const ATTACK_POSE_SECONDS = 0.35;
 
+/** Share of its speed an adventurer keeps while climbing over rubble. */
+export const RUBBLE_SPEED = 0.5;
+
 export interface RunTower {
   id: string;
   type: TowerType;
@@ -163,7 +166,7 @@ export class StageRun {
 
   private readonly effects: ResearchEffects;
   private readonly bedrock: Set<number>;
-  /** Fallen rock: walked over, never built on. */
+  /** Fallen rock: climbed over slowly, never built on. */
   private readonly rubble: Set<number>;
   private readonly dug = new Set<number>();
   private queue: Spawn[] = [];
@@ -486,7 +489,10 @@ export class StageRun {
   private moveEnemies(dt: number): void {
     for (const enemy of this.enemies) {
       const slow = enemy.slowUntil > this.time ? enemy.slowFactor : 1;
-      let budget = ENEMIES[enemy.cls].speed * slow * dt;
+      // Scrambling over a heap of rubble takes a walker twice as long; a
+      // flyer goes over it like everything else.
+      const climbing = !ENEMIES[enemy.cls].flies && this.isRubble(Math.round(enemy.x), Math.round(enemy.y));
+      let budget = ENEMIES[enemy.cls].speed * slow * (climbing ? RUBBLE_SPEED : 1) * dt;
       while (budget > 0 && enemy.next < enemy.route.length) {
         const target = enemy.route[enemy.next];
         const dx = target.x - enemy.x;

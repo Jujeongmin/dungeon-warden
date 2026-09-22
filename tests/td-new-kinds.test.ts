@@ -117,6 +117,18 @@ describe("new floor traps", () => {
 });
 
 describe("the room thrown down anew", () => {
+  it("slows a walker that climbs over rubble", () => {
+    const walk = (rubble: boolean) => {
+      const run = new StageRun({ ...corridor(1), rubble: rubble ? [2, 3, 4].map((y) => ({ x: 1, y })) : [] }, everything);
+      run.startWave();
+      let n = 0;
+      while (run.status === "wave" && n < 2000) { run.step(); n++; }
+      return n;
+    };
+    // Three tiles at half speed: about three tiles' worth longer.
+    expect(walk(true) - walk(false)).toBeGreaterThan(30);
+  });
+
   it("never builds on rubble, but walks over it", () => {
     const stage: Stage = { ...corridor(1), rubble: [{ x: 1, y: 4 }] };
     const run = new StageRun(stage, everything);

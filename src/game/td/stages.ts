@@ -24,7 +24,7 @@ export interface Stage {
   arena: Arena;
   /** Rock nothing can stand on or walk through. */
   bedrock: Array<{ x: number; y: number }>;
-  /** Fallen rock: walked over like floor, but nothing can be built on it. */
+  /** Fallen rock: adventurers climb over it slowly, and nothing can be built on it. */
   rubble?: Array<{ x: number; y: number }>;
   startGold: number;
   lives: number;
