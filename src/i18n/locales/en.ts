@@ -204,4 +204,6 @@ export const en: Record<StringKey, string> = {
   ad_unavailable: "No ads here",
   ad_skipped: "Watch the ad through for the gold",
   hint_drag: "Drag it from the list onto an empty tile",
+  board_name_note: "Changing the name also renames the run already on the board.",
+  rank_saved: "Saved",
 };

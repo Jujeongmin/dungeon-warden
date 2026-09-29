@@ -878,6 +878,8 @@ export default function App() {
             onRetry={() => void beginRun()}
             onResearch={() => setResearchOpen(true)}
             onTitle={toTitle}
+            nickname={progress.isOffline ? null : progress.nickname}
+            onRename={progress.setNickname}
           />
         )}
 

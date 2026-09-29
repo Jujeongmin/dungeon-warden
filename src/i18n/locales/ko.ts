@@ -203,4 +203,6 @@ export const ko = {
   ad_unavailable: "여기서는 광고를 볼 수 없어요",
   ad_skipped: "광고를 끝까지 봐야 골드를 받아요",
   hint_drag: "목록에서 끌어다 빈 칸에 놓으세요",
+  board_name_note: "이름을 바꾸면 이미 올라간 기록의 이름도 같이 바뀌어요.",
+  rank_saved: "저장됨",
 };

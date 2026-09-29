@@ -205,4 +205,6 @@ export const zhHans: Record<StringKey, string> = {
   ad_unavailable: "这里无法播放广告",
   ad_skipped: "看完广告才能拿到金币",
   hint_drag: "从列表拖到空格子上",
+  board_name_note: "改名后，已经上榜的记录也会改成新名字。",
+  rank_saved: "已保存",
 };

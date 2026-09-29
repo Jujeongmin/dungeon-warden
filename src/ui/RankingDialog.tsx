@@ -30,6 +30,9 @@ export function RankingDialog({ offline, nickname, bestWaves, load, onRename, on
   const [name, setName] = useState(nickname);
   const [saving, setSaving] = useState(false);
 
+  /** Bumped after a rename, which rewrites the row this account already has. */
+  const [reloads, setReloads] = useState(0);
+
   useEffect(() => {
     let alive = true;
     void load().then((result) => {
@@ -40,7 +43,7 @@ export function RankingDialog({ offline, nickname, bestWaves, load, onRename, on
     return () => {
       alive = false;
     };
-  }, [load]);
+  }, [load, reloads]);
 
   const reach = (waves: number) => t("rank_reach", { stage: stageOf(waves), wave: (waves % 5) + 1 });
 
@@ -64,13 +67,20 @@ export function RankingDialog({ offline, nickname, bestWaves, load, onRename, on
               disabled={saving || name.trim() === "" || name.trim() === nickname}
               onClick={() => {
                 setSaving(true);
-                void onRename(name).finally(() => setSaving(false));
+                // The board already holds this account's run: renaming rewrites
+                // that row, so the list is read again rather than left stale.
+                void onRename(name)
+                  .then((ok) => {
+                    if (ok) setReloads((n) => n + 1);
+                  })
+                  .finally(() => setSaving(false));
               }}
             >
               {t("rank_rename")}
             </button>
           </div>
         )}
+        {!offline && <p className="modal-note small">{t("board_name_note")}</p>}
 
         {offline ? (
           <p className="modal-note">{t("board_offline")}</p>

@@ -210,4 +210,6 @@ export const ja: Record<StringKey, string> = {
   ad_unavailable: "ここでは広告を見られません",
   ad_skipped: "最後まで見るとゴールドがもらえます",
   hint_drag: "リストから空きマスへドラッグ",
+  board_name_note: "名前を変えると、すでに載っている記録の名前も変わります。",
+  rank_saved: "保存しました",
 };

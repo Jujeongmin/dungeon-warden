@@ -205,4 +205,6 @@ export const zhHant: Record<StringKey, string> = {
   ad_unavailable: "這裡無法播放廣告",
   ad_skipped: "看完廣告才能拿到金幣",
   hint_drag: "從列表拖到空格子上",
+  board_name_note: "改名後，已經上榜的紀錄也會改成新名字。",
+  rank_saved: "已儲存",
 };
