@@ -201,4 +201,6 @@ export const en: Record<StringKey, string> = {
   ad_gold: "Watch an ad: +{n} gold",
   ad_once: "(once a run)",
   guide_more_4: "**Ad** Once a run, the button under the build list plays an ad for +{n} gold. The game waits while it plays.",
+  ad_unavailable: "No ads here",
+  ad_skipped: "Watch the ad through for the gold",
 };

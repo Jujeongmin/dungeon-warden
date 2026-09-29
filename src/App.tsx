@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DungeonRenderer } from "./game/DungeonRenderer";
-import { adButtonShown, watchGoldAd } from "./game/ads";
+import { adButtonShown, initAds, watchGoldAd } from "./game/ads";
 import { audio, type Cue } from "./game/audio";
 import { installDevTools } from "./game/devtools";
 import { BUZZ, buzz } from "./game/haptics";
@@ -107,6 +107,10 @@ export default function App() {
   const [homeArmed, setHomeArmed] = useState(false);
   /** An ad is showing: the run waits, and the button cannot be pressed twice. */
   const [adShowing, setAdShowing] = useState(false);
+  /** Bumped after an ad attempt: the SDK may now say this host shows none. */
+  const [adTry, setAdTry] = useState(0);
+  /** Why the last ad paid nothing, on the hint line. */
+  const [adNote, setAdNote] = useState<StringKey | null>(null);
 
   const [rankingOpen, setRankingOpen] = useState(false);
   /** Souls paid on starting for a run that was left open, shown once. */
@@ -481,6 +485,10 @@ export default function App() {
   // ------------------------------------------------------------- dev tools
 
   useEffect(() => {
+    initAds();
+  }, []);
+
+  useEffect(() => {
     installDevTools({
       run: () => runner.run,
       stepBy: (n: number) => runner.stepBy(n),
@@ -505,6 +513,8 @@ export default function App() {
 
   const hint = refusal
     ? t(REFUSAL_TEXT[refusal])
+    : adNote
+    ? t(adNote)
     : tool
       ? tool.kind === "tower"
         ? t(TOWERS[tool.type].note)
@@ -688,7 +698,7 @@ export default function App() {
                 <p className="hint small">{t("hint_tap_tower")}</p>
               </div>
               <div className="hud-foot">
-                {adButtonShown() && !run.adGoldClaimed && run.status !== "lost" && (
+                {adButtonShown() && adTry >= 0 && !run.adGoldClaimed && run.status !== "lost" && (
                   <button
                     className="ad-gold"
                     disabled={adShowing}
@@ -697,14 +707,19 @@ export default function App() {
                       setAdShowing(true);
                       const wasPaused = runner.paused;
                       runner.setPaused(true);
-                      const watched = await watchGoldAd();
+                      const outcome = await watchGoldAd();
                       runner.setPaused(wasPaused);
                       setAdShowing(false);
-                      if (watched && runner.claimAdGold()) {
+                      // Redraws the button, which the SDK may just have said
+                      // this host cannot show at all.
+                      setAdTry((n) => n + 1);
+                      if (outcome === "rewarded" && runner.claimAdGold()) {
                         audio.play("coins");
                         float(`+${AD_GOLD}`, run.core.x, run.core.y - 1, "gold");
-                      } else if (!watched) {
+                        setAdNote(null);
+                      } else {
                         audio.play("error");
+                        setAdNote(outcome === "unavailable" ? "ad_unavailable" : "ad_skipped");
                       }
                     }}
                   >

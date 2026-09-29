@@ -15,26 +15,48 @@ import { Verse8Ads } from "@verse8/ads";
 
 export const AD_PLACEMENT = { goldReward: "gold-reward" } as const;
 
-/** True when the player watched the ad through to the reward. */
-export async function watchGoldAd(): Promise<boolean> {
-  // The preview runs outside the Verse8 shell, where no ad can fill: it
-  // pretends one did, so the button can be tried.
-  if (import.meta.env.DEV && !adsLikelyAvailable()) return true;
+/**
+ * Whether the host has told us it cannot show ads.
+ *
+ * The button used to be drawn only inside an iframe, which is how the web
+ * shell runs a game - and is not how the mobile app runs one: there the game
+ * is the top frame with a bridge injected into it, so the button simply never
+ * appeared on a phone. So it is drawn everywhere and taken away only once the
+ * SDK has actually answered `unsupported_env`.
+ */
+let unsupported = false;
+
+/** Opens the handshake with the host early: see the SDK's note on caching it. */
+export function initAds(): void {
   try {
-    const result = await Verse8Ads.showRewarded({ placementId: AD_PLACEMENT.goldReward });
-    return result.status === "rewarded";
+    Verse8Ads.init();
   } catch {
-    // No ad filled, no network, or not inside the Verse8 shell. Never a
-    // reward, and never an exception the caller has to handle.
-    return false;
+    // Nothing to talk to. showRewarded will say so when it is pressed.
   }
 }
 
-/** Whether an ad could be shown here: inside the Verse8 frame, or the dev preview. */
-export function adsLikelyAvailable(): boolean {
-  return typeof window !== "undefined" && window.self !== window.top;
+export type AdOutcome = "rewarded" | "skipped" | "unavailable";
+
+export async function watchGoldAd(): Promise<AdOutcome> {
+  // The preview runs outside any Verse8 host, where no ad can fill: it
+  // pretends one did, so the button can be tried.
+  if (import.meta.env.DEV) return "rewarded";
+  try {
+    const result = await Verse8Ads.showRewarded({ placementId: AD_PLACEMENT.goldReward });
+    if (result.status === "rewarded") return "rewarded";
+    if (result.status === "failed" && result.error.code === "unsupported_env") {
+      unsupported = true;
+      return "unavailable";
+    }
+    // Dismissed early, or the ad network had nothing: no reward, and the
+    // button stays for another try.
+    return "skipped";
+  } catch {
+    return "unavailable";
+  }
 }
 
+/** Whether the ad button is worth drawing at all. */
 export function adButtonShown(): boolean {
-  return adsLikelyAvailable() || import.meta.env.DEV;
+  return !unsupported;
 }

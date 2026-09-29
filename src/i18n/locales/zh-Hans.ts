@@ -202,4 +202,6 @@ export const zhHans: Record<StringKey, string> = {
   ad_gold: "看广告 +{n}金币",
   ad_once: "（每局一次）",
   guide_more_4: "**广告** 每局一次，点建造列表下方的按钮看广告可得 +{n} 金币。广告播放时游戏暂停。",
+  ad_unavailable: "这里无法播放广告",
+  ad_skipped: "看完广告才能拿到金币",
 };

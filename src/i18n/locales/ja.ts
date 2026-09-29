@@ -207,4 +207,6 @@ export const ja: Record<StringKey, string> = {
   ad_gold: "広告を見て +{n}G",
   ad_once: "（1プレイ1回）",
   guide_more_4: "**広告** 1プレイに1回、建設リストの下のボタンで広告を見るとゴールド+{n}。広告の間はゲームが止まります。",
+  ad_unavailable: "ここでは広告を見られません",
+  ad_skipped: "最後まで見るとゴールドがもらえます",
 };
