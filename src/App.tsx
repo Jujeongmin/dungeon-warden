@@ -813,8 +813,9 @@ export default function App() {
                       }
                     }}
                   >
-                    <Icon name="play" size={12} />
-                    {t("ad_gold", { n: AD_GOLD })}
+                    <span>
+                      <Icon name="play" size={12} /> {t("ad_gold", { n: AD_GOLD })}
+                    </span>
                     <i>{t("ad_once")}</i>
                   </button>
                 )}

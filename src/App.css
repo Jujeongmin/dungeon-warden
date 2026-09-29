@@ -514,9 +514,12 @@ h3.section {
   font-size: var(--fs-sm);
   font-weight: 700;
 }
-.ad-gold i {
-  /* Never split a Korean phrase across lines. */
-  word-break: keep-all; font-style: normal; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
+/* The reward stays on one line, and the aside drops under it whole when
+   the panel is narrow (the Verse8 frame on a PC is), instead of either
+   breaking mid-phrase. */
+.ad-gold { flex-wrap: wrap; row-gap: 0; }
+.ad-gold > span { white-space: nowrap; }
+.ad-gold i { white-space: nowrap; font-style: normal; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
 .ad-gold:disabled { opacity: 0.5; }
 
 @media (max-height: 520px) {
