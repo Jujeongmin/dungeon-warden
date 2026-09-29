@@ -514,8 +514,17 @@ h3.section {
   font-size: var(--fs-sm);
   font-weight: 700;
 }
-.ad-gold i { font-style: normal; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
+.ad-gold i {
+  /* Never split a Korean phrase across lines. */
+  word-break: keep-all; font-style: normal; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
 .ad-gold:disabled { opacity: 0.5; }
+
+@media (max-height: 520px) {
+  /* A phone in landscape has no room for the aside: the button says the
+     reward, and the guide says it is once a run. */
+  .ad-gold { margin-bottom: 6px; padding: 6px 8px; }
+  .ad-gold i { display: none; }
+}
 
 /* The champion's health, top and centre while it is in the room. */
 .boss-bar {
