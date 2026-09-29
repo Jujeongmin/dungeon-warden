@@ -2231,7 +2231,8 @@ button.primary {
   line-height: 1.5;
 }
 .boon-card img { width: 52px; height: 52px; image-rendering: pixelated; }
-.boon-card b { color: var(--accent); font-size: var(--fs-md); }
+.boon-card b { color: var(--accent); font-size: var(--fs-md); word-break: keep-all; }
+.boon-card span { word-break: keep-all; }
 .boon-card span { color: var(--muted); font-size: var(--fs-xs); }
 
 @media (max-height: 520px) {
