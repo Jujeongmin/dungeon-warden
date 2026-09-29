@@ -2663,6 +2663,18 @@ export class DungeonRenderer {
     c.addEventListener("pointerup", this.onPointerUp);
     c.addEventListener("pointercancel", this.onPointerUp);
     c.addEventListener("pointerleave", this.onPointerLeave);
+    /*
+     * A touch that is never released leaves the board thinking a finger is
+     * still down, and the next single touch counts as the second one: the
+     * board only pinched and would not place anything. It happened when the
+     * canvas lost the pointer capture - a dialog or a banner appearing as a
+     * wave ended - because the `pointerup` then goes somewhere else. So the
+     * end of a pointer is also heard on the window, and losing the capture
+     * ends it too.
+     */
+    c.addEventListener("lostpointercapture", this.onPointerLost);
+    window.addEventListener("pointerup", this.onPointerLost, true);
+    window.addEventListener("pointercancel", this.onPointerLost, true);
     c.addEventListener("wheel", this.onWheel, { passive: false });
     c.addEventListener("contextmenu", (e) => e.preventDefault());
   }
@@ -2743,6 +2755,25 @@ export class DungeonRenderer {
       if (tile) this.callbacks.onTileTap(tile.x, tile.y);
     }
 
+    if (this.activePointers.size === 0) {
+      this.dragStart = null;
+      this.dragMoved = false;
+      this.pinchStartDistance = 0;
+    }
+  };
+
+  /**
+   * A pointer that ended somewhere this canvas did not hear about.
+   *
+   * Only bookkeeping: it never counts as a tap, because a pointer that ended
+   * off the board was not one. See attachPointerEvents.
+   */
+  private onPointerLost = (e: PointerEvent): void => {
+    // The canvas's own handler deals with a pointer that ended on it, and it
+    // is the one that can still count as a tap.
+    if (e.type !== "lostpointercapture" && e.target === this.canvas) return;
+    if (!this.activePointers.has(e.pointerId)) return;
+    this.activePointers.delete(e.pointerId);
     if (this.activePointers.size === 0) {
       this.dragStart = null;
       this.dragMoved = false;
@@ -2869,6 +2900,9 @@ export class DungeonRenderer {
     c.removeEventListener("pointerup", this.onPointerUp);
     c.removeEventListener("pointercancel", this.onPointerUp);
     c.removeEventListener("pointerleave", this.onPointerLeave);
+    c.removeEventListener("lostpointercapture", this.onPointerLost);
+    window.removeEventListener("pointerup", this.onPointerLost, true);
+    window.removeEventListener("pointercancel", this.onPointerLost, true);
     c.removeEventListener("wheel", this.onWheel);
 
     this.disposeInstanced();

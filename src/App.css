@@ -1744,6 +1744,35 @@ button.primary {
 }
 
 /* ---------------------------------------------------------------------------
+   The pointer, cut from the same bone as everything else.
+
+   Only where there is a real pointer to replace: a phone has none, and a
+   custom cursor on a touch screen is a picture nobody sees. The arrow is a
+   bone blade; anything that can be pressed lights it the torch colour, and a
+   tool being dragged out of the panel carries the lit one across the board.
+   --------------------------------------------------------------------------- */
+@media (pointer: fine) {
+  .app,
+  .app canvas.viewport,
+  .rotate-guard {
+    cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2728%27%20height%3D%2728%27%20viewBox%3D%270%200%2028%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8.5%2016%20L12%2025%20L16%2023.5%20L12.5%2015%20L20%2014.5%20Z%27%20fill%3D%27%23e6dcc6%27%20stroke%3D%27%231b1611%27%20stroke-width%3D%272.2%27%20stroke-linejoin%3D%27round%27%2F%3E%3Cpath%20d%3D%27M5%206%20L5%2016%20L8.5%2013%20L10.5%2018%27%20fill%3D%27none%27%20stroke%3D%27%23e6dcc6%27%20stroke-width%3D%271%27%20opacity%3D%27.55%27%2F%3E%3C%2Fsvg%3E") 3 2, default;
+  }
+
+  .app button:not(:disabled),
+  .app a,
+  .app input[type="range"],
+  .app select {
+    cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2728%27%20height%3D%2728%27%20viewBox%3D%270%200%2028%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8.5%2016%20L12%2025%20L16%2023.5%20L12.5%2015%20L20%2014.5%20Z%27%20fill%3D%27%23f0b660%27%20stroke%3D%27%231b1611%27%20stroke-width%3D%272.2%27%20stroke-linejoin%3D%27round%27%2F%3E%3Cpath%20d%3D%27M5%206%20L5%2016%20L8.5%2013%20L10.5%2018%27%20fill%3D%27none%27%20stroke%3D%27%23f0b660%27%20stroke-width%3D%271%27%20opacity%3D%27.55%27%2F%3E%3C%2Fsvg%3E") 3 2, pointer;
+  }
+
+  .app.dragging,
+  .app.dragging canvas.viewport,
+  .app.dragging button:not(:disabled) {
+    cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2728%27%20height%3D%2728%27%20viewBox%3D%270%200%2028%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8.5%2016%20L12%2025%20L16%2023.5%20L12.5%2015%20L20%2014.5%20Z%27%20fill%3D%27%23f0b660%27%20stroke%3D%27%231b1611%27%20stroke-width%3D%272.2%27%20stroke-linejoin%3D%27round%27%2F%3E%3Cpath%20d%3D%27M5%206%20L5%2016%20L8.5%2013%20L10.5%2018%27%20fill%3D%27none%27%20stroke%3D%27%23f0b660%27%20stroke-width%3D%271%27%20opacity%3D%27.55%27%2F%3E%3C%2Fsvg%3E") 3 2, grabbing;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Landscape.
 
    The game is one 9:16 column. On a desktop that is a tall pane in the middle

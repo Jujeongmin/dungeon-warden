@@ -87,7 +87,7 @@ export const zhHant: Record<StringKey, string> = {
   guide_basics_4: "**波次** 按下「下一波」敵人才會進入。波次進行中也可以建造和升級。",
   guide_more: "其他",
   guide_more_1: "**倍速** 1×、2×免費，3×在商店解鎖。",
-  guide_more_2: "**操作** 從建造列表把塔或陷阱拖到空格子上放下。只點擊不會放置，不會誤放到別處。",
+  guide_more_2: "**操作** 從建造列表把塔或陷阱拖到空格子上放下。只點擊不會放置，不會誤放到別處。 用手指拖曳時會放在手指上方一格，避免被手指擋住。",
   guide_more_3: "**離開** 波次開始後按兩次主頁鍵，本局就此結束並記錄。",
   tower_warrior_note: "均衡型 · 單體攻擊",
   tower_mage_note: "較慢但範圍攻擊",

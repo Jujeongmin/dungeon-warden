@@ -86,7 +86,7 @@ export const en: Record<StringKey, string> = {
   guide_basics_4: "**Waves** Nothing comes in until you press Next wave. You can build and upgrade while a wave is on.",
   guide_more: "More",
   guide_more_1: "**Speed** 1× and 2× are free; 3× is in the shop.",
-  guide_more_2: "**Controls** Drag a tower or trap from the build list onto an empty tile. A tap alone never places anything, so nothing lands where you did not mean it to.",
+  guide_more_2: "**Controls** Drag a tower or trap from the build list onto an empty tile. A tap alone never places anything, so nothing lands where you did not mean it to. On a touch screen it lands on the tile lit just above your finger, so the finger never covers it.",
   guide_more_3: "**Leaving** Once a wave has started, pressing home twice ends the run there, and it counts.",
   tower_warrior_note: "All-rounder · one at a time",
   tower_mage_note: "Slow, hits an area",

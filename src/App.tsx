@@ -51,6 +51,21 @@ const TOWER_SOUND: Partial<Record<TowerType, Cue>> = {
 /** How long a refusal stays on the hint line. */
 const REFUSAL_MS = 2200;
 
+/**
+ * How far above a finger the tile being placed on sits, in pixels.
+ *
+ * A thumb covers the tile under it, so on a touch screen the drag aims at a
+ * tile a little higher up - the one lit on the board - and that is where the
+ * tower lands. A mouse points at what it covers nothing of, so it aims at
+ * itself.
+ */
+const TOUCH_LIFT = 56;
+
+/** Where a drag is aiming: above the finger, or exactly at the cursor. */
+function aimPoint(e: { clientX: number; clientY: number; pointerType: string }): { x: number; y: number } {
+  return { x: e.clientX, y: e.clientY - (e.pointerType === "mouse" ? 0 : TOUCH_LIFT) };
+}
+
 const TRAP_TYPES: TrapType[] = ["spike", "arrow", "rockfall", "flame", "web", "poison", "rune"];
 
 type Tool = { kind: "tower"; type: TowerType } | { kind: "trap"; type: TrapType };
@@ -107,7 +122,15 @@ export default function App() {
   const [homeArmed, setHomeArmed] = useState(false);
   /** An ad is showing: the run waits, and the button cannot be pressed twice. */
   /** The tool being dragged out of the build panel, if one is. */
+  /** The tool being dragged out of the build panel; drives the cursor. */
   const [dragging, setDragging] = useState<Tool | null>(null);
+  // Read inside the pointer handlers: the first move can arrive before React
+  // has re-rendered with the state above.
+  const draggingRef = useRef<Tool | null>(null);
+  const beginDrag = (tool: Tool | null) => {
+    draggingRef.current = tool;
+    setDragging(tool);
+  };
   const [adShowing, setAdShowing] = useState(false);
   /** Bumped after an ad attempt: the SDK may now say this host shows none. */
   const [adTry, setAdTry] = useState(0);
@@ -414,8 +437,8 @@ export default function App() {
   };
 
   /** Puts down what was dragged, wherever the pointer let go. */
-  const dropTool = (dropped: Tool, clientX: number, clientY: number) => {
-    const tile = rendererRef.current?.tileAt(clientX, clientY) ?? null;
+  const dropTool = (dropped: Tool, at: { x: number; y: number }) => {
+    const tile = rendererRef.current?.tileAt(at.x, at.y) ?? null;
     if (!tile) return;
     const outcome =
       dropped.kind === "tower"
@@ -534,7 +557,7 @@ export default function App() {
 
   return (
     <LocaleProvider locale={settings.locale}>
-      <div className="app">
+      <div className={dragging ? "app dragging" : "app"}>
         <canvas ref={canvasRef} className="viewport" />
 
         {screen === "title" && (
@@ -692,27 +715,35 @@ export default function App() {
                           audio.play("click");
                           setToolId(entry.id);
                           setSelection(null);
-                          setDragging(entry.tool);
+                          beginDrag(entry.tool);
                           e.currentTarget.setPointerCapture(e.pointerId);
                         }}
                         onPointerMove={(e) => {
-                          if (!dragging) return;
+                          if (!draggingRef.current) return;
                           // The button holds the pointer, so the board is told
                           // by hand which tile is under it.
-                          const tile = rendererRef.current?.tileAt(e.clientX, e.clientY) ?? null;
+                          const at = aimPoint(e);
+                          const tile = rendererRef.current?.tileAt(at.x, at.y) ?? null;
                           rendererRef.current?.hoverTile(tile);
                           setHover(tile);
                         }}
                         onPointerUp={(e) => {
-                          if (!dragging) return;
-                          const dropped = dragging;
-                          setDragging(null);
+                          if (!draggingRef.current) return;
+                          const dropped = draggingRef.current;
+                          beginDrag(null);
                           rendererRef.current?.hoverTile(null);
                           setHover(null);
-                          dropTool(dropped, e.clientX, e.clientY);
+                          dropTool(dropped, aimPoint(e));
+                        }}
+                        onLostPointerCapture={() => {
+                          // The button stopped hearing the finger: drop the drag
+                          // rather than leaving a ghost on the board.
+                          beginDrag(null);
+                          rendererRef.current?.hoverTile(null);
+                          setHover(null);
                         }}
                         onPointerCancel={() => {
-                          setDragging(null);
+                          beginDrag(null);
                           rendererRef.current?.hoverTile(null);
                           setHover(null);
                         }}
