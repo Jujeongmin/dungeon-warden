@@ -104,6 +104,8 @@ interface Result {
   souls: number | null;
   improved: boolean;
   saved: boolean | null;
+  /** The server's reason, when saving failed. */
+  failure?: string;
 }
 
 export default function App() {
@@ -390,11 +392,11 @@ export default function App() {
     const pending: Result = { wavesCleared: finished.wavesCleared, souls: null, improved: false, saved: null };
     setResult(pending);
     void progress.finishRun(finished.wavesCleared).then((saved) => {
-      setResult((current) =>
-        current === pending
-          ? { ...current, souls: saved?.souls ?? 0, improved: saved?.improved ?? false, saved: saved !== null }
-          : current,
-      );
+      setResult((current) => {
+        if (current !== pending) return current;
+        if ("failed" in saved) return { ...current, souls: 0, improved: false, saved: false, failure: saved.failed };
+        return { ...current, souls: saved.souls, improved: saved.improved, saved: true };
+      });
     });
   };
 
@@ -733,7 +735,7 @@ export default function App() {
                         disabled={locked}
                         onPointerDown={(e) => {
                           if (locked) return;
-                          audio.play("click");
+                          // No sound yet: this touch may be the start of a scroll.
                           setToolId(entry.id);
                           setSelection(null);
                           beginDrag(entry.tool);
@@ -754,7 +756,10 @@ export default function App() {
                           beginDrag(null);
                           rendererRef.current?.hoverTile(null);
                           setHover(null);
-                          dropTool(dropped, aimPoint(e));
+                          const at = aimPoint(e);
+                          // Let go off the board: it was a tap that picked the tool.
+                          if (!rendererRef.current?.tileAt(at.x, at.y)) audio.play("click");
+                          else dropTool(dropped, at);
                         }}
                         onLostPointerCapture={() => {
                           // The button stopped hearing the finger: drop the drag
@@ -910,6 +915,8 @@ export default function App() {
             souls={result.souls}
             improved={result.improved}
             saved={result.saved}
+            failure={result.failure}
+            bestWaves={best}
             onRetry={() => void beginRun()}
             onResearch={() => setResearchOpen(true)}
             onTitle={toTitle}

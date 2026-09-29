@@ -867,8 +867,11 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
 }
 
 .tool {
-  /* Dragged onto the board: the finger must not scroll the panel instead. */
-  touch-action: none;
+  /* Up and down scrolls the list; sideways - towards the board - is a drag.
+     \`none\` here left a list made of buttons that no finger could scroll.
+     When the browser takes a vertical swipe for itself it cancels the
+     pointer, and the drag is dropped with it. */
+  touch-action: pan-y;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

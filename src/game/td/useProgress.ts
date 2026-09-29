@@ -37,6 +37,12 @@ const LOCAL_KEY = "dungeon-warden:endless-progress";
 /** The offline preview's run in progress: waves checkpointed, for a closed tab. */
 const LOCAL_RUN_KEY = "dungeon-warden:endless-run";
 
+/** How many times a run's end is sent before it is given up as lost. */
+const FINISH_ATTEMPTS = 4;
+
+/** Errors that are the server refusing a run, not the line dropping: never retried. */
+const SERVER_REFUSALS = ["RUN_TOO_FAST", "NO_RUN_OPEN", "BAD_WAVES"];
+
 function readLocalRun(): number {
   try {
     return Number(window.localStorage.getItem(LOCAL_RUN_KEY)) || 0;
@@ -189,19 +195,34 @@ export function useProgress() {
 
   /** Closes a run. Null when the server would not record it. */
   const finishRun = useCallback(
-    async (wavesCleared: number): Promise<RunResult | null> => {
+    async (wavesCleared: number): Promise<RunResult | { failed: string }> => {
       if (!HAS_VERSE) {
         writeLocalRun(null);
         return settleLocal(wavesCleared);
       }
-      try {
-        const result: RunResult & { progress: Progress } = await server.remoteFunction("finishRun", [{ wavesCleared }]);
-        update(fromServer(result.progress));
-        return { souls: result.souls, improved: result.improved };
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-        return null;
+      /*
+       * A phone drops its socket when the app goes to the background or the
+       * screen sleeps, and reconnects a moment later - and a run that ends
+       * in that moment used to be reported lost. So a failure that is not
+       * the server refusing the run is tried again a few times, a little
+       * further apart each time. A refusal is final and is not retried.
+       */
+      let message = "";
+      for (let attempt = 0; attempt < FINISH_ATTEMPTS; attempt++) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+        try {
+          const result: RunResult & { progress: Progress } = await server.remoteFunction("finishRun", [{ wavesCleared }]);
+          update(fromServer(result.progress));
+          return { souls: result.souls, improved: result.improved };
+        } catch (e) {
+          message = e instanceof Error ? e.message : String(e);
+          if (SERVER_REFUSALS.some((code) => message.includes(code))) break;
+        }
       }
+      // The reason goes on the result screen, so a refusal can be told from
+      // a connection that never came back.
+      setError(message);
+      return { failed: message };
     },
     [server, update, settleLocal],
   );

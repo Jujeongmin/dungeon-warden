@@ -119,7 +119,7 @@ export const zhHant: Record<StringKey, string> = {
   refuse_fixed: "入口和核心不能建造",
   refuse_over: "本局已結束",
   stage_new_best: "新紀錄！",
-  stage_not_saved: "結果未能保存",
+  stage_not_saved: "未能把紀錄傳送到伺服器。靈魂會在下一局開始時，按最後通過的關卡結算",
   stage_retry: "重試",
   research_note: "用靈魂購買的永久強化。每局結束時，每突破一關獲得一個靈魂。",
   research_needs: "需要：{list}",
@@ -240,4 +240,5 @@ export const zhHant: Record<StringKey, string> = {
   boon_thick_walls_n: "生命+1",
   wave_early: "提前 +{n}金幣",
   guide_waves_6: "**提前召喚** 上一波敵人還在場時召喚下一波，每個還活著的敵人給{n}金幣。代價是同時應付兩波。",
+  stage_short_of_best: "未達到最高紀錄（第{stage}關 · 第{wave}波）",
 };

@@ -118,7 +118,7 @@ export const en: Record<StringKey, string> = {
   refuse_fixed: "Not on the door or the core",
   refuse_over: "This run is over",
   stage_new_best: "New best!",
-  stage_not_saved: "The result could not be saved",
+  stage_not_saved: "The run could not be sent to the server. Its souls are paid up to the last stage cleared when the next run starts",
   stage_retry: "Retry",
   research_note: "Lasting upgrades bought with souls. A run pays one soul per stage it gets past.",
   research_needs: "Needs: {list}",
@@ -239,4 +239,5 @@ export const en: Record<StringKey, string> = {
   boon_thick_walls_n: "One more life",
   wave_early: "Early +{n}G",
   guide_waves_6: "**Calling early** Call the next wave while the last one is still in the room and it pays {n} gold for every adventurer still standing - two waves at once, for the gold.",
+  stage_short_of_best: "Short of your best (stage {stage} · wave {wave})",
 };

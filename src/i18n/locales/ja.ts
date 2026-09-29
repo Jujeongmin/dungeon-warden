@@ -124,7 +124,7 @@ export const ja: Record<StringKey, string> = {
   refuse_fixed: "入口とコアには置けません",
   refuse_over: "このプレイは終わりました",
   stage_new_best: "自己ベスト更新！",
-  stage_not_saved: "記録を保存できませんでした",
+  stage_not_saved: "記録をサーバーに送れませんでした。魂は次のプレイ開始時に、最後に突破したステージまで精算されます",
   stage_retry: "もう一度",
   research_note: "魂で買う永続強化。挑戦の終わりに、突破したステージ数だけ魂を得る。",
   research_needs: "必要: {list}",
@@ -245,4 +245,5 @@ export const ja: Record<StringKey, string> = {
   boon_thick_walls_n: "ライフ+1",
   wave_early: "早出し +{n}G",
   guide_waves_6: "**早出し** 前のウェーブの敵が残っているうちに次を呼ぶと、残っている敵1体につきゴールド{n}がもらえます。2つのウェーブを同時に相手する代わりの報酬です。",
+  stage_short_of_best: "最高記録（ステージ{stage}・ウェーブ{wave}）には届きませんでした",
 };

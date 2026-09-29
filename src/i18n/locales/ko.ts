@@ -117,7 +117,7 @@ export const ko = {
   refuse_fixed: "입구와 코어에는 지을 수 없어요",
   refuse_over: "이번 판이 끝났어요",
   stage_new_best: "새 최고 기록!",
-  stage_not_saved: "기록을 저장하지 못했어요",
+  stage_not_saved: "서버에 기록을 보내지 못했어요. 영혼은 다음 판을 시작할 때 마지막으로 깬 스테이지까지 정산돼요",
   stage_retry: "다시 하기",
   research_note: "영혼으로 사는 영구 강화예요. 영혼은 판이 끝날 때 돌파한 스테이지 수만큼 받아요.",
   research_needs: "먼저 필요: {list}",
@@ -238,4 +238,5 @@ export const ko = {
   boon_thick_walls_n: "목숨 +1",
   wave_early: "서두르기 +{n}G",
   guide_waves_6: "**서두르기** 이전 웨이브의 적이 아직 남아 있을 때 다음 웨이브를 부르면, 남아 있는 적 한 명당 골드 {n}을 받아요. 한 번에 두 웨이브를 상대하는 대신 골드를 버는 셈이에요.",
+  stage_short_of_best: "최고 기록(스테이지 {stage} · 웨이브 {wave})에는 도달하지 못했어요",
 };

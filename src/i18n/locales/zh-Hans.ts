@@ -119,7 +119,7 @@ export const zhHans: Record<StringKey, string> = {
   refuse_fixed: "入口和核心不能建造",
   refuse_over: "本局已结束",
   stage_new_best: "新纪录！",
-  stage_not_saved: "结果未能保存",
+  stage_not_saved: "未能把记录发送到服务器。灵魂会在下一局开始时，按最后通过的关卡结算",
   stage_retry: "重试",
   research_note: "用灵魂购买的永久强化。每局结束时，每突破一关获得一个灵魂。",
   research_needs: "需要：{list}",
@@ -240,4 +240,5 @@ export const zhHans: Record<StringKey, string> = {
   boon_thick_walls_n: "生命+1",
   wave_early: "提前 +{n}金币",
   guide_waves_6: "**提前召唤** 上一波敌人还在场时召唤下一波，每个还活着的敌人给{n}金币。代价是同时应付两波。",
+  stage_short_of_best: "未达到最高纪录（第{stage}关 · 第{wave}波）",
 };

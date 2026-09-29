@@ -9,6 +9,10 @@ interface Props {
   souls: number | null;
   improved: boolean;
   saved: boolean | null;
+  /** The server's reason when saving failed, shown so it can be reported. */
+  failure?: string;
+  /** The account's best, to say how far short a run fell. */
+  bestWaves: number;
   onRetry: () => void;
   onResearch: () => void;
   onTitle: () => void;
@@ -24,7 +28,7 @@ interface Props {
 
 /** The end of a run: how far it got, what it earned, and the way back in. */
 export function StageResultDialog({
-  stage, wave, wavesCleared, souls, improved, saved, onRetry, onResearch, onTitle, nickname, onRename,
+  stage, wave, wavesCleared, souls, improved, saved, failure, bestWaves, onRetry, onResearch, onTitle, nickname, onRename,
 }: Props) {
   const t = useT();
   const [name, setName] = useState(nickname ?? "");
@@ -46,7 +50,17 @@ export function StageResultDialog({
         <p className="modal-note">{t("run_cleared", { n: wavesCleared })}</p>
         {souls !== null && <p className="modal-note owned">{t("run_souls", { n: souls })}</p>}
         {improved && <p className="modal-note owned">{t("stage_new_best")}</p>}
-        {saved === false && <p className="modal-note error">{t("stage_not_saved")}</p>}
+        {saved === true && !improved && bestWaves > 0 && (
+          <p className="modal-note">
+            {t("stage_short_of_best", { stage: Math.floor(bestWaves / 5) + 1, wave: (bestWaves % 5) + 1 })}
+          </p>
+        )}
+        {saved === false && (
+          <p className="modal-note error">
+            {t("stage_not_saved")}
+            {failure ? ` (${failure})` : ""}
+          </p>
+        )}
 
         {asking && (
           <div className="rank-name">
