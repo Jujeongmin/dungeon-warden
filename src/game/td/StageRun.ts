@@ -2,6 +2,7 @@ import { blockedKey } from "../arena";
 import { findPath, type Point } from "../sim/pathfinding";
 import { TRAP_STATS } from "../sim/traps";
 import { TRAP_COST, type AdventurerClass, type TrapType } from "../types";
+import { addBoon, emptyBoons, type Boon, type BoonState } from "./boons";
 import { CHAMPION_LIVES, ENEMIES, enemyBounty, enemyHp } from "./enemies";
 import type { ResearchEffects } from "./research";
 import {
@@ -16,7 +17,7 @@ import {
 import {
   MAX_TOWER_LEVEL,
   SLOW_SECONDS,
-  sellValue,
+  SELL_REFUND,
   towerStats,
   upgradeCost,
   TOWERS,
@@ -165,6 +166,8 @@ export class StageRun {
   status: RunStatus = "build";
   /** Whether this run's one ad reward has been taken. */
   adGoldClaimed = false;
+  /** What the cards taken at each stage cleared add up to. See boons.ts. */
+  readonly boons: BoonState = emptyBoons();
 
   towers: RunTower[] = [];
   traps: RunTrap[] = [];
@@ -218,6 +221,34 @@ export class StageRun {
   dugTiles(): Point[] {
     const w = this.stage.arena.w;
     return [...this.dug].map((k) => ({ x: k % w, y: Math.floor(k / w) }));
+  }
+
+  /** What a tower costs to place, or null past the top level. */
+  towerPrice(type: TowerType, level = 0): number | null {
+    const cost = TOWERS[type].cost[level];
+    if (cost === undefined) return null;
+    return Math.max(1, Math.round(cost * this.boons.towerCost));
+  }
+
+  trapPrice(type: TrapType): number {
+    return Math.max(1, Math.round(TRAP_COST[type] * this.boons.trapCost));
+  }
+
+  /** Gold back for a tower: the share of what it actually cost this run. */
+  towerRefund(type: TowerType, level: number): number {
+    let spent = 0;
+    for (let i = 0; i < Math.min(MAX_TOWER_LEVEL, level); i++) spent += this.towerPrice(type, i) ?? 0;
+    return Math.floor(spent * SELL_REFUND);
+  }
+
+  /**
+   * Takes one of the cards a cleared stage offered: its effect lasts the run.
+   * Gold and lives are paid here; everything else is read as it is used.
+   */
+  takeBoon(boon: Boon): void {
+    addBoon(this.boons, boon);
+    if (boon.instantGold) this.gold += boon.instantGold;
+    if (boon.lives) this.lives += boon.lives;
   }
 
   towerAt(x: number, y: number): RunTower | undefined {
@@ -321,7 +352,7 @@ export class StageRun {
     if (this.isRubble(x, y)) return "rubble";
     if (this.isFixed(x, y)) return "fixed";
     if (this.towerAt(x, y) || this.trapAt(x, y)) return "taken";
-    const cost = kind === "tower" ? TOWERS[type as TowerType].cost[0] : TRAP_COST[type as TrapType];
+    const cost = kind === "tower" ? (this.towerPrice(type as TowerType) ?? 0) : this.trapPrice(type as TrapType);
     if (this.gold < cost) return "gold";
     if (kind === "tower") {
       if (this.occupied(x, y)) return "occupied";
@@ -342,7 +373,7 @@ export class StageRun {
     if (this.isRubble(x, y)) return { ok: false, reason: "rubble" };
     if (this.isFixed(x, y)) return { ok: false, reason: "fixed" };
     if (this.towerAt(x, y) || this.trapAt(x, y)) return { ok: false, reason: "taken" };
-    const cost = TOWERS[type].cost[0];
+    const cost = this.towerPrice(type) ?? 0;
     if (this.gold < cost) return { ok: false, reason: "gold" };
     if (this.occupied(x, y)) return { ok: false, reason: "occupied" };
     if (!this.keepsWay(x, y)) return { ok: false, reason: "blocks" };
@@ -359,8 +390,10 @@ export class StageRun {
     const tower = this.towers.find((t) => t.id === id);
     if (!tower) return { ok: false, reason: "not_dug" };
     if (this.status === "won" || this.status === "lost") return { ok: false, reason: "over" };
-    const cost = upgradeCost(tower.type, tower.level);
-    if (cost === null || tower.level >= MAX_TOWER_LEVEL) return { ok: false, reason: "max_level" };
+    if (tower.level >= MAX_TOWER_LEVEL || upgradeCost(tower.type, tower.level) === null) {
+      return { ok: false, reason: "max_level" };
+    }
+    const cost = this.towerPrice(tower.type, tower.level) ?? 0;
     if (this.gold < cost) return { ok: false, reason: "gold" };
     this.gold -= cost;
     tower.level += 1;
@@ -380,7 +413,7 @@ export class StageRun {
     if (index < 0) return { ok: false, reason: "not_dug" };
     if (this.status === "won" || this.status === "lost") return { ok: false, reason: "over" };
     const tower = this.towers[index];
-    this.gold += sellValue(tower.type, tower.level);
+    this.gold += this.towerRefund(tower.type, tower.level);
     this.towers.splice(index, 1);
     this.reroute();
     return { ok: true };
@@ -393,7 +426,7 @@ export class StageRun {
     if (this.isRubble(x, y)) return { ok: false, reason: "rubble" };
     if (this.isFixed(x, y)) return { ok: false, reason: "fixed" };
     if (this.towerAt(x, y) || this.trapAt(x, y)) return { ok: false, reason: "taken" };
-    const cost = TRAP_COST[type];
+    const cost = this.trapPrice(type);
     if (this.gold < cost) return { ok: false, reason: "gold" };
     this.gold -= cost;
     this.seq += 1;
@@ -405,7 +438,7 @@ export class StageRun {
     const index = this.traps.findIndex((t) => t.id === id);
     if (index < 0) return { ok: false, reason: "not_dug" };
     if (this.status === "won" || this.status === "lost") return { ok: false, reason: "over" };
-    this.gold += Math.floor(TRAP_COST[this.traps[index].type] * 0.7);
+    this.gold += Math.floor(this.trapPrice(this.traps[index].type) * 0.7);
     this.traps.splice(index, 1);
     return { ok: true };
   }
@@ -570,11 +603,12 @@ export class StageRun {
       if (tower.cooldown > 0) continue;
       const stats = towerStats(tower.type, tower.level);
       if (stats.haste) continue;
+      const reach = stats.range + this.boons.range;
       // The one nearest the core that is in reach: the classic "first".
       let target: RunEnemy | null = null;
       let best = Infinity;
       for (const enemy of this.enemies) {
-        if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) > stats.range) continue;
+        if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) > reach) continue;
         const left = this.distanceLeft(enemy);
         if (left < best) {
           best = left;
@@ -582,15 +616,15 @@ export class StageRun {
         }
       }
       if (!target) continue;
-      tower.cooldown = stats.interval / (1 + this.hasteFor(tower));
+      tower.cooldown = stats.interval / (1 + this.hasteFor(tower) + this.boons.haste);
       this.events.push({ kind: "fired", towerId: tower.id, type: tower.type, x: tower.x, y: tower.y });
       tower.facing = Math.atan2(target.x - tower.x, target.y - tower.y);
       tower.attackUntil = this.time + ATTACK_POSE_SECONDS;
-      const damage = stats.damage * this.effects.towerDamageScale;
+      const damage = stats.damage * this.effects.towerDamageScale * this.boons.damage[tower.type];
       const from = { x: tower.x, y: tower.y };
       if (stats.cleave) {
         for (const enemy of [...this.enemies]) {
-          if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) > stats.range) continue;
+          if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) > reach) continue;
           this.hurt(enemy, damage, "tower");
         }
       } else if (stats.splash) {
@@ -603,8 +637,8 @@ export class StageRun {
       } else {
         if (stats.slow !== undefined) {
           const active = target.slowUntil > this.time ? target.slowFactor : 1;
-          target.slowFactor = Math.min(active, stats.slow);
-          target.slowUntil = this.time + SLOW_SECONDS;
+          target.slowFactor = Math.min(active, Math.max(0.1, stats.slow - this.boons.chillSlow));
+          target.slowUntil = this.time + SLOW_SECONDS + this.boons.chillSeconds;
         }
         this.hurt(target, damage, "tower", from);
       }
@@ -616,7 +650,7 @@ export class StageRun {
       trap.cooldown = Math.max(0, trap.cooldown - dt);
       if (trap.cooldown > 0) continue;
       const stats = TRAP_STATS[trap.type];
-      const scale = this.effects.trapDamageScale;
+      const scale = this.effects.trapDamageScale * this.boons.trapDamage;
       if (stats.range > 0) {
         // Shoots: the one nearest the core within reach.
         let target: RunEnemy | null = null;
@@ -650,8 +684,9 @@ export class StageRun {
       for (const enemy of hit) {
         trap.hit.add(enemy.id);
         const resist = ENEMIES[enemy.cls].trapResistance;
-        if (stats.burn) enemy.burn = { dps: stats.burn.dps * scale * resist, until: this.time + stats.burn.duration };
-        if (stats.poison) enemy.poison = { dps: stats.poison.dps * scale * resist, until: this.time + stats.poison.duration };
+        const dot = this.boons.dotSeconds;
+        if (stats.burn) enemy.burn = { dps: stats.burn.dps * scale * resist, until: this.time + stats.burn.duration * dot };
+        if (stats.poison) enemy.poison = { dps: stats.poison.dps * scale * resist, until: this.time + stats.poison.duration * dot };
         if (stats.slow) {
           const active = enemy.slowUntil > this.time ? enemy.slowFactor : 1;
           enemy.slowFactor = Math.min(active, stats.slow.factor);
@@ -695,7 +730,7 @@ export class StageRun {
     enemy.hp -= amount;
     this.events.push({ kind: "damage", targetId: enemy.id, amount, x: enemy.x, y: enemy.y, source, from });
     if (enemy.hp > 0) return;
-    const bounty = enemyBounty(enemy.cls, enemy.level, enemy.champion);
+    const bounty = Math.round(enemyBounty(enemy.cls, enemy.level, enemy.champion) * this.boons.killGold);
     this.gold += bounty;
     this.events.push({ kind: "killed", targetId: enemy.id, x: enemy.x, y: enemy.y, bounty });
     this.remove(enemy);
@@ -706,7 +741,7 @@ export class StageRun {
     if (index >= 0) this.enemies.splice(index, 1);
     this.remaining[enemy.wave] -= 1;
     if (this.remaining[enemy.wave] === 0) {
-      const bonus = waveBonus(enemy.wave);
+      const bonus = waveBonus(enemy.wave) + this.boons.waveBonus;
       this.gold += bonus;
       this.events.push({ kind: "waveCleared", wave: enemy.wave, bonus });
       if (enemy.wave % WAVES_PER_STAGE === WAVES_PER_STAGE - 1) {

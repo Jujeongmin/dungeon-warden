@@ -3,6 +3,7 @@ import { StageRun } from "../src/game/td/StageRun";
 import { researchEffects, RESEARCH } from "../src/game/td/research";
 import { ENDLESS, endlessStage, type Stage } from "../src/game/td/stages";
 import { findPath } from "../src/game/sim/pathfinding";
+import { BOONS_BY_ID, dealBoons } from "../src/game/td/boons";
 import type { TowerType } from "../src/game/td/towers";
 
 const everything = researchEffects(RESEARCH.map((n) => n.id));
@@ -213,5 +214,49 @@ describe("the ad reward", () => {
     const over = new StageRun(corridor(1), everything);
     over.status = "lost";
     expect(over.claimAdGold()).toBe(false);
+  });
+});
+
+describe("stage rewards", () => {
+  it("deals three different cards", () => {
+    const hand = dealBoons();
+    expect(hand).toHaveLength(3);
+    expect(new Set(hand.map((b) => b.id)).size).toBe(3);
+  });
+
+  it("pays gold and lives at once, and changes what things cost", () => {
+    const run = new StageRun(corridor(1), everything);
+    const gold = run.gold;
+    const lives = run.lives;
+    run.takeBoon(BOONS_BY_ID.get("hoard")!);
+    run.takeBoon(BOONS_BY_ID.get("thick_walls")!);
+    expect(run.gold).toBe(gold + 120);
+    expect(run.lives).toBe(lives + 1);
+
+    const full = run.towerPrice("warrior")!;
+    run.takeBoon(BOONS_BY_ID.get("cheap_bones")!);
+    expect(run.towerPrice("warrior")).toBe(Math.round(full * 0.8));
+    // A cheaper tower must also refund less, or buying and selling would pay.
+    run.placeTower("warrior", 1, 3);
+    expect(run.towerRefund("warrior", 1)).toBeLessThan(full);
+  });
+
+  it("makes the towers a card names hit harder", () => {
+    const shots = (boon: boolean) => {
+      const run = new StageRun(corridor(1), everything);
+      if (boon) run.takeBoon(BOONS_BY_ID.get("bone_arrows")!);
+      run.towers.push(tower("warrior", 0, 3));
+      run.enemies.push({
+        id: "dummy", cls: "knight", level: 1, champion: false, wave: 0, x: 1, y: 3,
+        hp: 1e9, maxHp: 1e9, route: [{ x: 1, y: 3 }], next: 1, slowUntil: 0, slowFactor: 1, burn: null, poison: null, facing: 0,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (run as any).remaining = [99];
+      run.status = "wave";
+      return steps(run, 200)
+        .filter((e) => e.kind === "damage")
+        .reduce((sum, e) => sum + (e as { amount: number }).amount, 0);
+    };
+    expect(shots(true)).toBeGreaterThan(shots(false) * 1.2);
   });
 });

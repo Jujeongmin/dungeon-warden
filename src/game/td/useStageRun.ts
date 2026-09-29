@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TrapType } from "../types";
+import type { Boon } from "./boons";
 import type { ResearchEffects } from "./research";
 import { SIM_DT, StageRun, type BuildResult, type RunEvent } from "./StageRun";
 import type { Stage } from "./stages";
@@ -104,6 +105,12 @@ export function useStageRun(options: {
     placeTrap: (type: TrapType, x: number, y: number) => act((r) => r.placeTrap(type, x, y)),
     upgradeTower: (id: string) => act((r) => r.upgradeTower(id)),
     sellTower: (id: string) => act((r) => r.sellTower(id)),
+    takeBoon: (boon: Boon) => {
+      const run = runRef.current;
+      if (!run) return;
+      run.takeBoon(boon);
+      bump();
+    },
     claimAdGold: (): boolean => act((r) => (r.claimAdGold() ? { ok: true } : { ok: false, reason: "over" })).ok,
     sellTrap: (id: string) => act((r) => r.sellTrap(id)),
     startWave: (): boolean => {

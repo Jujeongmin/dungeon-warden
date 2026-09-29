@@ -2216,6 +2216,29 @@ button.primary {
 .floater.stage { color: var(--accent); font-family: var(--font-display); font-size: var(--fs-lg); animation-duration: 1.6s; }
 
 .modal.ranking { width: min(460px, 100%); }
+
+/* The three cards a cleared stage deals. Wide enough to read at a glance,
+   and they wrap to one column on a phone in landscape. */
+.modal.boons { max-width: 640px; }
+.boon-hand { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0 4px; }
+.boon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  text-align: center;
+  line-height: 1.5;
+}
+.boon-card img { width: 52px; height: 52px; image-rendering: pixelated; }
+.boon-card b { color: var(--accent); font-size: var(--fs-md); }
+.boon-card span { color: var(--muted); font-size: var(--fs-xs); }
+
+@media (max-height: 520px) {
+  .boon-card { padding: 8px 6px; }
+  .boon-card img { width: 36px; height: 36px; }
+}
+
 .modal-note.small { margin: 2px 0 6px; font-size: var(--fs-xs); }
 .rank-name { display: flex; gap: 6px; margin: 6px 0 8px; }
 .rank-name input { flex: 1; min-width: 0; }

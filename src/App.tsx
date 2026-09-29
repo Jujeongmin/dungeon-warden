@@ -8,6 +8,7 @@ import { loadSettings, pixelRatioFor, saveSettings, type Settings } from "./game
 import { TRAP_STATS } from "./game/sim/traps";
 import { researchEffects } from "./game/td/research";
 import { AD_GOLD, type Refusal, type RunEvent, type StageRun } from "./game/td/StageRun";
+import { BOONS_BY_ID, dealBoons, type Boon } from "./game/td/boons";
 import { endlessStage, WAVES_PER_STAGE, stageOfWave } from "./game/td/stages";
 import { MAX_TOWER_LEVEL, sellValue, TOWER_TYPES, TOWERS, towerStats, upgradeCost, type TowerType } from "./game/td/towers";
 import { tutorialFor } from "./game/td/tutorial";
@@ -23,6 +24,7 @@ import { Icon } from "./ui/Icon";
 import { IntroDialog } from "./ui/IntroDialog";
 import { ResearchDialog } from "./ui/ResearchDialog";
 import { SettingsDialog } from "./ui/SettingsDialog";
+import { BoonDialog } from "./ui/BoonDialog";
 import { StageResultDialog } from "./ui/StageResultDialog";
 import { RankingDialog } from "./ui/RankingDialog";
 import { TitleScreen } from "./ui/TitleScreen";
@@ -131,6 +133,8 @@ export default function App() {
     draggingRef.current = tool;
     setDragging(tool);
   };
+  /** The three cards a cleared stage is offering, and which stage it was. */
+  const [boonOffer, setBoonOffer] = useState<{ stage: number; hand: Boon[] } | null>(null);
   const [adShowing, setAdShowing] = useState(false);
   /** Bumped after an ad attempt: the SDK may now say this host shows none. */
   const [adTry, setAdTry] = useState(0);
@@ -220,6 +224,8 @@ export default function App() {
           audio.play("victory");
           void checkpointRef.current(run.wavesCleared);
           float(t("stage_cleared", { n: event.stage }), run.core.x, run.core.y - 3, "stage");
+          // The run waits on the cards: see BoonDialog.
+          setBoonOffer({ stage: event.stage, hand: dealBoons() });
         } else if (event.kind === "won" || event.kind === "lost") {
           finishRef.current(run);
         }
@@ -865,6 +871,19 @@ export default function App() {
               />
             )}
           </>
+        )}
+
+        {boonOffer && run && !result && (
+          <BoonDialog
+            stage={boonOffer.stage}
+            hand={boonOffer.hand}
+            taken={run.boons.taken.map((id) => BOONS_BY_ID.get(id)!).filter(Boolean)}
+            onPick={(boon) => {
+              audio.play("upgrade");
+              runner.takeBoon(boon);
+              setBoonOffer(null);
+            }}
+          />
         )}
 
         {result && (
