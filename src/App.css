@@ -867,6 +867,8 @@ button.danger { color: #ffb4a8; border-color: rgba(215, 106, 90, 0.45); }
 }
 
 .tool {
+  /* Dragged onto the board: the finger must not scroll the panel instead. */
+  touch-action: none;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

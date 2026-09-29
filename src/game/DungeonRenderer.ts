@@ -2485,6 +2485,22 @@ export class DungeonRenderer {
     if (!this.userAdjustedZoom) this.fitToArena();
   }
 
+  /**
+   * The tile under a screen point, for a drag that started off the canvas.
+   *
+   * A tool is dragged out of the build panel, so the panel's button holds the
+   * pointer and the canvas never hears the move: the drag asks for the tile
+   * itself, and says which one to light up.
+   */
+  tileAt(clientX: number, clientY: number): { x: number; y: number } | null {
+    return this.pointerToTile(clientX, clientY);
+  }
+
+  /** Lights a tile as though the pointer were over it. See tileAt. */
+  hoverTile(tile: { x: number; y: number } | null): void {
+    this.setHovered(tile);
+  }
+
   private pointerToTile(clientX: number, clientY: number): { x: number; y: number } | null {
     const rect = this.canvas.getBoundingClientRect();
     const ndc = new THREE.Vector2(

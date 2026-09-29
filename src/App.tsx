@@ -106,6 +106,8 @@ export default function App() {
   const [hudOpen, setHudOpen] = useState(true);
   const [homeArmed, setHomeArmed] = useState(false);
   /** An ad is showing: the run waits, and the button cannot be pressed twice. */
+  /** The tool being dragged out of the build panel, if one is. */
+  const [dragging, setDragging] = useState<Tool | null>(null);
   const [adShowing, setAdShowing] = useState(false);
   /** Bumped after an ad attempt: the SDK may now say this host shows none. */
   const [adTry, setAdTry] = useState(0);
@@ -406,12 +408,19 @@ export default function App() {
       setSelection({ kind: "trap", id: trap.id });
       return;
     }
-    if (selection) {
-      setSelection(null);
-      return;
-    }
-    if (!tool) return;
-    const outcome = tool.kind === "tower" ? runner.placeTower(tool.type, x, y) : runner.placeTrap(tool.type, x, y);
+    // Nothing else: building is a drag out of the panel, so a stray tap on
+    // the board can no longer drop a tower somewhere nobody meant.
+    if (selection) setSelection(null);
+  };
+
+  /** Puts down what was dragged, wherever the pointer let go. */
+  const dropTool = (dropped: Tool, clientX: number, clientY: number) => {
+    const tile = rendererRef.current?.tileAt(clientX, clientY) ?? null;
+    if (!tile) return;
+    const outcome =
+      dropped.kind === "tower"
+        ? runner.placeTower(dropped.type, tile.x, tile.y)
+        : runner.placeTrap(dropped.type, tile.x, tile.y);
     if (outcome.ok) {
       audio.play("place");
       buzz(settings.haptics, BUZZ.place);
@@ -678,10 +687,34 @@ export default function App() {
                         data-tut={`tool:${entry.id}`}
                         className={toolId === entry.id ? "tool active" : "tool"}
                         disabled={locked}
-                        onClick={() => {
+                        onPointerDown={(e) => {
+                          if (locked) return;
                           audio.play("click");
                           setToolId(entry.id);
                           setSelection(null);
+                          setDragging(entry.tool);
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                        }}
+                        onPointerMove={(e) => {
+                          if (!dragging) return;
+                          // The button holds the pointer, so the board is told
+                          // by hand which tile is under it.
+                          const tile = rendererRef.current?.tileAt(e.clientX, e.clientY) ?? null;
+                          rendererRef.current?.hoverTile(tile);
+                          setHover(tile);
+                        }}
+                        onPointerUp={(e) => {
+                          if (!dragging) return;
+                          const dropped = dragging;
+                          setDragging(null);
+                          rendererRef.current?.hoverTile(null);
+                          setHover(null);
+                          dropTool(dropped, e.clientX, e.clientY);
+                        }}
+                        onPointerCancel={() => {
+                          setDragging(null);
+                          rendererRef.current?.hoverTile(null);
+                          setHover(null);
                         }}
                         title={locked ? t("locked_hint") : undefined}
                       >
@@ -695,7 +728,7 @@ export default function App() {
                   })}
                 </div>
                 <p className={refusal ? "hint warn" : "hint"}>{hint}</p>
-                <p className="hint small">{t("hint_tap_tower")}</p>
+                <p className="hint small">{t("hint_drag")} · {t("hint_tap_tower")}</p>
               </div>
               <div className="hud-foot">
                 {adButtonShown() && adTry >= 0 && !run.adGoldClaimed && run.status !== "lost" && (
