@@ -314,11 +314,15 @@ export default function App() {
 
   const tool = TOOLS.find((entry) => entry.id === toolId)?.tool ?? null;
 
-  // The ghost under the cursor, its reach, and the maze it would make.
+  // The ghost under the cursor, its reach, and the maze it would make - only
+  // while a tool is being dragged. Shown under a plain mouse, it promised a
+  // click would build there, and building is a drag.
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
-    if (!run || !tool || !hover || run.towerAt(hover.x, hover.y) || run.trapAt(hover.x, hover.y)) {
+    const overBuilt = !!run && !!hover && (!!run.towerAt(hover.x, hover.y) || !!run.trapAt(hover.x, hover.y));
+    renderer.setHoverHighlight(!!dragging || (overBuilt && screen === "play"));
+    if (!run || !tool || !dragging || !hover || overBuilt) {
       renderer.setGhost(null, true);
       renderer.setRangeRing(null);
       renderer.setPathGhost(null);

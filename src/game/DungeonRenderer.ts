@@ -487,6 +487,8 @@ export class DungeonRenderer {
   private arrowGeometry = DungeonRenderer.makeArrowGeometry();
 
   private hovered: { x: number; y: number } | null = null;
+  /** See setHoverHighlight. */
+  private highlightOn = false;
   private frameId = 0;
   private resizeObserver: ResizeObserver;
   private resizeFrame = 0;
@@ -2525,14 +2527,24 @@ export class DungeonRenderer {
     if (same) return;
 
     this.hovered = tile;
-    if (tile) {
-      this.highlight.position.set(tile.x, WALL_HEIGHT / 2, tile.y);
-      this.highlight.visible = true;
-    } else {
-      this.highlight.visible = false;
-    }
+    if (tile) this.highlight.position.set(tile.x, WALL_HEIGHT / 2, tile.y);
+    this.highlight.visible = tile !== null && this.highlightOn;
     this.positionGhost();
     this.callbacks.onHoverChange(tile);
+  }
+
+  /**
+   * Whether the tile under the pointer is lit.
+   *
+   * Building is a drag, so a lit empty tile under a plain mouse read as
+   * "click here to build" and a click then did nothing. The owner turns the
+   * light on only while something is being dragged, or over a tower or trap
+   * a click would pick.
+   */
+  setHoverHighlight(on: boolean): void {
+    if (this.highlightOn === on) return;
+    this.highlightOn = on;
+    this.highlight.visible = on && this.hovered !== null;
   }
 
   /**
