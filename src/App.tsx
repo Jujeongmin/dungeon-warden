@@ -10,12 +10,12 @@ import { researchEffects } from "./game/td/research";
 import { AD_GOLD, type Refusal, type RunEvent, type StageRun } from "./game/td/StageRun";
 import { BOONS_BY_ID, dealBoons, type Boon } from "./game/td/boons";
 import { endlessStage, WAVES_PER_STAGE, stageOfWave } from "./game/td/stages";
-import { MAX_TOWER_LEVEL, sellValue, TOWER_TYPES, TOWERS, towerStats, upgradeCost, type TowerType } from "./game/td/towers";
+import { MAX_TOWER_LEVEL, TOWER_TYPES, TOWERS, towerStats, upgradeCost, type TowerType } from "./game/td/towers";
 import { tutorialFor } from "./game/td/tutorial";
 import { useProgress } from "./game/td/useProgress";
 import { FREE_RUN_SPEED, PAID_RUN_SPEED, RUN_SPEEDS, useStageRun } from "./game/td/useStageRun";
 import { runFloor, runMarkers, runUnits } from "./game/td/views";
-import { ADVENTURER_LABEL, TRAP_COST, TRAP_LABEL, TRAP_NOTE, type TrapType } from "./game/types";
+import { ADVENTURER_LABEL, TRAP_LABEL, TRAP_NOTE, type TrapType } from "./game/types";
 import { useTitleDemo } from "./game/useTitleDemo";
 import { LocaleProvider, type Translate } from "./i18n";
 import { translate, type StringKey } from "./i18n/strings";
@@ -551,6 +551,11 @@ export default function App() {
   const enemiesIn = run ? run.enemies.length : 0;
   // Gold for calling the next wave into a room that is still busy.
   const earlyBonus = run ? run.earlyBonus() : 0;
+  // The price of the selected tower's next level, as this run pays it.
+  const upgradePrice =
+    run && selectedTower && selectedTower.level < MAX_TOWER_LEVEL && upgradeCost(selectedTower.type, selectedTower.level) !== null
+      ? run.towerPrice(selectedTower.type, selectedTower.level)
+      : null;
   // The champion in the room, if one is: its health gets the top of the screen.
   const boss = run?.enemies.find((e) => e.champion) ?? null;
 
@@ -712,7 +717,8 @@ export default function App() {
                       entry.tool.kind === "tower"
                         ? !effects.towers.includes(entry.tool.type)
                         : !effects.traps.includes(entry.tool.type);
-                    const cost = entry.tool.kind === "tower" ? TOWERS[entry.tool.type].cost[0] : TRAP_COST[entry.tool.type];
+                    // What it actually costs this run: a card can make it cheaper.
+                    const cost = entry.tool.kind === "tower" ? (run.towerPrice(entry.tool.type) ?? 0) : run.trapPrice(entry.tool.type);
                     const label = entry.tool.kind === "tower" ? t(TOWERS[entry.tool.type].label) : t(TRAP_LABEL[entry.tool.type]);
                     const icon = toolIcons[entry.model];
                     return (
@@ -830,7 +836,7 @@ export default function App() {
                       className="primary"
                       disabled={
                         selectedTower.level >= MAX_TOWER_LEVEL ||
-                        run.gold < (upgradeCost(selectedTower.type, selectedTower.level) ?? Infinity)
+                        run.gold < (upgradePrice ?? Infinity)
                       }
                       onClick={() => {
                         const outcome = runner.upgradeTower(selectedTower.id);
@@ -840,7 +846,7 @@ export default function App() {
                     >
                       {selectedTower.level >= MAX_TOWER_LEVEL
                         ? t("tower_max")
-                        : t("tower_upgrade", { n: upgradeCost(selectedTower.type, selectedTower.level) ?? 0 })}
+                        : t("tower_upgrade", { n: upgradePrice ?? 0 })}
                     </button>
                     <button
                       onClick={() => {
@@ -849,7 +855,7 @@ export default function App() {
                         setSelection(null);
                       }}
                     >
-                      {t("tower_sell", { n: sellValue(selectedTower.type, selectedTower.level) })}
+                      {t("tower_sell", { n: run.towerRefund(selectedTower.type, selectedTower.level) })}
                     </button>
                   </>
                 ) : selectedTrap ? (
@@ -862,7 +868,7 @@ export default function App() {
                         setSelection(null);
                       }}
                     >
-                      {t("tower_sell", { n: Math.floor(TRAP_COST[selectedTrap.type] * 0.7) })}
+                      {t("tower_sell", { n: Math.floor(run.trapPrice(selectedTrap.type) * 0.7) })}
                     </button>
                   </>
                 ) : null}
