@@ -217,6 +217,9 @@ export default function App() {
           audio.play("leak", 120);
           buzz(settings.haptics, BUZZ.leak);
           float(`-${event.lives}♥`, event.x, event.y, "leak");
+        } else if (event.kind === "early") {
+          audio.play("coins");
+          float(`+${event.gold}`, run.entrance.x, run.entrance.y + 1, "gold");
         } else if (event.kind === "waveCleared") {
           float(t("wave_bonus", { n: event.bonus }), run.core.x, run.core.y - 1, "bonus");
           audio.play("coins");
@@ -546,6 +549,8 @@ export default function App() {
     ? nextWave.map((g) => `${g.champion ? "♛ " : ""}${t(ADVENTURER_LABEL[g.cls])} ${g.count}`).join(" · ")
     : null;
   const enemiesIn = run ? run.enemies.length : 0;
+  // Gold for calling the next wave into a room that is still busy.
+  const earlyBonus = run ? run.earlyBonus() : 0;
   // The champion in the room, if one is: its health gets the top of the screen.
   const boss = run?.enemies.find((e) => e.champion) ?? null;
 
@@ -807,6 +812,7 @@ export default function App() {
                   }}
                 >
                   <span>{run.wavesStarted === 0 ? t("first_wave") : t("next_wave")}</span>
+                  {earlyBonus > 0 && <span className="go-sub early">{t("wave_early", { n: earlyBonus })}</span>}
                   {nextSummary && <span className="go-sub">{nextSummary}</span>}
                   {!nextWave && <span className="go-sub">{t("last_wave_out")}</span>}
                 </button>

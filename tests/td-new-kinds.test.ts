@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StageRun } from "../src/game/td/StageRun";
+import { EARLY_GOLD, StageRun } from "../src/game/td/StageRun";
 import { researchEffects, RESEARCH } from "../src/game/td/research";
 import { ENDLESS, endlessStage, type Stage } from "../src/game/td/stages";
 import { findPath } from "../src/game/sim/pathfinding";
@@ -258,5 +258,25 @@ describe("stage rewards", () => {
         .reduce((sum, e) => sum + (e as { amount: number }).amount, 0);
     };
     expect(shots(true)).toBeGreaterThan(shots(false) * 1.2);
+  });
+});
+
+describe("calling a wave early", () => {
+  it("pays for every adventurer still in the room, and nothing in an empty one", () => {
+    const run = new StageRun({ ...corridor(3), waves: [[{ cls: "knight", count: 3, level: 1 }], [{ cls: "knight", count: 1, level: 1 }]] }, everything);
+    run.startWave();
+    steps(run, 40);
+    expect(run.enemies.length).toBeGreaterThan(0);
+    expect(run.earlyBonus()).toBe(run.enemies.length * EARLY_GOLD);
+
+    const gold = run.gold;
+    const standing = run.enemies.length;
+    const events = [];
+    run.startWave();
+    events.push(...run.step());
+    expect(run.gold).toBe(gold + standing * EARLY_GOLD);
+
+    const empty = new StageRun(corridor(1), everything);
+    expect(empty.earlyBonus()).toBe(0);
   });
 });

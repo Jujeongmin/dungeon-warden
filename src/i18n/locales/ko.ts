@@ -236,4 +236,6 @@ export const ko = {
   boon_venom_n: "독·화상 지속 +50%",
   boon_thick_walls: "성벽 보강",
   boon_thick_walls_n: "목숨 +1",
+  wave_early: "서두르기 +{n}G",
+  guide_waves_6: "**서두르기** 이전 웨이브의 적이 아직 남아 있을 때 다음 웨이브를 부르면, 남아 있는 적 한 명당 골드 {n}을 받아요. 한 번에 두 웨이브를 상대하는 대신 골드를 버는 셈이에요.",
 };

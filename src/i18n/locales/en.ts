@@ -237,4 +237,6 @@ export const en: Record<StringKey, string> = {
   boon_venom_n: "Poison and burning last 50% longer",
   boon_thick_walls: "Thick Walls",
   boon_thick_walls_n: "One more life",
+  wave_early: "Early +{n}G",
+  guide_waves_6: "**Calling early** Call the next wave while the last one is still in the room and it pays {n} gold for every adventurer still standing - two waves at once, for the gold.",
 };

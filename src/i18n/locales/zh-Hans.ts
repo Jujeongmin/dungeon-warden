@@ -238,4 +238,6 @@ export const zhHans: Record<StringKey, string> = {
   boon_venom_n: "中毒与灼烧持续+50%",
   boon_thick_walls: "加固城墙",
   boon_thick_walls_n: "生命+1",
+  wave_early: "提前 +{n}金币",
+  guide_waves_6: "**提前召唤** 上一波敌人还在场时召唤下一波，每个还活着的敌人给{n}金币。代价是同时应付两波。",
 };

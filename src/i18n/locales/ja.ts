@@ -243,4 +243,6 @@ export const ja: Record<StringKey, string> = {
   boon_venom_n: "毒・炎上の持続+50%",
   boon_thick_walls: "城壁補強",
   boon_thick_walls_n: "ライフ+1",
+  wave_early: "早出し +{n}G",
+  guide_waves_6: "**早出し** 前のウェーブの敵が残っているうちに次を呼ぶと、残っている敵1体につきゴールド{n}がもらえます。2つのウェーブを同時に相手する代わりの報酬です。",
 };

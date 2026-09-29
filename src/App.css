@@ -2239,6 +2239,8 @@ button.primary {
   .boon-card img { width: 36px; height: 36px; }
 }
 
+.go-sub.early { color: var(--accent); }
+
 .modal-note.small { margin: 2px 0 6px; font-size: var(--fs-xs); }
 .rank-name { display: flex; gap: 6px; margin: 6px 0 8px; }
 .rank-name input { flex: 1; min-width: 0; }

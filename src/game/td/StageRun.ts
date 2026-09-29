@@ -50,6 +50,15 @@ export const SIM_DT = 0.05;
 /** How near an adventurer has to be to a tile for it to count as standing on it. */
 const OCCUPIED_RADIUS = 0.75;
 
+/**
+ * Gold for each adventurer still in the room when the next wave is called.
+ *
+ * Waves wait for a button, and waiting cost nothing: the safe play was
+ * always to clear the room first. Calling the next one early now pays, so
+ * every wave asks whether the maze can take two at once.
+ */
+export const EARLY_GOLD = 4;
+
 /** Gold for watching the one rewarded ad a run allows. */
 export const AD_GOLD = 50;
 
@@ -119,6 +128,8 @@ export type RunEvent =
   | { kind: "killed"; targetId: string; x: number; y: number; bounty: number }
   | { kind: "leaked"; targetId: string; x: number; y: number; lives: number }
   | { kind: "waveCleared"; wave: number; bonus: number }
+  /** The next wave was called while `left` adventurers were still in the room. */
+  | { kind: "early"; gold: number; left: number }
   /** The last wave of a stage is through: `stage` is the one just finished. */
   | { kind: "stageCleared"; stage: number }
   | { kind: "won" }
@@ -299,6 +310,12 @@ export class StageRun {
   }
 
   /** Whether "next wave" may be pressed: everyone of the last one has come in. */
+  /** Gold the next wave would pay for being called now, while the room is busy. */
+  earlyBonus(): number {
+    if (!this.canStartWave()) return 0;
+    return this.enemies.length * EARLY_GOLD;
+  }
+
   canStartWave(): boolean {
     if (this.status === "won" || this.status === "lost") return false;
     if (this.wavesStarted >= this.wavesTotal) return false;
@@ -475,6 +492,11 @@ export class StageRun {
         at += SPAWN_INTERVAL;
         count += 1;
       }
+    }
+    const early = this.enemies.length * EARLY_GOLD;
+    if (early > 0) {
+      this.gold += early;
+      this.events.push({ kind: "early", gold: early, left: this.enemies.length });
     }
     this.remaining[index] = count;
     this.wavesStarted += 1;

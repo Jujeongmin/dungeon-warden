@@ -1,7 +1,7 @@
 import type { StringKey } from "../i18n/strings";
 import { CHAMPION_LIVES } from "./td/enemies";
 import { STARTING_LIVES } from "./td/stages";
-import { AD_GOLD } from "./td/StageRun";
+import { AD_GOLD, EARLY_GOLD } from "./td/StageRun";
 import { SELL_REFUND, TOWERS } from "./td/towers";
 
 /**
@@ -58,6 +58,7 @@ export const GUIDE: Array<{ id: GuideSection; title: StringKey; lines: GuideLine
       { key: "guide_waves_3" },
       { key: "guide_waves_4" },
       { key: "guide_waves_5" },
+      { key: "guide_waves_6", vars: { n: EARLY_GOLD } },
     ],
   },
   {
